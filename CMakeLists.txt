@@ -1,5 +1,17 @@
 cmake_minimum_required(VERSION 3.13)
-project(Squeeze C CXX)
+project(Squeeze CXX)
 
-set(TARGET_NAME sqz)
-add_executable(${TARGET_NAME} main.cpp)
+set(CMAKE_CXX_STANDARD_REQUIRED 20)
+
+set(MAIN_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+add_subdirectory(src)
+
+option(BUILD_TESTS "Build tests?" OFF)
+if (BUILD_TESTS)
+    add_subdirectory(test)
+endif ()
+
+option(BUILD_TOOLS "Build tools?" ON)
+if (BUILD_TOOLS)
+    add_subdirectory(tools)
+endif ()
