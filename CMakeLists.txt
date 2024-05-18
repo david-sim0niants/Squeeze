@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(FComp C CXX)
+project(Squeeze C CXX)
 
-set(TARGET_NAME fcomp)
+set(TARGET_NAME sqz)
 add_executable(${TARGET_NAME} main.cpp)
