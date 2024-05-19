@@ -1,5 +1,5 @@
 set(TARGET_NAME squeeze)
-add_library(${TARGET_NAME} SHARED squeeze.cpp)
+add_library(${TARGET_NAME} SHARED reader.cpp writer.cpp entry.cpp)
 target_include_directories(${TARGET_NAME} PUBLIC ${MAIN_INCLUDE_DIR})
 set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME sqz)
 install(TARGETS squeeze DESTINATION lib)
