@@ -4,6 +4,7 @@
 
 #include "squeeze/exception.h"
 #include "squeeze/utils/fs.h"
+#include "squeeze/utils/io.h"
 
 namespace squeeze {
 
@@ -48,7 +49,7 @@ Error<Reader> Reader::extract(const ReaderIterator& it)
             if (e.failed())
                 return e.report();
             else
-                return {};
+                return success;
         }
     case EntryType::Symlink:
         {
@@ -62,7 +63,7 @@ Error<Reader> Reader::extract(const ReaderIterator& it)
             if (ec.failed())
                 return ec.report();
             else
-                return {};
+                return success;
         }
     default:
         throw Exception<Reader>("attempt to extract an entry with an invalid type");
@@ -71,8 +72,20 @@ Error<Reader> Reader::extract(const ReaderIterator& it)
 
 Error<Reader> Reader::extract(const ReaderIterator& it, std::ostream& output)
 {
-    // TODO: extraction
-    return {};
+    auto& [pos, entry_header] = *it;
+    source.seekg(pos + entry_header.get_header_size());
+    switch (entry_header.compression_method) {
+        using enum CompressionMethod;
+    case None:
+        utils::ioscopy(source, source.tellg(), output, output.tellp(), entry_header.content_size);
+    default:
+        throw Exception<Reader>("invalid compression method");
+    }
+
+    if (source.fail() || output.fail())
+        return "I/O failure";
+
+    return success;
 }
 
 

@@ -12,7 +12,7 @@ Error<EntryHeader> EntryHeader::encode(std::ostream& output, const EntryHeader& 
             << entry_header.path;
     if (output.fail())
         return "output write error";
-    return {};
+    return success;
 }
 
 Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_header)
@@ -50,7 +50,7 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
     if (input.fail())
         return "failed parsing a path";
 
-    return {};
+    return success;
 }
 
 std::istream& operator>>(std::istream& input, EntryAttributes& entry_attributes)

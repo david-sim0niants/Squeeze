@@ -32,10 +32,16 @@ template<> struct OptionalField_Or_NoField<void> {
 
 }
 
+class Success {};
+constexpr Success success;
+
 template<typename MessageType = std::string>
 class BasicError {
 public:
-    BasicError() = default;
+    constexpr BasicError() = default;
+
+    constexpr BasicError(Success success)
+    {}
 
     BasicError(MessageType&& content) : content(std::forward<MessageType>(content))
     {}
@@ -44,6 +50,21 @@ public:
     BasicError(U&& content) requires std::is_convertible_v<U, MessageType>
     : content(static_cast<MessageType>(std::forward<U>(content)))
     {}
+
+    template<typename U, typename Internal>
+    BasicError(U&& content, const Internal& internal,
+            const std::string& infix = " due to the following error: ")
+        requires std::is_convertible_v<Internal, std::string> and
+                 std::is_convertible_v<std::string, MessageType> and
+                 std::is_convertible_v<U, std::string>
+    : content(std::string(content) + infix + std::string(internal))
+    {
+    }
+
+    inline operator bool()
+    {
+        return failed();
+    }
 
     inline bool successful()
     {
@@ -67,7 +88,8 @@ public:
 
     template<typename F = decltype(utils::stringify<MessageType>),
         typename = std::enable_if_t<std::is_invocable_v<F, MessageType>>>
-    inline std::string report(std::string&& prefix = "Error", F tostr = +utils::stringify<MessageType>)
+    inline std::string report(const std::string& prefix = "Error",
+                              F tostr = +utils::stringify<MessageType>)
     {
         if (successful())
             return "SUCCESS";
@@ -80,6 +102,7 @@ private:
 
 template<typename RelatedType, typename MessageType = std::string>
 using Error = BasicError<MessageType>;
+
 
 template<> inline std::string utils::stringify<std::error_code>(const std::error_code& ec)
 {

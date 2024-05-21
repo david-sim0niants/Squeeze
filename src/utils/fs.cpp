@@ -13,7 +13,7 @@ std::variant<std::fstream, ErrorCode>
     std::filesystem::create_directories(path.parent_path(), ec);
     if (ec)
         return ec;
-    std::fstream file(path);
+    std::fstream file(path, std::ios_base::binary | std::ios_base::in | std::ios_base::out);
     if (!file)
         return std::make_error_code(static_cast<std::errc>(errno));
 
@@ -40,7 +40,7 @@ ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms
     if (ec)
         return ec;
 
-    return {};
+    return success;
 }
 
 ErrorCode make_symlink(std::string_view path_str, std::string_view link_to, EntryPermissions)
@@ -53,7 +53,7 @@ ErrorCode make_symlink(std::string_view path_str, std::string_view link_to, Entr
     std::filesystem::create_symlink(std::filesystem::path(link_to), path, ec);
     if (ec)
         return ec;
-    return {};
+    return success;
 }
 
 void convert(const EntryPermissions& from, std::filesystem::perms& to)
