@@ -90,4 +90,50 @@ void convert(const std::filesystem::perms& from, EntryPermissions& to)
         ;
 }
 
+void convert(const EntryType& from, std::filesystem::file_type& to)
+{
+    using enum EntryType;
+    using enum std::filesystem::file_type;
+    switch (from) {
+    case None:
+        to = none;
+        break;
+    case RegularFile:
+        to = regular;
+        break;
+    case Directory:
+        to = directory;
+        break;
+    case Symlink:
+        to = symlink;
+        break;
+    default:
+        to = unknown;
+        break;
+    }
+}
+
+void convert(const std::filesystem::file_type& from, EntryType& to)
+{
+    using enum EntryType;
+    using enum std::filesystem::file_type;
+    switch (from) {
+    case none:
+        to = None;
+        break;
+    case regular:
+        to = RegularFile;
+        break;
+    case directory:
+        to = Directory;
+        break;
+    case symlink:
+        to = Symlink;
+        break;
+    default:
+        to = None;
+        break;
+    }
+}
+
 }

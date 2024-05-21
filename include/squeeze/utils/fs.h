@@ -18,4 +18,7 @@ ErrorCode make_symlink(std::string_view path, std::string_view link_to, EntryPer
 void convert(const EntryPermissions& from, std::filesystem::perms& to);
 void convert(const std::filesystem::perms& from, EntryPermissions& to);
 
+void convert(const EntryType& from, std::filesystem::file_type& to);
+void convert(const std::filesystem::file_type& from, EntryType& to);
+
 }
