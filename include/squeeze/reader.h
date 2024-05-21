@@ -1,10 +1,9 @@
 #pragma once
 
 #include <string_view>
-#include <filesystem>
-#include <vector>
 #include <variant>
 #include <fstream>
+#include <iterator>
 
 #include "entry.h"
 
@@ -21,18 +20,23 @@ public:
     ReaderIterator begin() const;
     ReaderIterator end() const;
 
-    void extract(std::string&& path);
-    void extract(std::string&& path, std::ostream& output);
+    ReaderIterator find_path(std::string_view path);
 
-    inline void extract(const std::string_view path)
+    Error<Reader> extract(std::string&& path);
+    Error<Reader> extract(std::string&& path, std::ostream& output);
+
+    inline Error<Reader> extract(const std::string_view path)
     {
-        extract(std::string(path));
+        return extract(std::string(path));
     }
 
-    inline void extract(const std::string_view path, std::ostream& output)
+    inline Error<Reader> extract(const std::string_view path, std::ostream& output)
     {
-        extract(std::string(path), output);
+        return extract(std::string(path), output);
     }
+
+    Error<Reader> extract(const ReaderIterator& it);
+    Error<Reader> extract(const ReaderIterator& it, std::ostream& output);
 
 private:
     std::istream& source;
@@ -41,27 +45,33 @@ private:
 
 class ReaderIterator {
 public:
-    ReaderIterator& operator++();
-    ReaderIterator operator++(int);
+    using iterator_category = std::input_iterator_tag;
+    using value_type = std::pair<uint64_t, EntryHeader>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const value_type *;
+    using reference = const value_type&;
 
-    inline const auto& operator*() const
+    ReaderIterator& operator++() noexcept;
+    ReaderIterator operator++(int) noexcept;
+
+    inline reference operator*() const
     {
         return pos_and_entry_header;
     }
 
-    inline const auto *operator->() const
+    inline pointer operator->() const
     {
         return &pos_and_entry_header;
     }
 
-    inline bool operator==(const ReaderIterator& other)
+    inline bool operator==(const ReaderIterator& other) const noexcept
     {
-        return &owner == &other.owner && pos_and_entry_header.first == other.pos_and_entry_header.first;
+        return owner == other.owner && pos_and_entry_header.first == other.pos_and_entry_header.first;
     }
 
-    inline bool operator!=(const ReaderIterator& other)
+    inline bool operator!=(const ReaderIterator& other) const noexcept
     {
-        return !(*this == other);
+        return owner != other.owner || pos_and_entry_header.first != other.pos_and_entry_header.first;
     }
 
     static constexpr uint64_t npos = uint64_t(-1);
@@ -73,8 +83,8 @@ private:
     void read_current();
 
 private:
-    const Reader& owner;
-    std::pair<uint64_t, EntryHeader> pos_and_entry_header;
+    const Reader *owner;
+    value_type pos_and_entry_header;
 };
 
 

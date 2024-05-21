@@ -1,8 +1,9 @@
 #pragma once
 
-#include <string_view>
+#include <string>
 #include <optional>
 #include <utility>
+#include <system_error>
 
 #include "utils/stringify.h"
 
@@ -13,8 +14,15 @@ namespace detail {
 template<typename T>
 struct OptionalField_Or_NoField;
 
+template<typename T> struct OptionalField_Or_NoField {
+    using type = std::optional<T>;
+};
+
 template<> struct OptionalField_Or_NoField<void> {
     struct type {
+        void operator*(){}
+        const void operator*() const {}
+
         bool has_value()
         {
             return false;
@@ -22,87 +30,62 @@ template<> struct OptionalField_Or_NoField<void> {
     };
 };
 
-template<typename T> struct OptionalField_Or_NoField {
-    using type = std::optional<T>;
-};
-
 }
 
-template<typename MessageType = std::string, typename CodeType = void>
+template<typename MessageType = std::string>
 class BasicError {
 public:
     BasicError() = default;
 
-    BasicError(MessageType&& message) : message(std::move(message))
+    BasicError(MessageType&& content) : content(std::forward<MessageType>(content))
     {}
 
-    BasicError(MessageType&& message, CodeType&& code) : message(std::move(message)), code(std::move(code))
+    template<typename U>
+    BasicError(U&& content) requires std::is_convertible_v<U, MessageType>
+    : content(static_cast<MessageType>(std::forward<U>(content)))
     {}
-
-    template<typename MessageTypeOther = MessageType, typename CodeTypeOther = CodeType,
-        typename = std::enable_if_t<std::is_convertible_v<MessageTypeOther, MessageType>>>
-    BasicError(MessageTypeOther&& message) : message(std::forward<MessageTypeOther>(message))
-    {}
-
-    template<typename MessageTypeOther = MessageType, typename CodeTypeOther = CodeType,
-        typename = std::enable_if_t<std::is_convertible_v<MessageTypeOther, MessageType> && std::is_convertible_v<CodeTypeOther, CodeType>>>
-    BasicError(MessageTypeOther&& message, CodeTypeOther&& code)
-        : message(std::forward<MessageTypeOther>(message)), code(std::forward<CodeTypeOther>(code))
-    {}
-
-    inline bool has_message()
-    {
-        return message.has_value();
-    }
-
-    inline bool has_code()
-    {
-        return code.has_value();
-    }
-
-    inline const MessageType& get_message() const
-    {
-        return *message;
-    }
-
-    inline MessageType& get_message()
-    {
-        return *message;
-    }
-
-    inline const CodeType& get_code() const
-    {
-        return *code;
-    }
-
-    inline CodeType& get_code()
-    {
-        return *code;
-    }
 
     inline bool successful()
     {
-        return !has_message() && !has_code();
+        return !content.has_value();
     }
 
     inline bool failed()
     {
-        return has_message() || has_code();
+        return content.has_value();
     }
 
-    inline std::string report()
+    inline MessageType& get()
     {
-        return "Error: " + (has_message() ? utils::stringify(get_message()) : "")
-                         + (has_code() ? '(' + utils::stringify(get_code()) + ')' : "");
+        return *content;
+    }
+
+    inline const MessageType& get() const
+    {
+        return *content;
+    }
+
+    template<typename F = decltype(utils::stringify<MessageType>),
+        typename = std::enable_if_t<std::is_invocable_v<F, MessageType>>>
+    inline std::string report(std::string&& prefix = "Error", F tostr = +utils::stringify<MessageType>)
+    {
+        if (successful())
+            return "SUCCESS";
+        return prefix + tostr(get());
     }
 
 private:
-    typename detail::OptionalField_Or_NoField<MessageType>::type message;
-    typename detail::OptionalField_Or_NoField<CodeType>::type code;
+    std::optional<MessageType> content;
 };
 
+template<typename RelatedType, typename MessageType = std::string>
+using Error = BasicError<MessageType>;
 
-template<typename RelatedType, typename MessageType = std::string_view, typename CodeType = int>
-using Error = BasicError<MessageType, CodeType>;
+template<> inline std::string utils::stringify<std::error_code>(const std::error_code& ec)
+{
+    return ec.message() + " (" + utils::stringify(ec.value()) + ")";
+}
+
+using ErrorCode = BasicError<std::error_code>;
 
 }

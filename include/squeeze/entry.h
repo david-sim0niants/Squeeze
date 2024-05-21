@@ -3,9 +3,11 @@
 #include <cstdint>
 #include <string>
 #include <istream>
+#include <ostream>
 
 #include "compression_method.h"
 #include "error.h"
+#include "utils/enum.h"
 
 namespace squeeze {
 
@@ -25,6 +27,7 @@ enum class EntryPermissions : uint16_t {
     OthersAll   = OthersRead | OthersWrite | OthersExec,
     All         = OwnerAll | GroupAll | OthersAll,
 };
+SQUEEZE_DEFINE_ENUM_LOGIC_BITWISE_OPERATORS(EntryPermissions);
 
 enum class EntryType : uint8_t {
     None = 0,
@@ -48,6 +51,16 @@ struct EntryHeader {
     EntryAttributes attributes;
     uint32_t path_len = 0;
     std::string path;
+
+    inline constexpr uint64_t get_header_size() const
+    {
+        return static_size + path_len;
+    }
+
+    inline constexpr uint64_t get_total_size() const
+    {
+        return static_size + path_len + content_size;
+    }
 
     static Error<EntryHeader> encode(std::ostream& output, const EntryHeader& entry_header);
     static Error<EntryHeader> decode(std::istream& input, EntryHeader& entry_header);

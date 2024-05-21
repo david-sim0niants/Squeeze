@@ -9,7 +9,7 @@ namespace squeeze::utils {
 template<typename T>
 std::string stringify(const T& obj)
 {
-    return "";
+    return "<unpresentable>";
 }
 
 template<std::integral Integral>

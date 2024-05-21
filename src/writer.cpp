@@ -1,5 +1,11 @@
 #include "squeeze/writer.h"
 
+#include <variant>
+#include <fstream>
+#include <vector>
+
+#include "squeeze/utils/io.h"
+
 namespace squeeze {
 
 class InsertRequest {
@@ -37,51 +43,69 @@ private:
     int compression_level = 0;
 };
 
-Writer::Writer(const char *path) : target(std::fstream(path))
-{
-}
-
-Writer::Writer(const std::filesystem::path& path) : target(std::fstream(path))
-{
-}
-
-Writer::Writer(std::iostream& target) : target(&target)
+Writer::Writer(std::iostream& target) : target(target), reader(target)
 {
 }
 
 void Writer::will_insert(std::string&& path,
         CompressionMethod method, int level)
 {
-    insert_sources.emplace_back(std::move(path), method, level);
+    insert_requests.emplace(std::piecewise_construct,
+        std::forward_as_tuple(path), std::forward_as_tuple(std::move(path), method, level));
 }
 
 void Writer::will_insert(std::string&& path, std::istream& input,
         CompressionMethod method, int level)
 {
-    insert_sources.emplace_back(std::move(path), input, method, level);
+    insert_requests.emplace(std::piecewise_construct,
+        std::forward_as_tuple(path), std::forward_as_tuple(std::move(path), input, method, level));
 }
 
 void Writer::will_remove(std::string&& path)
 {
-    paths_to_remove.emplace_back(std::move(path));
+    auto it = insert_requests.find(path);
+    if (it != insert_requests.end())
+        insert_requests.erase(it);
+    paths_to_remove.emplace(std::move(path));
 }
 
-void Writer::perform()
+void Writer::write()
 {
+    std::vector<std::pair<uint64_t, uint64_t>> holes;
+    for (auto it = reader.begin(); it != reader.end(); ++it) {
+        auto& [pos, entry_header] = *it;
+        if (!paths_to_remove.contains(entry_header.path) && !insert_requests.contains(entry_header.path))
+            continue;
+        holes.emplace_back(pos, entry_header.get_total_size());
+    }
+    target.seekg(0, std::ios_base::end);
+    uint64_t stream_end = static_cast<uint64_t>(target.tellg());
+    holes.emplace_back(stream_end, ReaderIterator::npos);
+
+    size_t tot_hole = 0;
+    for (size_t i = 1; i < holes.size(); ++i) {
+        tot_hole += holes[i - 1].second;
+        uint64_t non_hole_beg = holes[i - 1].first + holes[i - 1].second;
+        uint64_t non_hole_end = holes[i].first;
+
+        utils::iosmove(target, non_hole_beg - tot_hole, non_hole_beg, non_hole_end - non_hole_beg);
+    }
+
+    // TODO: insertion
 }
 
 void Writer::insert(std::string&& path,
         CompressionMethod method, int level)
 {
     will_insert(std::move(path), method, level);
-    perform();
+    write();
 }
 
 void Writer::insert(std::string&& path, std::istream& input,
         CompressionMethod method, int level)
 {
     will_insert(std::move(path), input, method, level);
-    perform();
+    write();
 }
 
 }

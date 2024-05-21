@@ -1,12 +1,12 @@
 #pragma once
 
-#include <vector>
-#include <variant>
 #include <string_view>
-#include <fstream>
-#include <filesystem>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "compression_method.h"
+#include "reader.h"
 
 namespace squeeze {
 
@@ -14,15 +14,13 @@ class InsertRequest;
 
 class Writer {
 public:
-    explicit Writer(const char *path);
-    explicit Writer(const std::filesystem::path& path);
     explicit Writer(std::iostream& target);
 
     void will_insert(std::string&& path, CompressionMethod method, int level);
     void will_insert(std::string&& path, std::istream& input, CompressionMethod method, int level);
     void will_remove(std::string&& path);
 
-    void perform();
+    void write();
 
     void insert(std::string&& path, CompressionMethod method, int level);
     void insert(std::string&& path, std::istream& input, CompressionMethod method, int level);
@@ -63,9 +61,10 @@ public:
     }
 
 private:
-    std::variant<std::iostream *, std::fstream> target;
-    std::vector<InsertRequest> insert_sources;
-    std::vector<std::string> paths_to_remove;
+    std::iostream& target;
+    Reader reader;
+    std::unordered_map<std::string_view, InsertRequest> insert_requests;
+    std::unordered_set<std::string> paths_to_remove;
 };
 
 }

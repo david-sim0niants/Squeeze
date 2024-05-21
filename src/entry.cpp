@@ -48,7 +48,7 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
     entry_header.path.resize(entry_header.path_len);
     input.getline(entry_header.path.data(), entry_header.path_len, '\0');
     if (input.fail())
-        return "failed parsing path";
+        return "failed parsing a path";
 
     return {};
 }
