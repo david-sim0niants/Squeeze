@@ -32,7 +32,6 @@ bool Writer::FutureRemoveCompare::operator()(const FutureRemove& a, const Future
     return a.pos < b.pos;
 }
 
-
 Writer::Writer(std::iostream& target) : target(target), reader(target)
 {
     future_removes.emplace(std::string(), ReaderIterator::npos, ReaderIterator::npos, nullptr);
@@ -86,7 +85,6 @@ Error<Writer> Writer::remove(const ReaderIterator&& it)
     return err;
 }
 
-
 void Writer::perform_removes()
 {
     uint64_t rem_len = 0;
@@ -106,7 +104,7 @@ void Writer::perform_removes()
 
         if (target.fail()) {
             if (error)
-                *error = {"failed removing " + path, ErrorCode::from_current_errno().report()};
+                *error = "failed removing " + path;
         }
 
         rem_len += len;
@@ -128,34 +126,72 @@ void Writer::perform_appends()
 
 Error<Writer> Writer::perform_append(EntryInput& entry_input)
 {
-    std::istream *stream;
+    std::streampos initial_pos = target.tellp();
+
+    EntryInput::ContentType content = std::monostate();
     EntryHeader entry_header {};
-    auto e = entry_input.init(stream, entry_header);
+    auto e = entry_input.init(entry_header, content);
     if (e)
         return {"failed opening an input", e.report()};
 
-    std::streampos initial_target_size = target.tellp();
     target.seekp(target.tellp() + static_cast<std::streamsize>(entry_header.get_header_size()));
+
+    if (std::holds_alternative<std::istream *>(content))
+        e = perform_append_stream(entry_header, *std::get<std::istream *>(content));
+    else if (std::holds_alternative<std::string>(content))
+        e = perform_append_string(entry_header, std::get<std::string>(content));
+    else
+        entry_header.content_size = 0;
+
+    target.seekp(initial_pos);
+    if (e)
+        return e;
+
+    auto ehe = EntryHeader::encode(target, entry_header);
+    target.seekp(initial_pos);
+    if (ehe)
+        return {"failed encoding the entry header", ehe.report()};
+
+    return success;
+}
+
+Error<Writer> Writer::perform_append_stream(EntryHeader& entry_header, std::istream& input)
+{
+    std::streampos start = target.tellp();
 
     switch (entry_header.compression_method) {
         using enum CompressionMethod;
     case None:
-        stream->seekg(0, std::ios_base::end);
-        entry_header.content_size = static_cast<uint64_t>(stream->tellg());
-        stream->seekg(0);
-        utils::ioscopy(*stream, stream->tellg(), target, target.tellg(), entry_header.content_size);
+        input.seekg(0, std::ios_base::end);
+        entry_header.content_size = static_cast<uint64_t>(input.tellg());
+        input.seekg(0);
+        utils::ioscopy(input, input.tellg(), target, target.tellg(), entry_header.content_size);
         break;
     default:
         throw Exception<Writer>("invalid compression method");
     }
 
-    if (stream->fail() || target.fail())
+    if (input.fail() || target.fail()) {
+        target.clear();
         return "I/O failure";
+    }
 
-    target.seekp(initial_target_size);
-    auto ehe = EntryHeader::encode(target, entry_header);
-    if (ehe)
-        return {"failed encoding the entry header", ehe.report()};
+    entry_header.content_size = static_cast<uint64_t>(target.tellp() - start);
+
+    return success;
+}
+
+Error<Writer> Writer::perform_append_string(EntryHeader& entry_header, const std::string& str)
+{
+    std::streampos start = target.tellp();
+
+    target.write(str.data(), str.size() + 1);
+    if (target.fail()) {
+        target.clear();
+        return "I/O failure";
+    }
+
+    entry_header.content_size = static_cast<uint64_t>(target.tellp() - start);
 
     return success;
 }

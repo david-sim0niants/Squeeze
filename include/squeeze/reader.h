@@ -3,7 +3,7 @@
 #include <string_view>
 #include <iterator>
 
-#include "entry_header.h"
+#include "entry_output.h"
 
 namespace squeeze {
 
@@ -21,7 +21,7 @@ public:
     ReaderIterator find_path(std::string_view path);
 
     Error<Reader> extract(std::string&& path);
-    Error<Reader> extract(std::string&& path, std::ostream& output);
+    Error<Reader> extract(std::string&& path, EntryHeader& header, std::ostream& output);
 
     inline Error<Reader> extract(const std::string_view path)
     {
@@ -34,9 +34,13 @@ public:
     }
 
     Error<Reader> extract(const ReaderIterator& it);
-    Error<Reader> extract(const ReaderIterator& it, std::ostream& output);
+    Error<Reader> extract(const ReaderIterator& it, EntryHeader& entry_header, std::ostream& output);
+    Error<Reader> extract(const ReaderIterator& it, EntryOutput& entry_output);
 
 private:
+    Error<Reader> extract_plain(const EntryHeader& entry_header, std::ostream& output);
+    Error<Reader> extract_symlink(const EntryHeader& entry_header, std::string& target);
+
     std::istream& source;
 };
 

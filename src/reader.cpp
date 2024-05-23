@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include "squeeze/exception.h"
-#include "squeeze/utils/fs.h"
 #include "squeeze/utils/io.h"
 
 namespace squeeze {
@@ -23,57 +22,63 @@ Error<Reader> Reader::extract(std::string&& path)
     return it == end() ? "non-existing path" : extract(it);
 }
 
-Error<Reader> Reader::extract(std::string&& path, std::ostream& output)
+Error<Reader> Reader::extract(std::string&& path, EntryHeader& header, std::ostream& output)
 {
     auto it = find_path(path);
-    return it == end() ? "non-existing path" : extract(it, output);
+    return it == end() ? "non-existing path" : extract(it, header, output);
 }
 
 Error<Reader> Reader::extract(const ReaderIterator& it)
 {
-    const auto& [pos, entry_header] = *it;
-    switch (entry_header.attributes.type) {
-    case EntryType::None:
-        return "cannot extract none type entry without a custom output stream";
-    case EntryType::RegularFile:
-        {
-            auto result = utils::make_regular_file(entry_header.path, entry_header.attributes.permissions);
-            if (auto *file = std::get_if<std::fstream>(&result))
-                return extract(it, *file);
-            else
-                return get<ErrorCode>(result).report();
-        }
-    case EntryType::Directory:
-        {
-            auto e = utils::make_directory(entry_header.path, entry_header.attributes.permissions);
-            if (e.failed())
-                return e.report();
-            else
-                return success;
-        }
-    case EntryType::Symlink:
-        {
-            std::stringstream output;
-            Error<Reader> e = extract(it, output);
-            if (e.failed())
-                return e;
-
-            ErrorCode ec = utils::make_symlink(entry_header.path, output.str(),
-                    entry_header.attributes.permissions);
-            if (ec.failed())
-                return ec.report();
-            else
-                return success;
-        }
-    default:
-        throw Exception<Reader>("attempt to extract an entry with an invalid type");
-    }
+    FileEntryOutput entry_output;
+    return extract(it, entry_output);
 }
 
-Error<Reader> Reader::extract(const ReaderIterator& it, std::ostream& output)
+Error<Reader> Reader::extract(const ReaderIterator& it, EntryHeader& header, std::ostream& output)
+{
+    CustomStreamEntryOutput entry_output(header, output);
+    return extract(it, entry_output);
+}
+
+Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_output)
 {
     auto& [pos, entry_header] = *it;
     source.seekg(pos + entry_header.get_header_size());
+
+    switch (entry_header.attributes.type) {
+        using enum EntryType;
+    case None:
+    case RegularFile:
+    case Directory:
+    {
+        std::ostream *output;
+        auto e = entry_output.init(entry_header, output);
+        if (e)
+            return {"failed initializing entry output", e.report()};
+        if (output)
+            return extract_plain(entry_header, *output);
+        break;
+    }
+    case Symlink:
+    {
+        std::string target;
+        auto e = extract_symlink(entry_header, target);
+        if (e)
+            return e;
+        auto ee = entry_output.init_symlink(entry_header, target);
+        if (ee)
+            return ee.report();
+        break;
+    }
+    default:
+        throw Exception<Reader>("unexpected entry type");
+    }
+
+    return success;
+}
+
+Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostream& output)
+{
     switch (entry_header.compression_method) {
         using enum CompressionMethod;
     case None:
@@ -85,6 +90,17 @@ Error<Reader> Reader::extract(const ReaderIterator& it, std::ostream& output)
     if (source.fail() || output.fail())
         return "I/O failure";
 
+    return success;
+}
+
+Error<Reader> Reader::extract_symlink(const EntryHeader& entry_header, std::string& target)
+{
+    if (entry_header.content_size == 0)
+        return "no content";
+    target.resize(static_cast<std::size_t>(entry_header.content_size) - 1);
+    source.read(target.data(), target.size());
+    if (source.fail())
+        return "I/O failure";
     return success;
 }
 

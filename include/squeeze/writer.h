@@ -4,8 +4,8 @@
 #include <queue>
 #include <memory>
 #include <type_traits>
+#include <string>
 
-#include "compression_method.h"
 #include "reader.h"
 #include "entry_input.h"
 
@@ -30,7 +30,8 @@ public:
     }
 
     template<typename T, typename ...Args>
-    inline void will_append(Error<Writer>& err, Args&&... args) requires std::is_base_of_v<EntryType, T>
+    inline void will_append(Error<Writer>& err, Args&&... args)
+        requires std::is_base_of_v<EntryType, T>
     {
         will_append(std::make_unique<T>(std::forward<Args>(args)...), &err);
     }
@@ -55,7 +56,9 @@ public:
 private:
     void perform_removes();
     void perform_appends();
-    Error<Writer> perform_append(EntryInput& insert_request);
+    Error<Writer> perform_append(EntryInput& entry_input);
+    Error<Writer> perform_append_stream(EntryHeader& entry_header, std::istream& input);
+    Error<Writer> perform_append_string(EntryHeader& entry_header, const std::string& str);
 
     std::iostream& target;
     Reader reader;

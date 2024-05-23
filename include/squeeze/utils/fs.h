@@ -12,8 +12,11 @@ namespace squeeze::utils {
 
 std::variant<std::fstream, ErrorCode>
     make_regular_file(std::string_view path, EntryPermissions perms);
+std::variant<std::ofstream, ErrorCode>
+    make_regular_file_out(std::string_view path, EntryPermissions perms);
 ErrorCode make_directory(std::string_view path, EntryPermissions perms);
 ErrorCode make_symlink(std::string_view path, std::string_view link_to, EntryPermissions perms);
+ErrorCode set_permissions(const std::filesystem::path& path, EntryPermissions perms);
 
 void convert(const EntryPermissions& from, std::filesystem::perms& to);
 void convert(const std::filesystem::perms& from, EntryPermissions& to);

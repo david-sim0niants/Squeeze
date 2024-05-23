@@ -13,13 +13,13 @@ std::string stringify(const T& obj)
 }
 
 template<std::integral Integral>
-inline std::string stringify(Integral integral)
+inline std::string stringify(const Integral& integral)
 {
     return std::to_string(integral);
 }
 
 template<std::floating_point Floating>
-inline std::string stringify(Floating floating)
+inline std::string stringify(const Floating& floating)
 {
     return std::to_string(floating);
 }

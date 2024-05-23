@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <variant>
 
 #include "entry_common.h"
 #include "entry_header.h"
@@ -11,10 +12,12 @@ namespace squeeze {
 
 class EntryInput {
 public:
-    virtual Error<EntryInput> init(std::istream *& stream, EntryHeader& entry_header) = 0;
-    virtual void deinit() = 0;
-
     virtual ~EntryInput() = default;
+
+    using ContentType = std::variant<std::monostate, std::istream *, std::string>;
+
+    virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) = 0;
+    virtual void deinit() noexcept = 0;
 
     inline const std::string get_path() const
     {
@@ -52,8 +55,8 @@ public:
         :   BasicEntryInput(std::move(path), compression_method, compression_level)
     {}
 
-    Error<EntryInput> init(std::istream *& stream, EntryHeader& entry_header) override;
-    void deinit() override;
+    virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
+    virtual void deinit() noexcept override;
 
 protected:
     Error<EntryInput> init_entry_header(EntryHeader& entry_header);
@@ -65,16 +68,18 @@ protected:
 };
 
 
-class CustomStreamEntryInput : public BasicEntryInput {
+class CustomContentEntryInput : public BasicEntryInput {
 public:
-    CustomStreamEntryInput(std::string&& path, CompressionMethod compression_method, int compression_level,
-            std::istream& stream, EntryAttributes entry_attributes = default_attributes)
-        :   BasicEntryInput(std::move(path), compression_method, compression_level),
-            stream(stream), entry_attributes(entry_attributes)
+    CustomContentEntryInput(std::string&& path,
+            CompressionMethod compression_method, int compression_level,
+            ContentType& content, EntryAttributes entry_attributes = default_attributes)
+        :
+            BasicEntryInput(std::move(path), compression_method, compression_level),
+            content(content), entry_attributes(entry_attributes)
     {}
 
-    Error<EntryInput> init(std::istream *& stream, EntryHeader& entry_header) override;
-    void deinit() override;
+    virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
+    virtual void deinit() noexcept override;
 
 public:
     static constexpr EntryAttributes default_attributes = {
@@ -87,7 +92,7 @@ public:
 protected:
     void init_entry_header(EntryHeader& entry_header);
 
-    std::istream& stream;
+    ContentType& content;
     EntryAttributes entry_attributes;
 };
 

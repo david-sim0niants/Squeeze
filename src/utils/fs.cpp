@@ -19,12 +19,29 @@ std::variant<std::fstream, ErrorCode>
     if (!file)
         return std::make_error_code(static_cast<std::errc>(errno));
 
-    std::filesystem::perms perms;
-    convert(entry_perms, perms);
-    std::filesystem::permissions(path, perms, ec);
+    ErrorCode ec_ = set_permissions(path, entry_perms);
+    if (ec_)
+        return ec_;
+    return file;
+}
+
+std::variant<std::ofstream, ErrorCode>
+    make_regular_file_out(std::string_view path_str, EntryPermissions entry_perms)
+{
+    std::filesystem::path path(path_str);
+    std::error_code ec;
+
+    std::filesystem::create_directories(path.parent_path(), ec);
     if (ec)
         return ec;
 
+    std::ofstream file(path, std::ios_base::binary | std::ios_base::out);
+    if (!file)
+        return std::make_error_code(static_cast<std::errc>(errno));
+
+    ErrorCode ec_ = set_permissions(path, entry_perms);
+    if (ec_)
+        return ec_;
     return file;
 }
 
@@ -37,16 +54,11 @@ ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms
     if (ec)
         return ec;
 
-    std::filesystem::perms perms;
-    convert(entry_perms, perms);
-    std::filesystem::permissions(path, perms, ec);
-    if (ec)
-        return ec;
-
-    return success;
+    return set_permissions(path, entry_perms);
 }
 
-ErrorCode make_symlink(std::string_view path_str, std::string_view link_to, EntryPermissions)
+ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
+        EntryPermissions entry_perms)
 {
     std::filesystem::path path(path_str);
     std::error_code ec;
@@ -59,6 +71,17 @@ ErrorCode make_symlink(std::string_view path_str, std::string_view link_to, Entr
     if (ec)
         return ec;
 
+    return success;
+}
+
+ErrorCode set_permissions(const std::filesystem::path &path, EntryPermissions entry_perms)
+{
+    std::error_code ec;
+    std::filesystem::perms perms;
+    convert(entry_perms, perms);
+    std::filesystem::permissions(path, perms, ec);
+    if (ec)
+        return ec;
     return success;
 }
 

@@ -23,22 +23,42 @@ void BasicEntryInput::init_entry_header(EntryHeader& entry_header)
 }
 
 
-Error<EntryInput> FileEntryInput::init(std::istream *& stream, EntryHeader& entry_header)
+Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
     auto e = init_entry_header(entry_header);
     if (e)
         return e;
 
-    *file = std::ifstream(path, std::ios_base::binary | std::ios_base::in);
-    if (!*file)
-        return {"failed opening a file", ErrorCode::from_current_errno().report()};
+    switch (entry_header.attributes.type) {
+        using enum EntryType;
+    case Directory:
+        content = std::monostate();
+        break;
+    case Symlink:
+    {
+        std::error_code ec;
+        auto symlink_target = std::filesystem::read_symlink(
+                std::filesystem::path(entry_header.path), ec);
+        if (ec)
+            return {"failed reading symlink", ErrorCode(ec).report()};
+        content = symlink_target.string();
+        break;
+    }
+    case RegularFile:
+        file = std::ifstream(path, std::ios_base::binary | std::ios_base::in);
+        if (!*file)
+            return {"failed opening a file", ErrorCode::from_current_errno().report()};
+        content = &*file;
+        break;
+    default:
+        throw Exception<EntryInput>("unexpected file type");
+    }
 
-    stream = &*file;
     entry_header.content_size = 0;
     return success;
 }
 
-void FileEntryInput::deinit()
+void FileEntryInput::deinit() noexcept
 {
     file.reset();
 }
@@ -74,25 +94,25 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
     case unknown:
         return "unknown file type";
     default:
-        throw BaseException("unexpected file type");
+        throw Exception<EntryInput>("unexpected file type");
     }
 
     return success;
 }
 
 
-Error<EntryInput> CustomStreamEntryInput::init(std::istream *& stream, EntryHeader& entry_header)
+Error<EntryInput> CustomContentEntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
     init_entry_header(entry_header);
-    stream = &this->stream;
+    content = this->content;
     return success;
 }
 
-void CustomStreamEntryInput::deinit()
+void CustomContentEntryInput::deinit() noexcept
 {
 }
 
-void CustomStreamEntryInput::init_entry_header(EntryHeader& entry_header)
+void CustomContentEntryInput::init_entry_header(EntryHeader& entry_header)
 {
     BasicEntryInput::init_entry_header(entry_header);
     entry_header.attributes = entry_attributes;
