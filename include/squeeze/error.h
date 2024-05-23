@@ -32,27 +32,26 @@ template<> struct OptionalField_Or_NoField<void> {
 
 }
 
-class Success {};
-constexpr Success success;
+enum Success { success };
 
 template<typename MessageType = std::string>
 class BasicError {
 public:
     constexpr BasicError() = default;
 
-    constexpr BasicError(Success success)
+    constexpr BasicError(enum Success)
     {}
 
-    BasicError(MessageType&& content) : content(std::forward<MessageType>(content))
+    constexpr BasicError(MessageType&& content) : content(std::forward<MessageType>(content))
     {}
 
     template<typename U>
-    BasicError(U&& content) requires std::is_convertible_v<U, MessageType>
+    constexpr BasicError(U&& content) requires std::is_convertible_v<U, MessageType>
     : content(static_cast<MessageType>(std::forward<U>(content)))
     {}
 
     template<typename U, typename Internal>
-    BasicError(U&& content, const Internal& internal,
+    constexpr BasicError(U&& content, const Internal& internal,
             const std::string& infix = " due to the following error: ")
         requires std::is_convertible_v<Internal, std::string> and
                  std::is_convertible_v<std::string, MessageType> and
@@ -109,6 +108,17 @@ template<> inline std::string utils::stringify<std::error_code>(const std::error
     return ec.message() + " (" + utils::stringify(ec.value()) + ")";
 }
 
-using ErrorCode = BasicError<std::error_code>;
+class ErrorCode : public BasicError<std::error_code>
+{
+public:
+    using BasicError<std::error_code>::BasicError;
+    ErrorCode(std::errc errc) : BasicError<std::error_code>(std::make_error_code(errc))
+    {}
+
+    inline static ErrorCode from_current_errno()
+    {
+        return ErrorCode(static_cast<std::errc>(errno));
+    }
+};
 
 }

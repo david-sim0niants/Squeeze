@@ -1,8 +1,6 @@
 #pragma once
 
 #include <string_view>
-#include <variant>
-#include <fstream>
 #include <iterator>
 
 #include "entry.h"
