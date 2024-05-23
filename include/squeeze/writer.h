@@ -7,7 +7,7 @@
 
 #include "compression_method.h"
 #include "reader.h"
-#include "entry.h"
+#include "entry_input.h"
 
 namespace squeeze {
 

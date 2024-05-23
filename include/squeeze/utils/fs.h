@@ -6,7 +6,7 @@
 #include <filesystem>
 
 #include "squeeze/error.h"
-#include "squeeze/entry.h"
+#include "squeeze/entry_common.h"
 
 namespace squeeze::utils {
 

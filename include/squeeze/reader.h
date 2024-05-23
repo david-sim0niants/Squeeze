@@ -3,7 +3,7 @@
 #include <string_view>
 #include <iterator>
 
-#include "entry.h"
+#include "entry_header.h"
 
 namespace squeeze {
 
