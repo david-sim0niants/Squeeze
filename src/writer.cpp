@@ -32,7 +32,7 @@ bool Writer::FutureRemoveCompare::operator()(const FutureRemove& a, const Future
     return a.pos < b.pos;
 }
 
-Writer::Writer(std::iostream& target) : target(target), reader(target)
+Writer::Writer(std::iostream& target) : target(target)
 {
     future_removes.emplace(std::string(), ReaderIterator::npos, ReaderIterator::npos, nullptr);
 }

@@ -6,7 +6,7 @@
 #include <type_traits>
 #include <string>
 
-#include "reader.h"
+#include "reader_iterator.h"
 #include "entry_input.h"
 
 namespace squeeze {
@@ -43,7 +43,7 @@ public:
     void write();
 
     template<typename T, typename ...Args>
-    inline Error<Writer> append(Args&&... args) requires std::is_base_of_v<EntryType, T>
+    inline Error<Writer> append(Args&&... args) requires std::is_base_of_v<EntryInput, T>
     {
         T entry_input(std::forward<Args>(args)...);
         return append(entry_input);
@@ -61,7 +61,6 @@ private:
     Error<Writer> perform_append_string(EntryHeader& entry_header, const std::string& str);
 
     std::iostream& target;
-    Reader reader;
     std::vector<std::unique_ptr<EntryInput>> owned_entry_inputs;
     std::vector<FutureAppend> future_appends;
     std::priority_queue<FutureRemove, std::vector<FutureRemove>, FutureRemoveCompare> future_removes;

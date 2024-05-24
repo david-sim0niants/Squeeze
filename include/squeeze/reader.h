@@ -1,13 +1,11 @@
 #pragma once
 
 #include <string_view>
-#include <iterator>
 
+#include "reader_iterator.h"
 #include "entry_output.h"
 
 namespace squeeze {
-
-class ReaderIterator;
 
 class Reader {
     friend class ReaderIterator;
@@ -15,8 +13,15 @@ public:
     explicit Reader(std::istream& source) : source(source)
     {}
 
-    ReaderIterator begin() const;
-    ReaderIterator end() const;
+    inline ReaderIterator begin() const
+    {
+        return ReaderIterator(*this, true);
+    }
+
+    inline ReaderIterator end() const
+    {
+        return ReaderIterator(*this, false);
+    }
 
     ReaderIterator find_path(std::string_view path);
 
@@ -43,61 +48,5 @@ private:
 
     std::istream& source;
 };
-
-
-class ReaderIterator {
-public:
-    using iterator_category = std::input_iterator_tag;
-    using value_type = std::pair<uint64_t, EntryHeader>;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const value_type *;
-    using reference = const value_type&;
-
-    ReaderIterator& operator++() noexcept;
-    ReaderIterator operator++(int) noexcept;
-
-    inline reference operator*() const
-    {
-        return pos_and_entry_header;
-    }
-
-    inline pointer operator->() const
-    {
-        return &pos_and_entry_header;
-    }
-
-    inline bool operator==(const ReaderIterator& other) const noexcept
-    {
-        return owner == other.owner && pos_and_entry_header.first == other.pos_and_entry_header.first;
-    }
-
-    inline bool operator!=(const ReaderIterator& other) const noexcept
-    {
-        return owner != other.owner || pos_and_entry_header.first != other.pos_and_entry_header.first;
-    }
-
-    static constexpr uint64_t npos = uint64_t(-1);
-
-private:
-    friend class Reader;
-    explicit ReaderIterator(const Reader& owner, bool begin);
-
-    void read_current();
-
-private:
-    const Reader *owner;
-    value_type pos_and_entry_header;
-};
-
-
-inline ReaderIterator Reader::begin() const
-{
-    return ReaderIterator(*this, true);
-}
-
-inline ReaderIterator Reader::end() const
-{
-    return ReaderIterator(*this, false);
-}
 
 }

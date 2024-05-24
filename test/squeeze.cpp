@@ -6,10 +6,14 @@
 
 namespace squeeze::testing {
 
-TEST(Squeeze, WriteRead)
+class SqueezeTest : ::testing::Test {
+protected:
+};
+
+TEST_F(SqueezeTest, WriteRead)
 {
-    std::stringstream target;
-    Writer writer(target);
+    std::stringstream content;
+    Squeeze squeeze(content);
 }
 
 }
