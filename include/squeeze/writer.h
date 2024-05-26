@@ -24,14 +24,14 @@ public:
     ~Writer();
 
     template<typename T, typename ...Args>
-    inline void will_append(Args&&... args) requires std::is_base_of_v<EntryType, T>
+    inline void will_append(Args&&... args) requires std::is_base_of_v<EntryInput, T>
     {
         will_append(std::make_unique<T>(std::forward<Args>(args)...));
     }
 
     template<typename T, typename ...Args>
     inline void will_append(Error<Writer>& err, Args&&... args)
-        requires std::is_base_of_v<EntryType, T>
+        requires std::is_base_of_v<EntryInput, T>
     {
         will_append(std::make_unique<T>(std::forward<Args>(args)...), &err);
     }

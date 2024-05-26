@@ -15,7 +15,9 @@ list(TRANSFORM TEST_SRC_FILES APPEND .cpp)
 
 set(TARGET_NAME test_all)
 add_executable(${TARGET_NAME} ${TEST_SRC_FILES})
-target_link_libraries(${TARGET_NAME} GTest::gtest_main squeeze)
+target_link_libraries(${TARGET_NAME} GTest::gtest_main squeeze test_tools)
 
 include(GoogleTest)
 gtest_discover_tests(${TARGET_NAME})
+
+add_subdirectory(test_tools)
