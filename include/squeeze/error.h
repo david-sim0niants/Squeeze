@@ -87,7 +87,7 @@ public:
 
     template<typename F = decltype(utils::stringify<MessageType>),
         typename = std::enable_if_t<std::is_invocable_v<F, MessageType>>>
-    inline std::string report(const std::string& prefix = "Error",
+    inline std::string report(const std::string& prefix = "Error: ",
                               F tostr = +utils::stringify<MessageType>)
     {
         if (successful())

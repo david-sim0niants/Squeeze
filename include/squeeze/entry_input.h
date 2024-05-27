@@ -61,9 +61,6 @@ public:
 protected:
     Error<EntryInput> init_entry_header(EntryHeader& entry_header);
 
-    std::string path;
-    CompressionMethod compression_method;
-    int compression_level;
     std::optional<std::ifstream> file;
 };
 

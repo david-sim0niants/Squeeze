@@ -35,7 +35,7 @@ struct EntryHeader {
 
     static constexpr size_t static_size =
         sizeof(content_size) + sizeof(compression_method) + sizeof(compression_level) +
-        sizeof(attributes) + sizeof(path_len) + sizeof(path);
+        sizeof(attributes) + sizeof(path_len);
 };
 
 }

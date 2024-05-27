@@ -14,4 +14,39 @@ std::ostream& operator<<(std::ostream& output, const EntryAttributes& entry_attr
     return output;
 }
 
+template<> std::string utils::stringify<EntryAttributes>(const EntryAttributes& attributes)
+{
+    std::string str = "-rwxrwxrwx";
+    switch (attributes.type) {
+    case EntryType::Directory:
+        str[0] = 'd';
+        break;
+    case EntryType::Symlink:
+        str[0] = 'l';
+        break;
+    case EntryType::RegularFile:
+    default:
+        str[0] = '-';
+        break;
+    }
+
+    int i = 1;
+    for (EntryPermissions perm : {
+            EntryPermissions::OwnerRead,
+            EntryPermissions::OwnerWrite,
+            EntryPermissions::OwnerExec,
+            EntryPermissions::GroupRead,
+            EntryPermissions::GroupWrite,
+            EntryPermissions::GroupExec,
+            EntryPermissions::OthersRead,
+            EntryPermissions::OthersWrite,
+            EntryPermissions::OthersExec,
+        }) {
+        str[i] = test_flag(attributes.permissions, perm) ? str[i] : '-';
+        ++i;
+    }
+
+    return str;
+}
+
 }

@@ -4,6 +4,7 @@
 #include <istream>
 #include <ostream>
 
+#include "utils/stringify.h"
 #include "utils/enum.h"
 
 namespace squeeze {
@@ -40,5 +41,7 @@ struct EntryAttributes {
 
 std::istream& operator>>(std::istream& input, EntryAttributes& entry_attributes);
 std::ostream& operator<<(std::ostream& output, const EntryAttributes& entry_attributes);
+
+template<> std::string utils::stringify(const EntryAttributes& attributes);
 
 }

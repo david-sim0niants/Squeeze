@@ -39,3 +39,5 @@ TEST_F(SqueezeTest, WriteRead)
         tools::MockRegularFile, tools::MockSymlink, tools::MockDirectory>(
                 observer, symlink_observer, observer);
 }
+
+}
