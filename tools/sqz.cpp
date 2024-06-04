@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
             }
 
             write_errors.emplace_back();
-            sqz.will_append<squeeze::FileEntryInput>(write_errors.back(), std::string(argv[i]), squeeze::CompressionMethod::None, 0);
+            sqz.will_append<squeeze::FileEntryInput>(write_errors.back(),
+                    std::string(argv[i]), squeeze::CompressionMethod::None, 0);
             for (auto err : write_errors) {
                 if (err)
                     std::cerr << err.report() << '\n';

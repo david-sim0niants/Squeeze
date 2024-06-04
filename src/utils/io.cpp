@@ -30,15 +30,8 @@ void ioscopy(std::istream& src_stream, std::streampos src_pos,
 
     while (cpy_len) {
         const std::streamsize step_len = std::min(cpy_len, (std::streamsize)BUFSIZ);
-
-        src_stream.seekg(src_pos);
         src_stream.read(buffer, step_len);
-
-        dst_stream.seekp(dst_pos);
         dst_stream.write(buffer, step_len);
-
-        src_pos += step_len;
-        dst_pos += step_len;
         cpy_len -= step_len;
     }
 }

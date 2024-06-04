@@ -148,7 +148,7 @@ Error<Writer> Writer::perform_append(EntryInput& entry_input)
         return e;
 
     auto ehe = EntryHeader::encode(target, entry_header);
-    target.seekp(initial_pos);
+    target.seekp(0, std::ios_base::end);
     if (ehe)
         return {"failed encoding the entry header", ehe.report()};
 
@@ -164,8 +164,8 @@ Error<Writer> Writer::perform_append_stream(EntryHeader& entry_header, std::istr
     case None:
         input.seekg(0, std::ios_base::end);
         entry_header.content_size = static_cast<uint64_t>(input.tellg());
-        input.seekg(0);
-        utils::ioscopy(input, input.tellg(), target, target.tellg(), entry_header.content_size);
+        input.seekg(0, std::ios_base::beg);
+        utils::ioscopy(input, input.tellg(), target, target.tellp(), entry_header.content_size);
         break;
     default:
         throw Exception<Writer>("invalid compression method");
@@ -175,8 +175,6 @@ Error<Writer> Writer::perform_append_stream(EntryHeader& entry_header, std::istr
         target.clear();
         return "I/O failure";
     }
-
-    entry_header.content_size = static_cast<uint64_t>(target.tellp() - start);
 
     return success;
 }
