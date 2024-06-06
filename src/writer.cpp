@@ -94,9 +94,12 @@ void Writer::perform_removes()
         uint64_t pos = future_removes.top().pos;
         uint64_t len = future_removes.top().len;
         Error<Writer> *error = future_removes.top().error;
-        future_removes.pop();
 
-        uint64_t next_pos = future_removes.top().pos;
+        uint64_t next_pos = pos;
+        do {
+            future_removes.pop();
+            next_pos = future_removes.top().pos;
+        } while (pos == next_pos);
 
         const uint64_t mov_pos = pos + len;
         const uint64_t mov_len = next_pos - pos;

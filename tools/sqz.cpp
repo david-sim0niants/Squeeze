@@ -1,69 +1,38 @@
 #include "squeeze/squeeze.h"
+#include "utils/argparser.h"
 
+#include <cstring>
 #include <iostream>
 #include <deque>
 #include <filesystem>
 
 static void usage();
 
+static void process_sqz_instructions(squeeze::Squeeze& sqz, int argc, char *argv[]);
+
 int main(int argc, char *argv[])
 {
-    if (argc < 3) {
+    if (argc < 2) {
         usage();
         return EXIT_FAILURE;
     }
 
-    std::string cmd = argv[1];
-    const char *filename = argv[2];
+    const char *filename = argv[1];
 
-    std::fstream file;
+    std::fstream sqz_file;
     std::ios_base::openmode mode = std::ios_base::in | std::ios_base::out | std::ios_base::binary;
     if (!std::filesystem::exists(filename))
         mode |= std::ios_base::trunc;
-    file.open(filename, mode);
-    if (!file) {
+    sqz_file.open(filename, mode);
+    if (!sqz_file) {
         std::cerr << "Failed opening a file - " << filename << std::endl;
         return EXIT_FAILURE;
     }
 
     std::deque<squeeze::Error<squeeze::Writer>> write_errors;
-    squeeze::Squeeze sqz(file);
+    squeeze::Squeeze sqz(sqz_file);
 
-    if (cmd == "add") {
-        for (int i = 3; i < argc; ++i) {
-            if (!std::filesystem::exists(std::filesystem::path(argv[i]))) {
-                std::cerr << "Ignoring non-existent file - " << argv[i] << '\n';
-                continue;
-            }
-
-            write_errors.emplace_back();
-            sqz.will_append<squeeze::FileEntryInput>(write_errors.back(),
-                    std::string(argv[i]), squeeze::CompressionMethod::None, 0);
-            for (auto err : write_errors) {
-                if (err)
-                    std::cerr << err.report() << '\n';
-            }
-        }
-    } else if (cmd == "rm") {
-        for (int i = 3; i < argc; ++i) {
-            auto it = sqz.find_path(argv[i]);
-            if (it == sqz.end()) {
-                std::cerr << "Ignoring non-existent entry - " << argv[i] << '\n';
-                continue;
-            }
-            write_errors.emplace_back();
-            sqz.will_remove(it, &write_errors.back());
-        }
-    } else if (cmd == "ls") {
-        for (auto [pos, entry_header] : sqz) {
-            std::cout << entry_header.path << ' ' << squeeze::utils::stringify(entry_header.attributes) << std::endl;
-        }
-    }
-
-    if (cmd == "add" || cmd == "rm")
-        sqz.write();
-
-    file.close();
+    process_sqz_instructions(sqz, argc - 2, argv + 2);
 
     return EXIT_SUCCESS;
 }
@@ -71,11 +40,75 @@ int main(int argc, char *argv[])
 static void usage()
 {
     std::cerr <<
-R""""(Usage: sqz <command> <file> [<args>]
-Commands:
-    add <file>  <files to add>
-    rm  <file>  <files to remove>
-    ext <file> [<files to extract>]
-    ls  <file>
+R""""(Usage: sqz <sqz-file> <files...> [-options]
+By default the append mode is enabled, so even without specifying -a or --append
+at first, the files listed after the sqz file are assumed to be appended or updated.
+Options:
+    -a, --append       Append (or update) the following files to the sqz file
+    -r, --remove       Remove the following files from the sqz file
+    -x, --extract      Extract the following files from the sqz file
+    -l, --list         List files in the sqz file
 )"""";
 }
+
+enum class Option {
+    None, Append, Remove, Extract, List
+};
+
+static Option parse_short_option(char o)
+{
+    switch (o) {
+    case 'A':
+        return Option::Append;
+    case 'R':
+        return Option::Remove;
+    case 'X':
+        return Option::Extract;
+    case 'L':
+        return Option::List;
+    default:
+        return Option::None;
+    }
+}
+
+static Option parse_long_option(std::string_view option)
+{
+    if (option == "append")
+        return Option::Append;
+    if (option == "remove")
+        return Option::Remove;
+    if (option == "extract")
+        return Option::Extract;
+    if (option == "list")
+        return Option::List;
+    return Option::None;
+}
+
+static void process_sqz_instructions(squeeze::Squeeze& sqz, int argc, char *argv[])
+{
+    using namespace squeeze::tools::utils;
+    ArgParser parser(argc, argv, "ARXL", { "append", "remove", "extract", "list" });
+    while (auto maybe_arg = parser.next()) {
+        auto& arg = *maybe_arg;
+        switch (arg.type) {
+        case ArgType::Positional:
+            // TODO: process positional argument
+            break;
+        case ArgType::ShortOption:
+            // TODO: parse_short_option(arg.value[0])
+            break;
+        case ArgType::LongOption:
+            // TODO: parse_long_option(arg.value)
+            break;
+        case ArgType::UnknownShortOption:
+            std::cerr << "unknown option: -" << arg.value << '\n';
+            break;
+        case ArgType::UnknownLongOption:
+            std::cerr << "unknown option: --" << arg.value << '\n';
+            break;
+        default:
+            std::cerr << "unexpected argument: " << arg.value << '\n';
+        }
+    }
+}
+
