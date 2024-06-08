@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include <span>
 #include <string>
 #include <optional>
 #include <algorithm>
@@ -19,9 +19,8 @@ struct Arg {
 class ArgParser {
 public:
     ArgParser(int argc, const char * const argv[],
-            std::string&& short_options,
-            std::vector<std::string>&& long_options)
-        : argc(argc), argv(argv), short_options(std::move(short_options)), long_options(std::move(long_options))
+            const std::string_view short_options, const std::string_view *long_options, const std::string_view *long_options_end)
+        : argc(argc), argv(argv), short_options(short_options), long_options(long_options, long_options_end)
     {}
 
     void reset()
@@ -77,8 +76,8 @@ public:
 private:
     int argc;
     const char *const *argv;
-    std::string short_options;
-    std::vector<std::string> long_options;
+    const std::string_view short_options;
+    std::span<const std::string_view> long_options;
 
     const char *curr_arg;
     int curr_arg_index = -1;

@@ -32,18 +32,21 @@ public:
 
     inline bool operator==(const ReaderIterator& other) const noexcept
     {
-        return owner == other.owner && pos_and_entry_header.first == other.pos_and_entry_header.first;
+        return pos_and_entry_header.first == other.pos_and_entry_header.first;
     }
 
     inline bool operator!=(const ReaderIterator& other) const noexcept
     {
-        return owner != other.owner || pos_and_entry_header.first != other.pos_and_entry_header.first;
+        return pos_and_entry_header.first != other.pos_and_entry_header.first;
     }
 
     static constexpr uint64_t npos = uint64_t(-1);
 
 private:
     friend class Reader;
+    constexpr ReaderIterator()
+        : owner(nullptr), pos_and_entry_header(npos, std::move(EntryHeader()))
+    {}
     explicit ReaderIterator(const Reader& owner, bool begin);
 
     void read_current();

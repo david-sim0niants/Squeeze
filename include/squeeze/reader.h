@@ -18,9 +18,9 @@ public:
         return ReaderIterator(*this, true);
     }
 
-    inline ReaderIterator end() const
+    inline const ReaderIterator& end() const
     {
-        return ReaderIterator(*this, false);
+        return end_it;
     }
 
     ReaderIterator find_path(std::string_view path);
@@ -47,6 +47,8 @@ private:
     Error<Reader> extract_symlink(const EntryHeader& entry_header, std::string& target);
 
     std::istream& source;
+
+    inline static const ReaderIterator end_it;
 };
 
 }

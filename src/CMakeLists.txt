@@ -1,6 +1,6 @@
 set(TARGET_NAME squeeze)
 add_library(${TARGET_NAME} SHARED
-    reader.cpp writer.cpp reader_iterator.cpp
+    squeeze.cpp reader.cpp writer.cpp reader_iterator.cpp
     entry_common.cpp entry_header.cpp entry_input.cpp entry_output.cpp
     utils/io.cpp utils/fs.cpp)
 target_include_directories(${TARGET_NAME} PUBLIC ${MAIN_INCLUDE_DIR})

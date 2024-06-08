@@ -5,13 +5,13 @@
 
 namespace squeeze::utils {
 
+static std::error_code create_directories(const std::filesystem::path& path);
+
 std::variant<std::fstream, ErrorCode>
     make_regular_file(std::string_view path_str, EntryPermissions entry_perms)
 {
     std::filesystem::path path(path_str);
-    std::error_code ec;
-
-    std::filesystem::create_directories(path.parent_path(), ec);
+    std::error_code ec = utils::create_directories(path.parent_path());
     if (ec)
         return ec;
 
@@ -29,9 +29,7 @@ std::variant<std::ofstream, ErrorCode>
     make_regular_file_out(std::string_view path_str, EntryPermissions entry_perms)
 {
     std::filesystem::path path(path_str);
-    std::error_code ec;
-
-    std::filesystem::create_directories(path.parent_path(), ec);
+    std::error_code ec = utils::create_directories(path.parent_path());
     if (ec)
         return ec;
 
@@ -50,7 +48,7 @@ ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms
     std::filesystem::path path(path_str);
     std::error_code ec;
 
-    std::filesystem::create_directories(path.parent_path(), ec);
+    std::filesystem::create_directories(path, ec);
     if (ec)
         return ec;
 
@@ -163,6 +161,15 @@ void convert(const std::filesystem::file_type& from, EntryType& to)
         to = None;
         break;
     }
+}
+
+static std::error_code create_directories(const std::filesystem::path& path)
+{
+    std::error_code ec;
+    if (path.empty())
+        return ec;
+    std::filesystem::create_directories(path, ec);
+    return ec;
 }
 
 }

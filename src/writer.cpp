@@ -1,4 +1,5 @@
 #include "squeeze/writer.h"
+#include "writer_internal.h"
 
 #include "squeeze/exception.h"
 #include "squeeze/utils/io.h"
@@ -7,30 +8,6 @@
 #include <cassert>
 
 namespace squeeze {
-
-struct Writer::FutureAppend {
-    EntryInput& entry_input;
-    Error<Writer> *error;
-
-    FutureAppend(EntryInput& entry_input, Error<Writer> *error)
-        : entry_input(entry_input), error(error)
-    {}
-};
-
-struct Writer::FutureRemove {
-    mutable std::string path;
-    uint64_t pos, len;
-    Error<Writer> *error;
-
-    FutureRemove(std::string&& path, uint64_t pos, uint64_t len, Error<Writer> *error)
-        : path(std::move(path)), pos(pos), len(len), error(error)
-    {}
-};
-
-bool Writer::FutureRemoveCompare::operator()(const FutureRemove& a, const FutureRemove& b)
-{
-    return a.pos < b.pos;
-}
 
 Writer::Writer(std::iostream& target) : target(target)
 {
@@ -87,6 +64,8 @@ Error<Writer> Writer::remove(const ReaderIterator&& it)
 
 void Writer::perform_removes()
 {
+    target.seekg(0, std::ios_base::end);
+    const uint64_t initial_size = target.tellg();
     uint64_t rem_len = 0;
     while (future_removes.size() > 1) {
         std::string path;
@@ -102,22 +81,23 @@ void Writer::perform_removes()
         } while (pos == next_pos);
 
         const uint64_t mov_pos = pos + len;
-        const uint64_t mov_len = next_pos - pos;
+        const uint64_t mov_len = std::min(next_pos, initial_size) - pos;
         utils::iosmove(target, mov_pos - rem_len, mov_pos, mov_len);
 
         if (target.fail()) {
             if (error)
                 *error = "failed removing " + path;
+            target.clear();
         }
 
         rem_len += len;
     }
     assert(future_removes.size() == 1);
+    target.seekp(initial_size - rem_len);
 }
 
 void Writer::perform_appends()
 {
-    target.seekp(0, std::ios_base::end);
     for (auto& future_append : future_appends) {
         auto e = perform_append(future_append.entry_input);
         if (future_append.error)
@@ -176,7 +156,7 @@ Error<Writer> Writer::perform_append_stream(EntryHeader& entry_header, std::istr
 
     if (input.fail() || target.fail()) {
         target.clear();
-        return "I/O failure";
+        return input.fail() ? "input reading failure" : "target writing failure";
     }
 
     return success;
@@ -189,7 +169,7 @@ Error<Writer> Writer::perform_append_string(EntryHeader& entry_header, const std
     target.write(str.data(), str.size() + 1);
     if (target.fail()) {
         target.clear();
-        return "I/O failure";
+        return "target writing failure";
     }
 
     entry_header.content_size = static_cast<uint64_t>(target.tellp() - start);

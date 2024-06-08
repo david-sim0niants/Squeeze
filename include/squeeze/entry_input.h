@@ -19,7 +19,7 @@ public:
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) = 0;
     virtual void deinit() noexcept = 0;
 
-    inline const std::string get_path() const
+    inline const std::string& get_path() const
     {
         return path;
     }

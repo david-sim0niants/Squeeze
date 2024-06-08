@@ -20,4 +20,6 @@ target_link_libraries(${TARGET_NAME} GTest::gtest_main squeeze test_tools)
 include(GoogleTest)
 gtest_discover_tests(${TARGET_NAME})
 
+set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of GTest" FORCE)
+
 add_subdirectory(test_tools)

@@ -83,12 +83,15 @@ Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostrea
         using enum CompressionMethod;
     case None:
         utils::ioscopy(source, source.tellg(), output, output.tellp(), entry_header.content_size);
+        break;
     default:
         throw Exception<Reader>("invalid compression method");
     }
 
-    if (source.fail() || output.fail())
-        return "I/O failure";
+    if (source.fail() || output.fail()) {
+        source.clear();
+        return output.fail() ? "output writing failure" : "source reading failure";
+    }
 
     return success;
 }
@@ -100,7 +103,7 @@ Error<Reader> Reader::extract_symlink(const EntryHeader& entry_header, std::stri
     target.resize(static_cast<std::size_t>(entry_header.content_size) - 1);
     source.read(target.data(), target.size());
     if (source.fail())
-        return "I/O failure";
+        return "source reading failure";
     return success;
 }
 

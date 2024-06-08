@@ -11,6 +11,8 @@ public:
     explicit Squeeze(std::iostream& stream)
         : Reader(stream), Writer(stream)
     {}
+
+    void update();
 };
 
 }

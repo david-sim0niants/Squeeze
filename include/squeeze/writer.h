@@ -12,7 +12,7 @@
 namespace squeeze {
 
 class Writer {
-private:
+protected:
     struct FutureAppend;
     struct FutureRemove;
     struct FutureRemoveCompare {
@@ -53,7 +53,7 @@ public:
     Error<Writer> append(EntryInput& entry_input);
     Error<Writer> remove(const ReaderIterator&& it);
 
-private:
+protected:
     void perform_removes();
     void perform_appends();
     Error<Writer> perform_append(EntryInput& entry_input);
