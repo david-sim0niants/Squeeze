@@ -39,7 +39,7 @@ class BasicError {
 public:
     constexpr BasicError() = default;
 
-    constexpr BasicError(enum Success)
+    constexpr BasicError(Success)
     {}
 
     constexpr BasicError(MessageType&& content) : content(std::forward<MessageType>(content))

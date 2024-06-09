@@ -32,8 +32,8 @@ private:
 
 class CustomStreamEntryOutput : public EntryOutput {
 public:
-    explicit CustomStreamEntryOutput(EntryHeader& header, std::ostream& stream)
-        : header(header), stream(stream)
+    explicit CustomStreamEntryOutput(std::ostream& stream)
+        : stream(stream)
     {}
 
     virtual Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) override;
@@ -42,7 +42,6 @@ public:
     virtual void deinit() noexcept override;
 
 private:
-    EntryHeader& header;
     std::ostream& stream;
 };
 

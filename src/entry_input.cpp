@@ -68,7 +68,7 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
     BasicEntryInput::init_entry_header(entry_header);
 
     std::filesystem::path path(std::string(entry_header.path));
-    std::filesystem::file_status st = std::filesystem::status(path);
+    std::filesystem::file_status st = std::filesystem::symlink_status(path);
     switch (st.type()) {
         using enum std::filesystem::file_type;
     case regular:

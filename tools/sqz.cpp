@@ -7,6 +7,7 @@
 #include <iostream>
 #include <deque>
 #include <filesystem>
+#include <unordered_set>
 
 
 namespace {
@@ -105,12 +106,22 @@ private:
 
         switch (mode) {
         case Append:
+        {
+            auto path_opt = preprocess_filepath(arg_value);
+            if (!path_opt.has_value())
+                return EXIT_FAILURE;
+            auto& path = *path_opt;
+            if (appendee_path_set.contains(path))
+                break;
+
             assert(sqz.has_value());
             write_errors.emplace_back();
-            sqz->will_append<FileEntryInput>(write_errors.back(), std::string(arg_value),
+            appendee_path_set.insert(path);
+            sqz->will_append<FileEntryInput>(write_errors.back(), std::move(path),
                     CompressionMethod::None, 0);
             state |= Dirty;
             break;
+        }
         case Remove:
         {
             assert(sqz.has_value());
@@ -222,6 +233,7 @@ private:
             }
         }
         write_errors.clear();
+        appendee_path_set.clear();
         std::filesystem::resize_file(sqz_fn, sqz_file.tellp());
 
         state &= ~Dirty;
@@ -230,9 +242,17 @@ private:
 
     void run_list()
     {
-        for (const auto& [_, entry_header] : *sqz)
+        assert(sqz.has_value());
+        for (auto it = sqz->begin(); it != sqz->end(); ++it) {
+            const auto& entry_header = it->second;
             std::cout << squeeze::utils::stringify(entry_header.attributes)
-                      << "    " << entry_header.path << std::endl;
+                      << "    " << entry_header.path;
+            if (entry_header.attributes.type == EntryType::Symlink) {
+                std::cout << " -> ";
+                sqz->extract(it, std::cout);
+            }
+            std::cout << std::endl;
+        }
     }
 
     static Option parse_short_option(char o)
@@ -268,6 +288,28 @@ private:
         throw BaseException("unexpected long option");
     }
 
+    static std::optional<std::string> preprocess_filepath(const std::string_view path_str)
+    {
+        std::filesystem::path path = std::filesystem::path(path_str).lexically_normal();
+        std::error_code ec;
+        auto status = std::filesystem::symlink_status(path, ec);
+        switch (status.type()) {
+            using enum std::filesystem::file_type;
+        case directory:
+            path = path / "";
+            break;
+        case not_found:
+            std::cerr << "Error: no such file or directory - " << path_str << std::endl;
+            return std::nullopt;
+        case unknown:
+            std::cerr << "Error: unknown file type - " << path_str << std::endl;
+            return std::nullopt;
+        default:
+            break;
+        }
+        return path;
+    }
+
     static void usage()
     {
         std::cerr <<
@@ -289,6 +331,7 @@ private:
     std::optional<ArgParser> arg_parser;
     ModeFlags mode = Append;
     int state = 0;
+    std::unordered_set<std::string> appendee_path_set;
     std::deque<Error<Writer>> write_errors;
 };
 

@@ -16,16 +16,17 @@ ReaderIterator Reader::find_path(std::string_view path)
         });
 }
 
-Error<Reader> Reader::extract(std::string&& path)
+Error<Reader> Reader::extract(const std::string_view path)
 {
     auto it = find_path(path);
     return it == end() ? "non-existing path" : extract(it);
 }
 
-Error<Reader> Reader::extract(std::string&& path, EntryHeader& header, std::ostream& output)
+Error<Reader> Reader::extract(const std::string_view path, EntryHeader& header, std::ostream& output)
 {
     auto it = find_path(path);
-    return it == end() ? "non-existing path" : extract(it, header, output);
+    header = it->second;
+    return it == end() ? "non-existing path" : extract(it, output);
 }
 
 Error<Reader> Reader::extract(const ReaderIterator& it)
@@ -34,9 +35,9 @@ Error<Reader> Reader::extract(const ReaderIterator& it)
     return extract(it, entry_output);
 }
 
-Error<Reader> Reader::extract(const ReaderIterator& it, EntryHeader& header, std::ostream& output)
+Error<Reader> Reader::extract(const ReaderIterator& it, std::ostream& output)
 {
-    CustomStreamEntryOutput entry_output(header, output);
+    CustomStreamEntryOutput entry_output(output);
     return extract(it, entry_output);
 }
 
@@ -64,10 +65,10 @@ Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_outpu
         std::string target;
         auto e = extract_symlink(entry_header, target);
         if (e)
-            return e;
+            return {"failed extracting symlink", e.report()};
         auto ee = entry_output.init_symlink(entry_header, target);
         if (ee)
-            return ee.report();
+            return {"failed extracting symlink", ee.report()};
         break;
     }
     default:

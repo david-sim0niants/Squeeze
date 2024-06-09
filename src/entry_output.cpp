@@ -18,7 +18,7 @@ Error<EntryOutput> FileEntryOutput::init(const EntryHeader& entry_header, std::o
                 stream = &*file;
                 return success;
             } else {
-                return get<ErrorCode>(result).report();
+                return {"failed making regular file '" + entry_header.path + '\'', get<ErrorCode>(result).report()};
             }
         }
     case EntryType::Directory:
@@ -26,7 +26,7 @@ Error<EntryOutput> FileEntryOutput::init(const EntryHeader& entry_header, std::o
             stream = nullptr;
             auto e = utils::make_directory(entry_header.path, entry_header.attributes.permissions);
             if (e.failed())
-                return e.report();
+                return {"failed making directory '" + entry_header.path + '\'', e.report()};
             else
                 return success;
         }
@@ -42,7 +42,7 @@ Error<EntryOutput> FileEntryOutput::init_symlink(
 {
     ErrorCode ec = utils::make_symlink(entry_header.path, target, entry_header.attributes.permissions);
     if (ec)
-        return ec.report();
+        return {"failed initializing symlink '" + entry_header.path + " -> " + target + '\'', ec.report()};
     else
         return success;
 }
@@ -56,7 +56,6 @@ void FileEntryOutput::deinit() noexcept
 Error<EntryOutput> CustomStreamEntryOutput::init(
         const EntryHeader &entry_header, std::ostream *&stream)
 {
-    header = entry_header;
     stream = &this->stream;
     return success;
 }
@@ -64,7 +63,6 @@ Error<EntryOutput> CustomStreamEntryOutput::init(
 Error<EntryOutput> CustomStreamEntryOutput::init_symlink(
         const EntryHeader &entry_header, const std::string& target)
 {
-    header = entry_header;
     stream << target;
     return success;
 }

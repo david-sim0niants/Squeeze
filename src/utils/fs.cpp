@@ -46,12 +46,9 @@ std::variant<std::ofstream, ErrorCode>
 ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms)
 {
     std::filesystem::path path(path_str);
-    std::error_code ec;
-
-    std::filesystem::create_directories(path, ec);
+    std::error_code ec = utils::create_directories(path);
     if (ec)
         return ec;
-
     return set_permissions(path, entry_perms);
 }
 
@@ -59,9 +56,7 @@ ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
         EntryPermissions entry_perms)
 {
     std::filesystem::path path(path_str);
-    std::error_code ec;
-
-    std::filesystem::create_directories(path.parent_path(), ec);
+    std::error_code ec = utils::create_directories(path.parent_path());
     if (ec)
         return ec;
 
