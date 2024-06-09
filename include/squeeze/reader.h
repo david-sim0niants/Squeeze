@@ -42,6 +42,8 @@ public:
     Error<Reader> extract(const ReaderIterator& it, EntryHeader& entry_header, std::ostream& output);
     Error<Reader> extract(const ReaderIterator& it, EntryOutput& entry_output);
 
+    bool is_corrupted() const;
+
 private:
     Error<Reader> extract_plain(const EntryHeader& entry_header, std::ostream& output);
     Error<Reader> extract_symlink(const EntryHeader& entry_header, std::string& target);

@@ -77,6 +77,17 @@ Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_outpu
     return success;
 }
 
+bool Reader::is_corrupted() const
+{
+    source.seekg(0, std::ios_base::end);
+    size_t size = source.tellg();
+    ReaderIterator last_it = end();
+    for (auto it = begin(); it != end(); ++it)
+        last_it = it;
+    return last_it == end() && size > 0
+        || last_it->first + last_it->second.get_total_size() < size;
+}
+
 Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostream& output)
 {
     switch (entry_header.compression_method) {

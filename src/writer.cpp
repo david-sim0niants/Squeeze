@@ -81,8 +81,8 @@ void Writer::perform_removes()
         } while (pos == next_pos);
 
         const uint64_t mov_pos = pos + len;
-        const uint64_t mov_len = std::min(next_pos, initial_size) - pos;
-        utils::iosmove(target, mov_pos - rem_len, mov_pos, mov_len);
+        const uint64_t mov_len = std::min(next_pos, initial_size) - mov_pos;
+        utils::iosmove(target, pos - rem_len, mov_pos, mov_len);
 
         if (target.fail()) {
             if (error)
