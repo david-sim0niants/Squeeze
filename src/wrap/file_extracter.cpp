@@ -23,4 +23,11 @@ bool FileExtracter::extract_recursively(const std::string_view path,
     return at_least_one_path_extracted;
 }
 
+void FileExtracter::extract_all(const std::function<Error<Reader> *()>& get_err_ptr)
+{
+    for (auto it = reader.begin(); it != reader.end(); ++it)
+        if (auto *err = get_err_ptr())
+            *err = reader.extract(it);
+}
+
 }

@@ -15,6 +15,8 @@ public:
     bool extract_recursively(const std::string_view path,
             const std::function<Error<Reader> *()>& get_err_ptr = [](){return nullptr;});
 
+    void extract_all(const std::function<Error<Reader> *()>& get_err_ptr = [](){return nullptr;});
+
     inline auto& get_wrappee()
     {
         return reader;

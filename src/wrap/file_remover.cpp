@@ -30,5 +30,10 @@ bool FileRemover::will_remove_recursively(const std::string_view path,
     return at_least_one_path_removed;
 }
 
+void FileRemover::will_remove_all(const std::function<Error<Writer> *()>& get_err_ptr)
+{
+    for (auto it = squeeze.begin(); it != squeeze.end(); ++it)
+        squeeze.will_remove(it, get_err_ptr());
+}
 
 }

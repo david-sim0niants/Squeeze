@@ -21,10 +21,16 @@ bool FileAppender::will_append_recursively(const std::string_view path,
         const std::function<Error<Writer> *()>& get_err_ptr)
 {
     namespace fs = std::filesystem;
-    if (!will_append(path, compression_method, level, get_err_ptr()))
+
+    if (not will_append(path, compression_method, level, get_err_ptr()))
         return false;
-    for (const auto& dir_entry : fs::recursive_directory_iterator(path))
+
+    if (not std::filesystem::is_directory(path))
+        return true;
+
+    for (const auto& dir_entry : fs::recursive_directory_iterator(path, fs::directory_options::skip_permission_denied))
         will_append(dir_entry.path(), compression_method, level, get_err_ptr());
+
     return true;
 }
 

@@ -45,7 +45,7 @@ public:
 
         arg_parser.emplace(argc - 1, argv + 1,
                 short_options, long_options, long_options + std::size(long_options));
-        int exit_code = run_instructions();
+        int exit_code = handle_arguments();
         arg_parser.reset();
         return exit_code;
     }
@@ -54,7 +54,7 @@ public:
     static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse"};
 
 private:
-    int run_instructions()
+    int handle_arguments()
     {
         while (auto maybe_arg = arg_parser->next()) {
             auto& arg = *maybe_arg;
@@ -109,47 +109,14 @@ private:
 
         switch (mode) {
         case Append:
-        {
-            assert(sqz.has_value());
-            if (state & RecurseFlag) {
-                fsqz->will_append_recursively(
-                        arg_value, CompressionMethod::None, 0,
-                        make_back_inserter_lambda(write_errors));
-            } else {
-                write_errors.emplace_back();
-                fsqz->will_append(arg_value, CompressionMethod::None, 0, &write_errors.back());
-            }
-            state |= Dirty;
+            exit_code = handle_append(arg_value);
             break;
-        }
         case Remove:
-        {
-            assert(sqz.has_value());
-            if (state & RecurseFlag) {
-                fsqz->will_remove_recursively(arg_value, make_back_inserter_lambda(write_errors));
-            } else {
-                write_errors.emplace_back();
-                fsqz->will_remove(arg_value, &write_errors.back());
-            }
-            state |= Dirty;
+            exit_code = handle_remove(arg_value);
             break;
-        }
         case Extract:
-        {
-            assert(sqz.has_value());
-            if (state & RecurseFlag) {
-                std::deque<Error<Reader>> read_errors;
-                fsqz->extract_recursively(arg_value, make_back_inserter_lambda(read_errors));
-                for (auto& err : read_errors)
-                    if (err)
-                        std::cerr << err.report() << '\n';
-            } else {
-                Error<Reader> err = sqz->extract(arg_value);
-                if (err)
-                    std::cerr << err.report() << '\n';
-            }
+            exit_code = handle_extract(arg_value);
             break;
-        }
         default:
             throw BaseException("unexpected mode");
             break;
@@ -193,6 +160,71 @@ private:
             break;
         default:
             throw BaseException("unexpected option");
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    int handle_append(const std::string_view path)
+    {
+        assert(sqz.has_value());
+        assert(fsqz.has_value());
+        state |= Dirty;
+
+        if (state & RecurseFlag) {
+            fsqz->will_append_recursively(
+                    path, CompressionMethod::None, 0,
+                    make_back_inserter_lambda(write_errors));
+        } else {
+            write_errors.emplace_back();
+            fsqz->will_append(path, CompressionMethod::None, 0, &write_errors.back());
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    int handle_remove(const std::string_view path)
+    {
+        assert(sqz.has_value());
+        assert(fsqz.has_value());
+        state |= Dirty;
+
+        if (path == "*") {
+            fsqz->will_remove_all(make_back_inserter_lambda(write_errors));
+            return EXIT_SUCCESS;
+        }
+
+        if (state & RecurseFlag) {
+            fsqz->will_remove_recursively(path, make_back_inserter_lambda(write_errors));
+        } else {
+            write_errors.emplace_back();
+            fsqz->will_remove(path, &write_errors.back());
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    int handle_extract(const std::string_view path)
+    {
+        assert(sqz.has_value());
+        assert(fsqz.has_value());
+
+        if (path == "*") {
+            std::deque<Error<Reader>> read_errors;
+            fsqz->extract_all(make_back_inserter_lambda(read_errors));
+            return EXIT_SUCCESS;
+        }
+
+        if (state & RecurseFlag) {
+            std::deque<Error<Reader>> read_errors;
+            fsqz->extract_recursively(path, make_back_inserter_lambda(read_errors));
+            for (auto& err : read_errors)
+                if (err)
+                    std::cerr << err.report() << '\n';
+        } else {
+            Error<Reader> err = sqz->extract(path);
+            if (err)
+                std::cerr << err.report() << '\n';
         }
 
         return EXIT_SUCCESS;
