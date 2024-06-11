@@ -16,14 +16,16 @@ bool FileAppender::will_append(const std::filesystem::path& path,
     return true;
 }
 
-void FileAppender::will_append_recursively(const std::string_view path,
+bool FileAppender::will_append_recursively(const std::string_view path,
         CompressionMethod compression_method, int level,
         const std::function<Error<Writer> *()>& get_err_ptr)
 {
     namespace fs = std::filesystem;
-    will_append(path, compression_method, level, get_err_ptr());
+    if (!will_append(path, compression_method, level, get_err_ptr()))
+        return false;
     for (const auto& dir_entry : fs::recursive_directory_iterator(path))
         will_append(dir_entry.path(), compression_method, level, get_err_ptr());
+    return true;
 }
 
 void FileAppender::write()

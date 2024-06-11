@@ -14,7 +14,7 @@ public:
 
     bool will_remove(const std::string_view path, Error<Writer> *err = nullptr);
 
-    void will_remove_recursively(const std::string_view path,
+    bool will_remove_recursively(const std::string_view path,
             const std::function<Error<Writer> *()>& get_err_ptr = [](){ return nullptr; });
 
     inline auto& get_wrappee()

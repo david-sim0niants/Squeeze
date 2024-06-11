@@ -23,7 +23,7 @@ public:
     bool will_append(const std::filesystem::path& path,
             CompressionMethod compression_method, int level, Error<Writer> *err = nullptr);
 
-    void will_append_recursively(const std::string_view path,
+    bool will_append_recursively(const std::string_view path,
             CompressionMethod compression_method, int level,
             const std::function<Error<Writer> *()>& get_err_ptr = [](){ return nullptr; });
 

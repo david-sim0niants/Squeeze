@@ -12,7 +12,7 @@ public:
     explicit FileExtracter(Reader& reader) : reader(reader)
     {}
 
-    void extract_recursively(const std::string_view path,
+    bool extract_recursively(const std::string_view path,
             const std::function<Error<Reader> *()>& get_err_ptr = [](){return nullptr;});
 
     inline auto& get_wrappee()

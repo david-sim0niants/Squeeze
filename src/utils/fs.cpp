@@ -190,7 +190,11 @@ std::optional<std::string> make_concise_portable_path(const std::filesystem::pat
 
 bool path_within_dir(const std::string_view path, const std::string_view dir)
 {
-    return path.starts_with(dir);
+    static constexpr char portable_seperator = '/';
+    static constexpr char preferred_separator = std::filesystem::path::preferred_separator;
+    return path.starts_with(dir) && (dir.ends_with(portable_seperator) || dir.ends_with(preferred_separator)
+            || path.size() == dir.size()
+            || path[dir.size()] == portable_seperator || path[dir.size()] == preferred_separator);
 }
 
 }

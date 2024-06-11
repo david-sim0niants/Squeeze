@@ -45,12 +45,9 @@ public:
 
         arg_parser.emplace(argc - 1, argv + 1,
                 short_options, long_options, long_options + std::size(long_options));
-
         int exit_code = run_instructions();
-        if (exit_code != EXIT_SUCCESS)
-            return exit_code;
-
-        return EXIT_SUCCESS;
+        arg_parser.reset();
+        return exit_code;
     }
 
     static constexpr char short_options[] = "ARXLhr";
@@ -330,11 +327,11 @@ Options:
     }
 
 private:
+    std::optional<ArgParser> arg_parser;
     std::filesystem::path sqz_fn;
     std::fstream sqz_file;
     std::optional<Squeeze> sqz;
     std::optional<wrap::FileSqueeze> fsqz;
-    std::optional<ArgParser> arg_parser;
     ModeFlags mode = Append;
     int state = 0;
     std::deque<Error<Writer>> write_errors;
