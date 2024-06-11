@@ -1,14 +1,14 @@
-#include "squeeze/squeeze.h"
-#include "squeeze/exception.h"
-#include "utils/argparser.h"
-
 #include <cstring>
 #include <cassert>
 #include <iostream>
 #include <deque>
 #include <filesystem>
-#include <unordered_set>
 
+#include "squeeze/squeeze.h"
+#include "squeeze/wrap/file_squeeze.h"
+#include "squeeze/exception.h"
+
+#include "utils/argparser.h"
 
 namespace {
 
@@ -107,31 +107,17 @@ private:
         switch (mode) {
         case Append:
         {
-            auto path_opt = preprocess_filepath(arg_value);
-            if (!path_opt.has_value())
-                return EXIT_FAILURE;
-            auto& path = *path_opt;
-            if (appendee_path_set.contains(path))
-                break;
-
             assert(sqz.has_value());
             write_errors.emplace_back();
-            appendee_path_set.insert(path);
-            sqz->will_append<FileEntryInput>(write_errors.back(), std::move(path),
-                    CompressionMethod::None, 0);
+            fsqz->will_append(arg_value, CompressionMethod::None, 0, &write_errors.back());
             state |= Dirty;
             break;
         }
         case Remove:
         {
             assert(sqz.has_value());
-            auto it = sqz->find_path(arg_value);
-            if (it == sqz->end()) {
-                std::cerr << "Error: non-existing path: " << arg_value << '\n';
-                break;
-            }
             write_errors.emplace_back();
-            sqz->will_remove(it, &write_errors.back());
+            fsqz->will_remove(arg_value, &write_errors.back());
             state |= Dirty;
             break;
         }
@@ -205,6 +191,8 @@ private:
         if (sqz->is_corrupted())
             std::cerr << "WARNING: corrupted sqz file - " << sqz_fn << std::endl;
 
+        fsqz.emplace(*sqz);
+
         return EXIT_SUCCESS;
     }
 
@@ -213,6 +201,7 @@ private:
         if (!sqz)
             return EXIT_SUCCESS;
         int exit_code = run_update();
+        fsqz.reset();
         sqz.reset();
         sqz_file.close();
         sqz_fn.clear();
@@ -224,7 +213,7 @@ private:
         if (!(state & Dirty))
             return EXIT_SUCCESS;
 
-        sqz->update();
+        fsqz->update();
         int exit_code = EXIT_SUCCESS;
         for (auto err : write_errors) {
             if (err) {
@@ -233,7 +222,6 @@ private:
             }
         }
         write_errors.clear();
-        appendee_path_set.clear();
         std::filesystem::resize_file(sqz_fn, sqz_file.tellp());
 
         state &= ~Dirty;
@@ -288,28 +276,6 @@ private:
         throw BaseException("unexpected long option");
     }
 
-    static std::optional<std::string> preprocess_filepath(const std::string_view path_str)
-    {
-        std::filesystem::path path = std::filesystem::path(path_str).lexically_normal();
-        std::error_code ec;
-        auto status = std::filesystem::symlink_status(path, ec);
-        switch (status.type()) {
-            using enum std::filesystem::file_type;
-        case directory:
-            path = path / "";
-            break;
-        case not_found:
-            std::cerr << "Error: no such file or directory - " << path_str << std::endl;
-            return std::nullopt;
-        case unknown:
-            std::cerr << "Error: unknown file type - " << path_str << std::endl;
-            return std::nullopt;
-        default:
-            break;
-        }
-        return path;
-    }
-
     static void usage()
     {
         std::cerr <<
@@ -328,10 +294,10 @@ private:
     std::filesystem::path sqz_fn;
     std::fstream sqz_file;
     std::optional<Squeeze> sqz;
+    std::optional<wrap::FileSqueeze> fsqz;
     std::optional<ArgParser> arg_parser;
     ModeFlags mode = Append;
     int state = 0;
-    std::unordered_set<std::string> appendee_path_set;
     std::deque<Error<Writer>> write_errors;
 };
 

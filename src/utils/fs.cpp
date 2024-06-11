@@ -67,6 +67,15 @@ ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
     return success;
 }
 
+static std::error_code create_directories(const std::filesystem::path& path)
+{
+    std::error_code ec;
+    if (path.empty())
+        return ec;
+    std::filesystem::create_directories(path, ec);
+    return ec;
+}
+
 ErrorCode set_permissions(const std::filesystem::path &path, EntryPermissions entry_perms)
 {
     std::error_code ec;
@@ -158,13 +167,28 @@ void convert(const std::filesystem::file_type& from, EntryType& to)
     }
 }
 
-static std::error_code create_directories(const std::filesystem::path& path)
+std::optional<std::string> make_concise_portable_path(const std::filesystem::path& original_path)
 {
+    std::filesystem::path path = original_path.lexically_normal();
     std::error_code ec;
-    if (path.empty())
-        return ec;
-    std::filesystem::create_directories(path, ec);
-    return ec;
+    auto status = std::filesystem::symlink_status(path, ec);
+    switch (status.type()) {
+        using enum std::filesystem::file_type;
+    case directory:
+        path = path / "";
+        break;
+    case not_found:
+    case unknown:
+        return std::nullopt;
+    default:
+        break;
+    }
+    return path.generic_string();
+}
+
+bool path_within_dir(const std::string_view path, const std::string_view dir)
+{
+    return path.starts_with(dir);
 }
 
 }

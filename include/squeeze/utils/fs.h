@@ -24,4 +24,10 @@ void convert(const std::filesystem::perms& from, EntryPermissions& to);
 void convert(const EntryType& from, std::filesystem::file_type& to);
 void convert(const std::filesystem::file_type& from, EntryType& to);
 
+[[nodiscard]]
+std::optional<std::string> make_concise_portable_path(const std::filesystem::path& path);
+
+[[nodiscard]]
+bool path_within_dir(const std::string_view path, const std::string_view dir);
+
 }

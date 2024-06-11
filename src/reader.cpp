@@ -19,14 +19,14 @@ ReaderIterator Reader::find_path(std::string_view path)
 Error<Reader> Reader::extract(const std::string_view path)
 {
     auto it = find_path(path);
-    return it == end() ? "non-existing path" : extract(it);
+    return it == end() ? "non-existing path - " + std::string(path) : extract(it);
 }
 
 Error<Reader> Reader::extract(const std::string_view path, EntryHeader& header, std::ostream& output)
 {
     auto it = find_path(path);
     header = it->second;
-    return it == end() ? "non-existing path" : extract(it, output);
+    return it == end() ? "non-existing path - " + std::string(path) : extract(it, output);
 }
 
 Error<Reader> Reader::extract(const ReaderIterator& it)
