@@ -28,10 +28,11 @@ public:
     enum StateFlags {
         Processing = 1,
         Dirty = 2,
+        RecurseFlag = 4,
     };
 
     enum class Option {
-        Append, Remove, Extract, List, Help
+        Append, Remove, Extract, List, Recurse, NoRecurse, Help
     };
 
 public:
@@ -52,8 +53,8 @@ public:
         return EXIT_SUCCESS;
     }
 
-    static constexpr char short_options[] = "ARXLh";
-    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help"};
+    static constexpr char short_options[] = "ARXLhr";
+    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse"};
 
 private:
     int run_instructions()
@@ -87,6 +88,11 @@ private:
         return deinit_sqz();
     }
 
+    static auto make_back_inserter_lambda(auto& container)
+    {
+        return [&container]{ container.emplace_back(); return &container.back(); };
+    }
+
     int handle_positional_argument(std::string_view arg_value)
     {
         int exit_code = EXIT_SUCCESS;
@@ -108,25 +114,43 @@ private:
         case Append:
         {
             assert(sqz.has_value());
-            write_errors.emplace_back();
-            fsqz->will_append(arg_value, CompressionMethod::None, 0, &write_errors.back());
+            if (state & RecurseFlag) {
+                fsqz->will_append_recursively(
+                        arg_value, CompressionMethod::None, 0,
+                        make_back_inserter_lambda(write_errors));
+            } else {
+                write_errors.emplace_back();
+                fsqz->will_append(arg_value, CompressionMethod::None, 0, &write_errors.back());
+            }
             state |= Dirty;
             break;
         }
         case Remove:
         {
             assert(sqz.has_value());
-            write_errors.emplace_back();
-            fsqz->will_remove(arg_value, &write_errors.back());
+            if (state & RecurseFlag) {
+                fsqz->will_remove_recursively(arg_value, make_back_inserter_lambda(write_errors));
+            } else {
+                write_errors.emplace_back();
+                fsqz->will_remove(arg_value, &write_errors.back());
+            }
             state |= Dirty;
             break;
         }
         case Extract:
         {
             assert(sqz.has_value());
-            Error<Reader> err = sqz->extract(arg_value);
-            if (err)
-                std::cerr << err.report() << '\n';
+            if (state & RecurseFlag) {
+                std::deque<Error<Reader>> read_errors;
+                fsqz->extract_recursively(arg_value, make_back_inserter_lambda(read_errors));
+                for (auto& err : read_errors)
+                    if (err)
+                        std::cerr << err.report() << '\n';
+            } else {
+                Error<Reader> err = sqz->extract(arg_value);
+                if (err)
+                    std::cerr << err.report() << '\n';
+            }
             break;
         }
         default:
@@ -161,6 +185,12 @@ private:
             run_list();
             break;
         }
+        case Option::Recurse:
+            state |= RecurseFlag;
+            break;
+        case Option::NoRecurse:
+            state &= ~RecurseFlag;
+            break;
         case Option::Help:
             usage();
             break;
@@ -254,6 +284,8 @@ private:
             return Option::Extract;
         case 'L':
             return Option::List;
+        case 'r':
+            return Option::Recurse;
         case 'h':
             return Option::Help;
         default:
@@ -271,6 +303,10 @@ private:
             return Option::Extract;
         if (option == "list")
             return Option::List;
+        if (option == "recurse")
+            return Option::Recurse;
+        if (option == "no-recurse")
+            return Option::NoRecurse;
         if (option == "help")
             return Option::Help;
         throw BaseException("unexpected long option");
@@ -283,10 +319,13 @@ R""""(Usage: sqz <sqz-file> <files...> [-options]
 By default the append mode is enabled, so even without specifying -A or --append
 at first, the files listed after the sqz file are assumed to be appended or updated.
 Options:
-    -A, --append       Append (or update) the following files to the sqz file
-    -R, --remove       Remove the following files from the sqz file
-    -X, --extract      Extract the following files from the sqz file
-    -L, --list         List files in the sqz file
+    -A, --append        Append (or update) the following files to the sqz file
+    -R, --remove        Remove the following files from the sqz file
+    -X, --extract       Extract the following files from the sqz file
+    -L, --list          List files in the sqz file
+    -r, --recurse       Enable recursive mode: directories will be processed recursively
+        --no-recurse    Disable non-recursive mode: directories won't be processed recursively
+    -h, --help          Display usage information
 )"""";
     }
 

@@ -4,7 +4,7 @@
 #include "squeeze/utils/fs.h"
 
 #include <filesystem>
-#include <iterator>
+#include <functional>
 #include <unordered_set>
 
 namespace squeeze::wrap {
@@ -23,22 +23,9 @@ public:
     bool will_append(const std::filesystem::path& path,
             CompressionMethod compression_method, int level, Error<Writer> *err = nullptr);
 
-    template<std::output_iterator<Error<Writer>> ErrIt>
     void will_append_recursively(const std::string_view path,
             CompressionMethod compression_method, int level,
-            ErrIt err_it, ErrIt err_end)
-    {
-        namespace fs = std::filesystem;
-        for (const auto& dir_entry : fs::recursive_directory_iterator(path)) {
-            if (err_it == err_end) [[unlikely]]
-                break;
-            if (will_append(dir_entry.path(), compression_method, level, &*err_it))
-                ++err_it;
-        }
-    }
-
-    void will_append_recursively(const std::string_view path,
-            CompressionMethod compression_method, int level);
+            const std::function<Error<Writer> *()>& get_err_ptr = [](){ return nullptr; });
 
     void write();
 

@@ -131,7 +131,7 @@ Error<Writer> Writer::perform_append(EntryInput& entry_input)
         return e;
 
     auto ehe = EntryHeader::encode(target, entry_header);
-    target.seekp(0, std::ios_base::end);
+    target.seekp(target.tellp() + static_cast<std::streamsize>(entry_header.content_size));
     if (ehe)
         return {"failed encoding the entry header", ehe.report()};
 

@@ -67,7 +67,7 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
 {
     BasicEntryInput::init_entry_header(entry_header);
 
-    std::filesystem::path path(std::string(entry_header.path));
+    std::filesystem::path path(entry_header.path);
     std::filesystem::file_status st = std::filesystem::symlink_status(path);
     switch (st.type()) {
         using enum std::filesystem::file_type;
@@ -82,17 +82,17 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
         entry_header.attributes.permissions = perms;
         break;
     case not_found:
-        return "no such file or directory";
+        return "no such file or directory - " + entry_header.path;
     case block:
-        return "block file type not supported";
+        return "block file type not supported - " + entry_header.path;
     case character:
-        return "character file type not supported";
+        return "character file type not supported - " + entry_header.path;
     case fifo:
-        return "fifo file type not supported";
+        return "fifo file type not supported - " + entry_header.path;
     case socket:
-        return "socket file type not supported";
+        return "socket file type not supported - " + entry_header.path;
     case unknown:
-        return "unknown file type";
+        return "unknown file type - " + entry_header.path;
     default:
         throw Exception<EntryInput>("unexpected file type");
     }

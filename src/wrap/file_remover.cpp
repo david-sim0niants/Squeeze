@@ -14,11 +14,12 @@ bool FileRemover::will_remove(const std::string_view path, Error<Writer> *err)
     return true;
 }
 
-void FileRemover::will_remove_recursively(const std::string_view path)
+void FileRemover::will_remove_recursively(const std::string_view path,
+        const std::function<Error<Writer> *()>& get_err_ptr)
 {
     for (auto it = squeeze.begin(); it != squeeze.end(); ++it)
         if (utils::path_within_dir(it->second.path, path))
-            squeeze.will_remove(it);
+            squeeze.will_remove(it, get_err_ptr());
 }
 
 

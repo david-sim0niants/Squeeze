@@ -60,6 +60,8 @@ ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
     if (ec)
         return ec;
 
+    if (std::filesystem::exists(path))
+        std::filesystem::remove(path);
     std::filesystem::create_symlink(std::filesystem::path(link_to), path, ec);
     if (ec)
         return ec;
