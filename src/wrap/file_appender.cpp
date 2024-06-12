@@ -25,7 +25,7 @@ bool FileAppender::will_append_recursively(const std::string_view path,
     if (not will_append(path, compression_method, level, get_err_ptr()))
         return false;
 
-    if (not std::filesystem::is_directory(path))
+    if (std::filesystem::symlink_status(path).type() != std::filesystem::file_type::directory)
         return true;
 
     for (const auto& dir_entry : fs::recursive_directory_iterator(path, fs::directory_options::skip_permission_denied))

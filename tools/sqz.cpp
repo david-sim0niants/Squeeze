@@ -26,9 +26,10 @@ public:
     };
 
     enum StateFlags {
-        Processing = 1,
-        Dirty = 2,
-        RecurseFlag = 4,
+        FileCreated = 1,
+        Processing = 2,
+        Dirty = 4,
+        RecurseFlag = 8,
     };
 
     enum class Option {
@@ -47,6 +48,8 @@ public:
                 short_options, long_options, long_options + std::size(long_options));
         int exit_code = handle_arguments();
         arg_parser.reset();
+        state = 0;
+        mode = Append;
         return exit_code;
     }
 
@@ -235,11 +238,13 @@ private:
         deinit_sqz();
         sqz_fn = std::filesystem::path(filename);
 
-        std::ios_base::openmode mode = std::ios_base::in | std::ios_base::out | std::ios_base::binary;
-        if (!std::filesystem::exists(sqz_fn))
-            mode |= std::ios_base::trunc;
+        std::ios_base::openmode file_mode = std::ios_base::in | std::ios_base::out | std::ios_base::binary;
+        if (!std::filesystem::exists(sqz_fn)) {
+            file_mode |= std::ios_base::trunc;
+            state |= FileCreated;
+        }
 
-        sqz_file.open(sqz_fn, mode);
+        sqz_file.open(sqz_fn, file_mode);
         if (!sqz_file) {
             std::cerr << "Error: failed opening a file - " << sqz_fn.c_str() << '\n';
             return EXIT_FAILURE;
@@ -262,7 +267,20 @@ private:
         int exit_code = run_update();
         fsqz.reset();
         sqz.reset();
+
+        bool delete_file = false;
+        if (state & FileCreated) {
+            sqz_file.seekp(0, std::ios_base::end);
+            if (sqz_file.tellp() == 0)
+                delete_file = true;
+            state &= ~FileCreated;
+        }
+
         sqz_file.close();
+
+        if (delete_file)
+            std::filesystem::remove(sqz_fn);
+
         sqz_fn.clear();
         return exit_code;
     }
@@ -351,7 +369,7 @@ Options:
     -A, --append        Append (or update) the following files to the sqz file
     -R, --remove        Remove the following files from the sqz file
     -X, --extract       Extract the following files from the sqz file
-    -L, --list          List files in the sqz file
+    -L, --list          List all entries in the sqz file
     -r, --recurse       Enable recursive mode: directories will be processed recursively
         --no-recurse    Disable non-recursive mode: directories won't be processed recursively
     -h, --help          Display usage information
@@ -359,13 +377,14 @@ Options:
     }
 
 private:
+    ModeFlags mode = Append;
+    int state = 0;
+
     std::optional<ArgParser> arg_parser;
     std::filesystem::path sqz_fn;
     std::fstream sqz_file;
     std::optional<Squeeze> sqz;
     std::optional<wrap::FileSqueeze> fsqz;
-    ModeFlags mode = Append;
-    int state = 0;
     std::deque<Error<Writer>> write_errors;
 };
 
@@ -376,3 +395,4 @@ int main(int argc, char *argv[])
 {
     return CLI().run(argc, argv);
 }
+

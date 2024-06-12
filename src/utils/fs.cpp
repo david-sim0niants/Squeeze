@@ -3,14 +3,18 @@
 #include <filesystem>
 #include <system_error>
 
+#include "squeeze/utils/enum.h"
+
 namespace squeeze::utils {
 
-static std::error_code create_directories(const std::filesystem::path& path);
+namespace fs = std::filesystem;
+
+static std::error_code create_directories(const fs::path& path);
 
 std::variant<std::fstream, ErrorCode>
     make_regular_file(std::string_view path_str, EntryPermissions entry_perms)
 {
-    std::filesystem::path path(path_str);
+    fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
     if (ec)
         return ec;
@@ -28,7 +32,7 @@ std::variant<std::fstream, ErrorCode>
 std::variant<std::ofstream, ErrorCode>
     make_regular_file_out(std::string_view path_str, EntryPermissions entry_perms)
 {
-    std::filesystem::path path(path_str);
+    fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
     if (ec)
         return ec;
@@ -45,7 +49,7 @@ std::variant<std::ofstream, ErrorCode>
 
 ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms)
 {
-    std::filesystem::path path(path_str);
+    fs::path path(path_str);
     std::error_code ec = utils::create_directories(path);
     if (ec)
         return ec;
@@ -55,44 +59,44 @@ ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms
 ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
         EntryPermissions entry_perms)
 {
-    std::filesystem::path path(path_str);
+    fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
     if (ec)
         return ec;
 
-    if (std::filesystem::exists(path))
-        std::filesystem::remove(path);
-    std::filesystem::create_symlink(std::filesystem::path(link_to), path, ec);
+    if (fs::is_symlink(path))
+        fs::remove(path);
+    fs::create_symlink(fs::path(link_to), path, ec);
     if (ec)
         return ec;
 
     return success;
 }
 
-static std::error_code create_directories(const std::filesystem::path& path)
+static std::error_code create_directories(const fs::path& path)
 {
     std::error_code ec;
     if (path.empty())
         return ec;
-    std::filesystem::create_directories(path, ec);
+    fs::create_directories(path, ec);
     return ec;
 }
 
-ErrorCode set_permissions(const std::filesystem::path &path, EntryPermissions entry_perms)
+ErrorCode set_permissions(const fs::path &path, EntryPermissions entry_perms)
 {
     std::error_code ec;
-    std::filesystem::perms perms;
+    fs::perms perms;
     convert(entry_perms, perms);
-    std::filesystem::permissions(path, perms, ec);
+    fs::permissions(path, perms, ec);
     if (ec)
         return ec;
     return success;
 }
 
-void convert(const EntryPermissions& from, std::filesystem::perms& to)
+void convert(const EntryPermissions& from, fs::perms& to)
 {
     using enum EntryPermissions;
-    using enum std::filesystem::perms;
+    using enum fs::perms;
     to = none
         | switch_flag(owner_read,   test_flag(from, OwnerRead))
         | switch_flag(owner_write,  test_flag(from, OwnerWrite))
@@ -106,9 +110,9 @@ void convert(const EntryPermissions& from, std::filesystem::perms& to)
         ;
 }
 
-void convert(const std::filesystem::perms& from, EntryPermissions& to)
+void convert(const fs::perms& from, EntryPermissions& to)
 {
-    using enum std::filesystem::perms;
+    using enum fs::perms;
     using enum EntryPermissions;
     to = None
         | switch_flag(OwnerRead,   test_flag(from, owner_read))
@@ -123,10 +127,10 @@ void convert(const std::filesystem::perms& from, EntryPermissions& to)
         ;
 }
 
-void convert(const EntryType& from, std::filesystem::file_type& to)
+void convert(const EntryType& from, fs::file_type& to)
 {
     using enum EntryType;
-    using enum std::filesystem::file_type;
+    using enum fs::file_type;
     switch (from) {
     case None:
         to = none;
@@ -146,10 +150,10 @@ void convert(const EntryType& from, std::filesystem::file_type& to)
     }
 }
 
-void convert(const std::filesystem::file_type& from, EntryType& to)
+void convert(const fs::file_type& from, EntryType& to)
 {
     using enum EntryType;
-    using enum std::filesystem::file_type;
+    using enum fs::file_type;
     switch (from) {
     case none:
         to = None;
@@ -169,13 +173,13 @@ void convert(const std::filesystem::file_type& from, EntryType& to)
     }
 }
 
-std::optional<std::string> make_concise_portable_path(const std::filesystem::path& original_path)
+std::optional<std::string> make_concise_portable_path(const fs::path& original_path)
 {
-    std::filesystem::path path = original_path.lexically_normal();
+    fs::path path = original_path.lexically_normal();
     std::error_code ec;
-    auto status = std::filesystem::symlink_status(path, ec);
+    auto status = fs::symlink_status(path, ec);
     switch (status.type()) {
-        using enum std::filesystem::file_type;
+        using enum fs::file_type;
     case directory:
         path = path / "";
         break;
@@ -191,7 +195,7 @@ std::optional<std::string> make_concise_portable_path(const std::filesystem::pat
 bool path_within_dir(const std::string_view path, const std::string_view dir)
 {
     static constexpr char portable_seperator = '/';
-    static constexpr char preferred_separator = std::filesystem::path::preferred_separator;
+    static constexpr char preferred_separator = fs::path::preferred_separator;
     return path.starts_with(dir) && (dir.ends_with(portable_seperator) || dir.ends_with(preferred_separator)
             || path.size() == dir.size()
             || path[dir.size()] == portable_seperator || path[dir.size()] == preferred_separator);

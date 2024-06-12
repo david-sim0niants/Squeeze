@@ -42,7 +42,7 @@ Error<EntryOutput> FileEntryOutput::init_symlink(
 {
     ErrorCode ec = utils::make_symlink(entry_header.path, target, entry_header.attributes.permissions);
     if (ec)
-        return {"failed initializing symlink '" + entry_header.path + " -> " + target + '\'', ec.report()};
+        return {"failed creating symlink '" + entry_header.path + " -> " + target + '\'', ec.report()};
     else
         return success;
 }
