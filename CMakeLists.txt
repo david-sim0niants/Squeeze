@@ -16,3 +16,5 @@ option(BUILD_TOOLS "Build tools?" ON)
 if (BUILD_TOOLS)
     add_subdirectory(tools)
 endif ()
+
+option(USE_LOGGING "Use logging?" OFF)

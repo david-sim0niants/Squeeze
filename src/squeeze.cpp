@@ -2,12 +2,18 @@
 
 #include <unordered_set>
 
+#include "squeeze/logging.h"
 #include "writer_internal.h"
 
 namespace squeeze {
 
+#undef SQUEEZE_LOG_FUNC_PREFIX
+#define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Squeeze::"
+
 void Squeeze::update()
 {
+    SQUEEZE_TRACE("Updating...");
+
     std::unordered_multiset<std::string_view> appendee_path_set;
     appendee_path_set.reserve(future_appends.size());
 

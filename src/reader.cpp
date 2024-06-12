@@ -2,10 +2,14 @@
 
 #include <algorithm>
 
+#include "squeeze/logging.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/io.h"
 
 namespace squeeze {
+
+#undef SQUEEZE_LOG_FUNC_PREFIX
+#define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Reader::"
 
 ReaderIterator Reader::find_path(std::string_view path)
 {
@@ -43,6 +47,8 @@ Error<Reader> Reader::extract(const ReaderIterator& it, std::ostream& output)
 
 Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_output)
 {
+    SQUEEZE_TRACE("Extracting entry - {}", it->second.path);
+
     auto& [pos, entry_header] = *it;
     source.seekg(pos + entry_header.get_header_size());
 
@@ -74,7 +80,6 @@ Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_outpu
     default:
         throw Exception<Reader>("unexpected entry type");
     }
-
     return success;
 }
 

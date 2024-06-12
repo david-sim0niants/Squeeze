@@ -5,6 +5,7 @@
 #include <filesystem>
 
 #include "squeeze/squeeze.h"
+#include "squeeze/logging.h"
 #include "squeeze/wrap/file_squeeze.h"
 #include "squeeze/exception.h"
 
@@ -43,6 +44,8 @@ public:
             usage();
             return EXIT_FAILURE;
         }
+
+        init_logging();
 
         arg_parser.emplace(argc - 1, argv + 1,
                 short_options, long_options, long_options + std::size(long_options));

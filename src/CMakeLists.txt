@@ -7,3 +7,9 @@ add_library(${TARGET_NAME} SHARED
 target_include_directories(${TARGET_NAME} PUBLIC ${MAIN_INCLUDE_DIR})
 set_target_properties(${TARGET_NAME} PROPERTIES OUTPUT_NAME sqz)
 install(TARGETS squeeze DESTINATION lib)
+
+if (USE_LOGGING)
+    find_package(spdlog REQUIRED)
+    target_compile_options(${TARGET_NAME} PUBLIC -DSQUEEZE_USE_LOGGING)
+    target_link_libraries(${TARGET_NAME} PUBLIC spdlog::spdlog)
+endif ()

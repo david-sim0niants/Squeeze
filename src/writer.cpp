@@ -1,6 +1,7 @@
 #include "squeeze/writer.h"
 #include "writer_internal.h"
 
+#include "squeeze/logging.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/fs.h"
@@ -8,6 +9,9 @@
 #include <cassert>
 
 namespace squeeze {
+
+#undef SQUEEZE_LOG_FUNC_PREFIX
+#define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Writer::"
 
 Writer::Writer(std::iostream& target) : target(target)
 {
@@ -24,16 +28,19 @@ void Writer::will_append(std::unique_ptr<EntryInput>&& entry_input, Error<Writer
 
 void Writer::will_append(EntryInput& entry_input, Error<Writer> *err)
 {
+    SQUEEZE_TRACE("Registering future entry append - {}", entry_input.get_path());
     future_appends.emplace_back(entry_input, err);
 }
 
 void Writer::will_remove(const ReaderIterator& it, Error<Writer> *err)
 {
+    SQUEEZE_TRACE("Registering future entry remove - {}", it->second.path);
     future_removes.emplace(std::string(it->second.path), it->first, it->second.get_total_size(), err);
 }
 
 void Writer::write()
 {
+    SQUEEZE_TRACE("Writing...");
     perform_removes();
     perform_appends();
 }
