@@ -54,6 +54,8 @@ inline void init_logging()
 #else
     set_log_level(LogLevel::Trace);
 #endif
+
+    spdlog::set_pattern("[%^%l%$] [%s:%#] %v");
 }
 
 }

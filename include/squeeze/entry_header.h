@@ -38,4 +38,6 @@ struct EntryHeader {
         sizeof(attributes) + sizeof(path_len);
 };
 
+template<> std::string utils::stringify(const EntryHeader& header);
+
 }

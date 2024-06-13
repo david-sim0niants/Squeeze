@@ -47,10 +47,12 @@ Error<Reader> Reader::extract(const ReaderIterator& it, std::ostream& output)
 
 Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_output)
 {
-    SQUEEZE_TRACE("Extracting entry - {}", it->second.path);
+    SQUEEZE_TRACE("Extracting {}", it->second.path);
 
     auto& [pos, entry_header] = *it;
     source.seekg(pos + entry_header.get_header_size());
+
+    SQUEEZE_DEBUG("Entry header: {}", utils::stringify(entry_header));
 
     switch (entry_header.attributes.type) {
         using enum EntryType;
@@ -60,21 +62,30 @@ Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_outpu
     {
         std::ostream *output;
         auto e = entry_output.init(entry_header, output);
-        if (e)
+        if (e) {
+            SQUEEZE_ERROR("Failed initializing entry output");
             return {"failed initializing entry output", e.report()};
-        if (output)
+        }
+        if (output) {
             return extract_plain(entry_header, *output);
+        }
         break;
     }
     case Symlink:
     {
         std::string target;
         auto e = extract_symlink(entry_header, target);
-        if (e)
+        if (e) {
+            SQUEEZE_ERROR("Failed extracting symlink");
             return {"failed extracting symlink", e.report()};
+        }
+
         auto ee = entry_output.init_symlink(entry_header, target);
-        if (ee)
+        if (ee) {
+            SQUEEZE_ERROR("Failed extracting symlink");
             return {"failed extracting symlink", ee.report()};
+        }
+
         break;
     }
     default:
@@ -96,6 +107,8 @@ bool Reader::is_corrupted() const
 
 Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostream& output)
 {
+    SQUEEZE_TRACE();
+
     switch (entry_header.compression_method) {
         using enum CompressionMethod;
     case None:
@@ -115,8 +128,12 @@ Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostrea
 
 Error<Reader> Reader::extract_symlink(const EntryHeader& entry_header, std::string& target)
 {
-    if (entry_header.content_size == 0)
-        return "no content";
+    SQUEEZE_TRACE();
+
+    if (entry_header.content_size == 0) {
+        SQUEEZE_ERROR("Symlink entry with no content");
+        return "symlink entry with no content";
+    }
     target.resize(static_cast<std::size_t>(entry_header.content_size) - 1);
     source.read(target.data(), target.size());
     if (source.fail())

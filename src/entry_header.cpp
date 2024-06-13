@@ -42,4 +42,22 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
     return success;
 }
 
+template<> std::string utils::stringify(const EntryHeader& header)
+{
+    const char *compression_method = "[unknown]";
+    switch (header.compression_method) {
+    case CompressionMethod::None:
+        compression_method = "none";
+        break;
+    default:
+        break;
+    }
+
+    return  "{ content_size=" + utils::stringify(header.content_size) +
+            ", compression_method=" + compression_method +
+            ", compression_level=" + utils::stringify(header.compression_level) +
+            ", attributes=" + utils::stringify(header.attributes) +
+            ", path=" + header.path + " }";
+}
+
 }

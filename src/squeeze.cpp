@@ -12,7 +12,7 @@ namespace squeeze {
 
 void Squeeze::update()
 {
-    SQUEEZE_TRACE("Updating...");
+    SQUEEZE_TRACE();
 
     std::unordered_multiset<std::string_view> appendee_path_set;
     appendee_path_set.reserve(future_appends.size());
@@ -25,6 +25,7 @@ void Squeeze::update()
         if (appendee_path_set.extract(entry_header.path).empty())
             continue;
         will_remove(it);
+        SQUEEZE_TRACE("Will update {}", it->second.path);
     }
 
     this->write();
