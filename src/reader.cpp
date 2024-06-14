@@ -102,7 +102,7 @@ bool Reader::is_corrupted() const
     for (auto it = begin(); it != end(); ++it)
         last_it = it;
     return last_it == end() && size > 0
-        || last_it->first + last_it->second.get_total_size() < size;
+        || last_it->first + last_it->second.get_full_size() < size;
 }
 
 Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostream& output)

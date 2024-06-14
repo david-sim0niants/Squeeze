@@ -35,7 +35,7 @@ void Writer::will_append(EntryInput& entry_input, Error<Writer> *err)
 void Writer::will_remove(const ReaderIterator& it, Error<Writer> *err)
 {
     SQUEEZE_TRACE("Will remove {}", it->second.path);
-    future_removes.emplace(std::string(it->second.path), it->first, it->second.get_total_size(), err);
+    future_removes.emplace(std::string(it->second.path), it->first, it->second.get_full_size(), err);
 }
 
 void Writer::write()
@@ -44,14 +44,6 @@ void Writer::write()
     perform_removes();
     perform_appends();
     SQUEEZE_DEBUG("Stream put pointer at: {}", target.tellp());
-}
-
-Error<Writer> Writer::append(std::unique_ptr<EntryInput>&& entry_input)
-{
-    Error<Writer> err;
-    will_append(std::move(entry_input), &err);
-    write();
-    return err;
 }
 
 Error<Writer> Writer::append(EntryInput& entry_input)
@@ -74,9 +66,14 @@ void Writer::perform_removes()
 {
     SQUEEZE_TRACE("Removing {} entries", future_removes.size());
 
+    // linear-time algorithm for removing multiple chunks of data from the stream at once
+
     target.seekg(0, std::ios_base::end);
     const uint64_t initial_size = target.tellg();
-    uint64_t rem_len = 0;
+    uint64_t rem_len = 0; // remove length: the increasing size of the "hole" that gets pushed right
+
+    // future remove operations are stored in a priority queue based on their positions
+
     while (future_removes.size() > 1) {
         std::string path;
         future_removes.top().path.swap(path);
@@ -88,6 +85,10 @@ void Writer::perform_removes()
 
         uint64_t next_pos = pos;
         while (true) {
+            /* There might be some "unpleasant" cases when a remove operation
+             * at the same position has been registered multiple times.
+             * To overcome this problem we just keep popping out the next remove
+             * until its position is different. We will need the next remove position later. */
             future_removes.pop();
             next_pos = future_removes.top().pos;
             if (pos == next_pos) {
@@ -98,9 +99,18 @@ void Writer::perform_removes()
             }
         };
 
+        /* Removing a chunk of data is just moving another chunk of data, that is,
+         * between the former one and the next chunk of data to remove, to the left,
+         * concatenating it with the rest of the remaining data.
+         * After each remove operation, the size of the "hole" (rem_len) is increased
+         * and pushed right till the end of the stream. */
+
+        // the position of the following non-removing data
         const uint64_t mov_pos = pos + len;
+        // the length of the following non-removing data
         const uint64_t mov_len = std::min(next_pos, initial_size) - mov_pos;
-        utils::iosmove(target, pos - rem_len, mov_pos, mov_len);
+        // pos - rem_len is the destination of the following non-removing data to move to
+        utils::iosmove(target, pos - rem_len, mov_pos, mov_len); // do the move
 
         if (target.fail()) {
             SQUEEZE_ERROR("Target output stream failed");
@@ -109,10 +119,10 @@ void Writer::perform_removes()
             target.clear();
         }
 
-        rem_len += len;
+        rem_len += len; // increase the "hole" size
     }
-    assert(future_removes.size() == 1 && "The last element in the priority queue of future removes must remain after performing the removes.");
-    target.seekp(initial_size - rem_len);
+    assert(future_removes.size() == 1 && "The last element in the priority queue of future removes must remain after performing all the remove operations.");
+    target.seekp(initial_size - rem_len); // point to the new end of the stream
 }
 
 void Writer::perform_appends()

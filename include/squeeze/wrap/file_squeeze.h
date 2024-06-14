@@ -7,12 +7,15 @@
 
 namespace squeeze::wrap {
 
+/* This wrapper combines functionality of FileAppender, FileRemover, FileExtracter wrappers
+ * and provides one more method - update(). */
 class FileSqueeze : public FileAppender, public FileRemover, public FileExtracter {
 public:
     explicit FileSqueeze(Squeeze& squeeze)
         : squeeze(squeeze), FileAppender(squeeze), FileRemover(squeeze), FileExtracter(squeeze)
     {}
 
+    /* Calls update() on the squeeze while also resetting its own state. */
     void update();
 
     inline auto& get_wrappee()

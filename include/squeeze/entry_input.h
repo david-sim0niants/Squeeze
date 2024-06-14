@@ -10,12 +10,20 @@
 
 namespace squeeze {
 
+/* Interface responsible for providing the data (entry header and content) required
+ * for the Writer interface to perform append operation. This is the abstract class of it.
+ * Other derivations of it could provide the data from a file or in a custom way. */
 class EntryInput {
 public:
     virtual ~EntryInput() = default;
 
+    /* The content type.
+     * A monostate (no state) usually refers to a directory as directories don't have any content.
+     * An input stream usually refers to a regular file contents.
+     * A string usually refers to a symlink target. */
     using ContentType = std::variant<std::monostate, std::istream *, std::string>;
 
+    /* Initialize the entry input and get references to the entry header and its content. */
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) = 0;
     virtual void deinit() noexcept = 0;
 
@@ -34,6 +42,8 @@ protected:
 };
 
 
+/* Entry input base class for all classes that store the path, compression_method and compression_level
+ * before being initialized. */
 class BasicEntryInput : public EntryInput {
 protected:
     BasicEntryInput(std::string&& path, CompressionMethod compression_method, int compression_level)
@@ -49,6 +59,8 @@ protected:
 };
 
 
+/* Entry input interface that provides the entry header and content by opening
+ * the file with the specified path. */
 class FileEntryInput : public BasicEntryInput {
 public:
     FileEntryInput(std::string&& path, CompressionMethod compression_method, int compression_level)
@@ -65,6 +77,7 @@ protected:
 };
 
 
+/* Entry input interface that contains the necessary entry header data and contents in advance. */
 class CustomContentEntryInput : public BasicEntryInput {
 public:
     CustomContentEntryInput(std::string&& path,
