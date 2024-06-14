@@ -167,6 +167,42 @@ public:
 
     MockFileEntries entries;
 
+    static constexpr char seperator = '/';
+
+    std::shared_ptr<MockRegularFile> make_regular_file(const std::string_view path)
+    {
+        size_t i_sep = path.find_last_of(seperator);
+        MockDirectory *lastdir = this;
+        if (i_sep != std::string_view::npos)
+            lastdir = make_directories(path.substr(0, i_sep)).get();
+        return lastdir->entries.regular_files[std::string(path.substr(i_sep + 1))];
+    }
+
+    std::shared_ptr<MockDirectory> make_directories(std::string_view path)
+    {
+        std::shared_ptr<MockDirectory> curdir_shared = nullptr;
+        MockDirectory *curdir = this;
+        while (!path.empty()) {
+            size_t i_sep = path.find(seperator);
+            if (i_sep == std::string_view::npos)
+                i_sep = path.size();
+            curdir_shared = curdir->entries.directories[std::string(path.substr(0, i_sep))];
+            curdir = curdir_shared.get();
+            path = path.substr(i_sep);
+        }
+        return curdir_shared;
+    }
+
+    std::shared_ptr<MockSymlink> make_regular_file(const std::string_view path, std::string&& target)
+    {
+        size_t i_sep = path.find_last_of(seperator);
+        MockDirectory *lastdir = this;
+        if (i_sep != std::string_view::npos)
+            lastdir = make_directories(path.substr(0, i_sep)).get();
+        return lastdir->entries.symlinks[std::string(path.substr(i_sep + 1))] =
+                std::make_shared<tools::MockSymlink>(std::move(target));
+    }
+
 private:
     template<typename MockFile, typename OnFile>
     struct ListHelp {

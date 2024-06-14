@@ -60,17 +60,17 @@ public:
     {
     }
 
-    inline operator bool()
+    inline operator bool() const
     {
         return failed();
     }
 
-    inline bool successful()
+    inline bool successful() const
     {
         return !content.has_value();
     }
 
-    inline bool failed()
+    inline bool failed() const
     {
         return content.has_value();
     }
@@ -88,7 +88,7 @@ public:
     template<typename F = decltype(utils::stringify<MessageType>),
         typename = std::enable_if_t<std::is_invocable_v<F, MessageType>>>
     inline std::string report(const std::string& prefix = "Error: ",
-                              F tostr = +utils::stringify<MessageType>)
+                              F tostr = +utils::stringify<MessageType>) const
     {
         if (successful())
             return "SUCCESS";

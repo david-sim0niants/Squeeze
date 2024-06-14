@@ -2,6 +2,7 @@
 
 #include <filesystem>
 
+#include "squeeze/logging.h"
 #include "squeeze/utils/fs.h"
 #include "squeeze/exception.h"
 
@@ -22,9 +23,13 @@ void BasicEntryInput::init_entry_header(EntryHeader& entry_header)
     entry_header.compression_level = compression_level;
 }
 
+#undef SQUEEZE_LOG_FUNC_PREFIX
+#define SQUEEZE_LOG_FUNC_PREFIX "squeeze::FileEntryInput::"
 
 Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
+    SQUEEZE_TRACE("Opening {}", path);
+
     auto e = init_entry_header(entry_header);
     if (e)
         return e;
@@ -32,10 +37,12 @@ Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& c
     switch (entry_header.attributes.type) {
         using enum EntryType;
     case Directory:
+        SQUEEZE_TRACE("'{}' is a directory", path);
         content = std::monostate();
         break;
     case Symlink:
     {
+        SQUEEZE_TRACE("'{}' is a symlink", path);
         std::error_code ec;
         auto symlink_target = std::filesystem::read_symlink(
                 std::filesystem::path(entry_header.path), ec);
@@ -45,6 +52,7 @@ Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& c
         break;
     }
     case RegularFile:
+        SQUEEZE_TRACE("'{}' is a regular file", path);
         file = std::ifstream(path, std::ios_base::binary | std::ios_base::in);
         if (!*file)
             return {"failed opening a file", ErrorCode::from_current_errno().report()};

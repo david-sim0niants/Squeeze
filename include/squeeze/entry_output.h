@@ -26,7 +26,7 @@ public:
 };
 
 
-/* FileEntryOutput initializes a file  */
+/* FileEntryOutput creates a file for storing the extracted data.  */
 class FileEntryOutput : public EntryOutput {
 public:
     virtual Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) override;

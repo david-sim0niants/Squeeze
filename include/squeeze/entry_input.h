@@ -82,10 +82,10 @@ class CustomContentEntryInput : public BasicEntryInput {
 public:
     CustomContentEntryInput(std::string&& path,
             CompressionMethod compression_method, int compression_level,
-            ContentType& content, EntryAttributes entry_attributes = default_attributes)
+            ContentType&& content, EntryAttributes entry_attributes = default_attributes)
         :
             BasicEntryInput(std::move(path), compression_method, compression_level),
-            content(content), entry_attributes(entry_attributes)
+            content(std::move(content)), entry_attributes(entry_attributes)
     {}
 
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
@@ -102,7 +102,7 @@ public:
 protected:
     void init_entry_header(EntryHeader& entry_header);
 
-    ContentType& content;
+    ContentType content;
     EntryAttributes entry_attributes;
 };
 
