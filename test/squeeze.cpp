@@ -46,27 +46,28 @@ TEST_F(SqueezeTest, WriteRead)
     auto append_regular_file = [&squeeze, &write_errors](const std::string& path, std::shared_ptr<tools::MockRegularFile> file)
         {
             write_errors.emplace_back();
-            squeeze.will_append<CustomContentEntryInput>(write_errors.back(), std::string(path), CompressionMethod::None, 0, &file->contents);
+            squeeze.will_append<CustomContentEntryInput>(write_errors.back(),
+                    std::string(path), CompressionMethod::None, 0, &file->contents, file->get_attributes());
         };
-    auto append_directory = [&squeeze, &write_errors](const std::string& path, auto _)
+    auto append_directory = [&squeeze, &write_errors](const std::string& path, std::shared_ptr<tools::MockDirectory> file)
         {
             write_errors.emplace_back();
-            squeeze.will_append<CustomContentEntryInput>(write_errors.back(), std::string(path), CompressionMethod::None, 0, std::monostate{});
+            squeeze.will_append<CustomContentEntryInput>(write_errors.back(),
+                    std::string(path), CompressionMethod::None, 0, std::monostate{}, file->get_attributes());
         };
     auto append_symlink = [&squeeze, &write_errors](const std::string& path, std::shared_ptr<tools::MockSymlink> file)
         {
             write_errors.emplace_back();
-            squeeze.will_append<CustomContentEntryInput>(write_errors.back(), std::string(path), CompressionMethod::None, 0, file->target);
+            squeeze.will_append<CustomContentEntryInput>(write_errors.back(),
+                    std::string(path), CompressionMethod::None, 0, file->target, file->get_attributes());
         };
 
     mockfs.list_recursively<tools::MockRegularFile, tools::MockDirectory, tools::MockSymlink>(
             append_regular_file, append_directory, append_symlink);
     squeeze.write();
 
-    for (const auto& err : write_errors) {
-        if (err)
-            std::cerr << err.report() << '\n';
-    }
+    for (const auto& err : write_errors)
+        EXPECT_FALSE(err.failed()) << err.report();
 }
 
 }

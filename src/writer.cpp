@@ -64,12 +64,12 @@ Error<Writer> Writer::remove(const ReaderIterator&& it)
 
 void Writer::perform_removes()
 {
-    SQUEEZE_TRACE("Removing {} entries", future_removes.size());
+    SQUEEZE_TRACE("Removing {} entries", future_removes.size() - 1);
 
     // linear-time algorithm for removing multiple chunks of data from the stream at once
 
-    target.seekg(0, std::ios_base::end);
-    const uint64_t initial_size = target.tellg();
+    target.seekp(0, std::ios_base::end);
+    const uint64_t initial_endp = target.tellp();
     uint64_t rem_len = 0; // remove length: the increasing size of the "hole" that gets pushed right
 
     // future remove operations are stored in a priority queue based on their positions
@@ -100,7 +100,7 @@ void Writer::perform_removes()
         };
 
         /* Removing a chunk of data is just moving another chunk of data, that is,
-         * between the former one and the next chunk of data to remove, to the left,
+         * between the current one and the next chunk of data to remove, to the left,
          * concatenating it with the rest of the remaining data.
          * After each remove operation, the size of the "hole" (rem_len) is increased
          * and pushed right till the end of the stream. */
@@ -108,21 +108,21 @@ void Writer::perform_removes()
         // the position of the following non-removing data
         const uint64_t mov_pos = pos + len;
         // the length of the following non-removing data
-        const uint64_t mov_len = std::min(next_pos, initial_size) - mov_pos;
+        const uint64_t mov_len = std::min(next_pos, initial_endp) - mov_pos;
         // pos - rem_len is the destination of the following non-removing data to move to
         utils::iosmove(target, pos - rem_len, mov_pos, mov_len); // do the move
 
         if (target.fail()) {
             SQUEEZE_ERROR("Target output stream failed");
             if (error)
-                *error = "failed removing " + path;
+                *error = {"failed removing entry '" + path + '\'', "target output stream failed"};
             target.clear();
         }
 
         rem_len += len; // increase the "hole" size
     }
     assert(future_removes.size() == 1 && "The last element in the priority queue of future removes must remain after performing all the remove operations.");
-    target.seekp(initial_size - rem_len); // point to the new end of the stream
+    target.seekp(initial_endp - rem_len); // point to the new end of the stream
 }
 
 void Writer::perform_appends()
@@ -131,8 +131,12 @@ void Writer::perform_appends()
 
     for (auto& future_append : future_appends) {
         auto e = perform_append(future_append.entry_input);
-        if (future_append.error)
-            *future_append.error = e;
+        if (future_append.error) {
+            if (e)
+                *future_append.error = {"failed appending entry '" + future_append.entry_input.get_path() + '\'', e.report()};
+            else
+                *future_append.error = success;
+        }
     }
     future_appends.clear();
     owned_entry_inputs.clear();
@@ -142,46 +146,66 @@ Error<Writer> Writer::perform_append(EntryInput& entry_input)
 {
     SQUEEZE_TRACE("Appending {}", entry_input.get_path());
 
-    std::streampos initial_pos = target.tellp();
+    const std::streampos initial_pos = target.tellp();
 
     EntryInput::ContentType content = std::monostate();
     EntryHeader entry_header {};
+
     auto e = entry_input.init(entry_header, content);
     if (e) {
-        SQUEEZE_ERROR("Failed opening an input");
-        return {"failed opening an input", e.report()};
+        SQUEEZE_ERROR("Failed initializing entry input");
+        return {"failed initializing entry input", e.report()};
     }
 
-    SQUEEZE_DEBUG("entry_header = {}", utils::stringify(entry_header));
+    SQUEEZE_DEBUG("initial_pos = {}", initial_pos);
 
-    target.seekp(target.tellp() + static_cast<std::streamsize>(entry_header.get_header_size()));
-
-    if (std::holds_alternative<std::istream *>(content)) {
-        SQUEEZE_TRACE("Entry content is a stream, appending...");
-        e = perform_append_stream(entry_header, *std::get<std::istream *>(content));
-    } else if (std::holds_alternative<std::string>(content)) {
-        SQUEEZE_TRACE("Entry content is a string, appending...");
-        e = perform_append_string(entry_header, std::get<std::string>(content));
-    } else {
-        SQUEEZE_TRACE("Entry content is empty");
-        entry_header.content_size = 0;
-    }
-
-    target.seekp(initial_pos);
-    if (e) {
-        SQUEEZE_ERROR("Failed appending entry");
-        return {"failed appending entry", e.report()};
-    }
-
-    SQUEEZE_TRACE("Encoding entry header");
+    SQUEEZE_TRACE("Encoding entry_header = {}", utils::stringify(entry_header));
     auto ehe = EntryHeader::encode(target, entry_header);
-    target.seekp(target.tellp() + static_cast<std::streamsize>(entry_header.content_size));
     if (ehe) {
+        target.seekp(initial_pos);
         SQUEEZE_ERROR("Failed encoding the entry header");
         return {"failed encoding the entry header", ehe.report()};
     }
 
+    e = perform_append_content(entry_header, content);
+
+    const std::streampos final_pos = target.tellp();
+    target.seekp(initial_pos);
+
+    if (e) {
+        SQUEEZE_ERROR("Failed appending entry content");
+        return {"failed appending entry content", e.report()};
+    }
+
+    SQUEEZE_TRACE("Encoding entry_header.content_size={}", entry_header.content_size);
+    target.write(reinterpret_cast<const char *>(&entry_header.content_size), sizeof(entry_header.content_size));
+    if (target.fail()) {
+        target.clear();
+        target.seekp(initial_pos);
+        SQUEEZE_ERROR("Failed encoding entry_header.content_size");
+        return "failed encoding entry_header.content_size";
+    }
+
+    SQUEEZE_DEBUG("final_pos = {}", final_pos);
+    target.seekp(final_pos);
+
     return success;
+}
+
+Error<Writer> Writer::perform_append_content(EntryHeader& entry_header, const EntryInput::ContentType& content)
+{
+    SQUEEZE_DEBUG("target.fail() = {}", target.fail());
+    if (std::holds_alternative<std::istream *>(content)) {
+        SQUEEZE_TRACE("Entry content is a stream, appending...");
+        return perform_append_stream(entry_header, *std::get<std::istream *>(content));
+    } else if (std::holds_alternative<std::string>(content)) {
+        SQUEEZE_TRACE("Entry content is a string, appending...");
+        return perform_append_string(entry_header, std::get<std::string>(content));
+    } else {
+        SQUEEZE_TRACE("Entry content is empty");
+        entry_header.content_size = 0;
+        return success;
+    }
 }
 
 Error<Writer> Writer::perform_append_stream(EntryHeader& entry_header, std::istream& input)

@@ -64,8 +64,11 @@ ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
     if (ec)
         return ec;
 
-    if (fs::is_symlink(path))
-        fs::remove(path);
+    if (fs::is_symlink(path, ec)) {
+        fs::remove(path, ec);
+        if (ec)
+            return ec;
+    }
     fs::create_symlink(fs::path(link_to), path, ec);
     if (ec)
         return ec;
@@ -185,6 +188,7 @@ std::optional<std::string> make_concise_portable_path(const fs::path& original_p
         break;
     case not_found:
     case unknown:
+    case none:
         return std::nullopt;
     default:
         break;

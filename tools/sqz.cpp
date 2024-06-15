@@ -218,6 +218,9 @@ private:
         if (path == "*") {
             std::deque<Error<Reader>> read_errors;
             fsqz->extract_all(make_back_inserter_lambda(read_errors));
+            for (auto& err : read_errors)
+                if (err)
+                    std::cerr << err.report() << '\n';
             return EXIT_SUCCESS;
         }
 

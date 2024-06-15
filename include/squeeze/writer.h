@@ -85,6 +85,7 @@ protected:
     void perform_removes();
     void perform_appends();
     Error<Writer> perform_append(EntryInput& entry_input);
+    Error<Writer> perform_append_content(EntryHeader& entry_header, const EntryInput::ContentType& content);
     Error<Writer> perform_append_stream(EntryHeader& entry_header, std::istream& input);
     Error<Writer> perform_append_string(EntryHeader& entry_header, const std::string& str);
 

@@ -44,7 +44,7 @@ public:
 
 private:
     friend class Reader;
-    constexpr ReaderIterator()
+    ReaderIterator()
         : owner(nullptr), pos_and_entry_header(npos, std::move(EntryHeader()))
     {}
     explicit ReaderIterator(const Reader& owner, bool begin);

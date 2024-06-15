@@ -75,8 +75,12 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
 {
     BasicEntryInput::init_entry_header(entry_header);
 
-    std::filesystem::path path(entry_header.path);
-    std::filesystem::file_status st = std::filesystem::symlink_status(path);
+    ErrorCode ec;
+    std::filesystem::file_status st = std::filesystem::symlink_status(entry_header.path, ec.get());
+
+    if (ec)
+        return {"failed getting file status of '" + entry_header.path + '\'', ec.report()};
+
     switch (st.type()) {
         using enum std::filesystem::file_type;
     case regular:

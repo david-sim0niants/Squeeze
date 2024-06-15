@@ -11,10 +11,10 @@ static std::string generate_random_string(const Random<int>& prng, size_t size)
     str.resize(size);
 
     constexpr char alphanum[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
-    constexpr size_t alphanum_len = sizeof(alphanum) / sizeof(alphanum[0]) - 1;
+    constexpr size_t alphanum_max_idx = sizeof(alphanum) / sizeof(alphanum[0]) - 2;
 
     for (size_t i = 0; i < size; ++i)
-        str[i] = alphanum[prng(0, alphanum_len)];
+        str[i] = alphanum[prng(0, alphanum_max_idx)];
     return str;
 }
 

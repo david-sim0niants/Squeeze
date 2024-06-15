@@ -6,21 +6,27 @@ Error<EntryHeader> EntryHeader::encode(std::ostream& output, const EntryHeader& 
 {
     output.write(reinterpret_cast<const char *>(&entry_header), static_size);
     output.write(entry_header.path.data(), entry_header.path_len);
-    if (output.fail())
+    if (output.fail()) {
+        output.clear();
         return "output write error";
+    }
     return success;
 }
 
 Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_header)
 {
     input.read(reinterpret_cast<char *>(&entry_header), static_size);
-    if (input.fail())
+    if (input.fail()) {
+        input.clear();
         return "input read error";
+    }
 
     entry_header.path.resize(entry_header.path_len);
     input.read(entry_header.path.data(), entry_header.path_len);
-    if (input.fail())
+    if (input.fail()) {
+        input.clear();
         return "failed parsing a path";
+    }
 
     switch (entry_header.compression_method) {
     case CompressionMethod::None:

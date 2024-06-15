@@ -13,7 +13,7 @@ namespace squeeze::testing::tools {
 class MockAbstractFile {
 public:
     explicit MockAbstractFile(EntryPermissions permissions = default_permissions)
-        : MockAbstractFile({EntryType::None, permissions})
+        : MockAbstractFile(EntryAttributes{EntryType::None, permissions})
     {}
 
     inline EntryAttributes get_attributes() const
@@ -44,19 +44,18 @@ protected:
 class MockRegularFile final : public MockAbstractFile {
 public:
     template<typename ...Args>
-    explicit MockRegularFile(EntryPermissions permissions, Args&&... args)
-        : MockAbstractFile({EntryType::RegularFile, permissions}), contents(std::forward<Args>(args)...)
+    explicit MockRegularFile(EntryPermissions permissions, std::stringstream&& contents = std::stringstream())
+        : MockAbstractFile(EntryAttributes{EntryType::RegularFile, permissions}), contents(std::move(contents))
     {}
 
     template<typename ...Args>
-    explicit MockRegularFile(Args&&... args)
-        : MockRegularFile(default_permissions, std::forward<Args>(args)...)
+    explicit MockRegularFile(std::stringstream&& contents = std::stringstream())
+        : MockRegularFile(default_permissions, std::move(contents))
     {}
 
     MockRegularFile(const MockRegularFile& other)
         : contents(other.contents.str())
-    {
-    }
+    {}
 
     MockRegularFile& operator=(const MockRegularFile& other)
     {
@@ -74,7 +73,7 @@ public:
 class MockSymlink : public MockAbstractFile {
 public:
     explicit MockSymlink(EntryPermissions permissions, std::string&& target)
-        : MockAbstractFile({EntryType::Symlink, permissions}), target(std::move(target))
+        : MockAbstractFile(EntryAttributes{EntryType::Symlink, permissions}), target(std::move(target))
     {}
 
     explicit MockSymlink(std::string&& target)
@@ -120,7 +119,7 @@ struct MockFileEntries {
 class MockDirectory : public MockAbstractFile {
 public:
     explicit MockDirectory(EntryPermissions permissions, MockFileEntries&& entries = {})
-        : MockAbstractFile({EntryType::Directory, permissions}), entries(entries)
+        : MockAbstractFile(EntryAttributes{EntryType::Directory, permissions}), entries(entries)
     {}
 
     explicit MockDirectory(MockFileEntries&& entries)
@@ -165,10 +164,6 @@ public:
                 }, path);
     }
 
-    MockFileEntries entries;
-
-    static constexpr char seperator = '/';
-
     std::shared_ptr<MockRegularFile> make_regular_file(const std::string_view path)
     {
         size_t i_sep = path.find_last_of(seperator);
@@ -203,6 +198,9 @@ public:
                 std::make_shared<tools::MockSymlink>(std::move(target));
     }
 
+    static constexpr char seperator = '/';
+    MockFileEntries entries;
+
 private:
     template<typename MockFile, typename OnFile>
     struct ListHelp {
@@ -229,7 +227,7 @@ private:
                     on_directory(path, directory);
                     directory->list_recursively<MockFiles...>(path, on_files...);
                 }, path
-        );
+            );
         }
     };
 };
