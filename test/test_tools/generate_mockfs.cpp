@@ -3,8 +3,6 @@
 
 namespace squeeze::testing::tools {
 
-const std::string mockfs_seed = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec tristique dictum ex, vitae egestas elit aliquet ac. Pellentesque consectetur sapien quis purus euismod, vel efficitur nibh lobortis. In hac habitasse platea dictumst. Proin aliquam vulputate molestie. Morbi vehicula facilisis enim, id maximus tortor mollis at. Aenean vitae consequat turpis. Proin efficitur, dui ac commodo molestie, sapien lectus dignissim lectus, eget condimentum lacus lorem nec odio. Pellentesque convallis nulla eget malesuada consectetur. Fusce ullamcorper, massa non sagittis eleifend, arcu eros euismod orci, nec malesuada mauris mauris id risus. Vestibulum ullamcorper ac mi et fringilla. Proin sed lectus tincidunt, tristique enim in, interdum elit. Duis ac tincidunt diam, a vehicula leo. Ut luctus, ex eu ultrices vehicula, lorem enim dignissim tellus, ut congue nisi velit sit amet ante. Cras nec sagittis justo.\n";
-
 static std::string generate_random_string(const Random<int>& prng, size_t size)
 {
     std::string str;
@@ -22,7 +20,7 @@ std::string generate_random_dirname(const Random<int>& prng)
 {
     constexpr int min_name_len = 4;
     constexpr int max_name_len = 8;
-    return generate_random_string(prng, prng(min_name_len, max_name_len)) + '/';
+    return generate_random_string(prng, prng(min_name_len, max_name_len)) + MockFileSystem::seperator;
 }
 
 std::string generate_random_regular_file_name(const Random<int>& prng)
@@ -76,10 +74,10 @@ struct MockRegularFileGenerateParams {
     }; int flags;
 };
 
-static void generate_mock_regular_file_contents(const std::string_view seed, std::stringstream& contents,
+static void generate_mock_regular_file_contents(
+        const Random<int>& prng, const std::string_view seed, std::stringstream& contents,
         const MockRegularFileGenerateParams& params)
 {
-    Random<size_t> prng;
     int nr_reps = (params.flags & MockRegularFileGenerateParams::RandomizedRepCount) ?
             prng(params.min_nr_reps, params.max_nr_reps) : params.min_nr_reps;
     size_t curr_size = 0;
@@ -103,12 +101,13 @@ static void generate_mock_regular_file_contents(const std::string_view seed, std
     }
 }
 
-static std::shared_ptr<MockRegularFile> generate_mock_regular_file(const std::string_view seed,
+static std::shared_ptr<MockRegularFile> generate_mock_regular_file(
+        const Random<int>& prng, const std::string_view seed,
         const MockRegularFileGenerateParams& params)
 {
     std::shared_ptr<MockRegularFile> regular_file = std::make_shared<MockRegularFile>(
-            generate_random_permissions(Random<int>()));
-    generate_mock_regular_file_contents(seed, regular_file->contents, params);
+            generate_random_permissions(prng));
+    generate_mock_regular_file_contents(prng, seed, regular_file->contents, params);
     return regular_file;
 }
 
@@ -117,13 +116,10 @@ static std::shared_ptr<MockSymlink> generate_mock_symlink(const Random<int>& prn
     return std::make_shared<MockSymlink>(generate_random_permissions(prng), std::move(target));
 }
 
-MockFileSystem generate_mockfs(const std::string_view seed)
+MockFileSystem generate_mockfs(const Random<int>& prng, const std::string_view seed)
 {
-    constexpr int prng_seed = 1234;
     constexpr int nr_regular_files = 20;
     constexpr int nr_symlinks = 20;
-
-    Random<int> prng(prng_seed);
 
     MockFileSystem mockfs = generate_mockfs_entries(prng, 3, 4);
 
@@ -151,7 +147,7 @@ MockFileSystem generate_mockfs(const std::string_view seed)
         std::string file_name = generate_random_regular_file_name(prng);
         auto& entries = directories[prng(0, directories.size() - 1)]->entries;
         regular_files.push_back(
-                entries.regular_files[file_name] = generate_mock_regular_file(seed, params));
+                entries.regular_files[file_name] = generate_mock_regular_file(prng, seed, params));
     }
 
     int nr_symlinks_left = nr_symlinks;

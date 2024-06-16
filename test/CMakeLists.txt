@@ -12,10 +12,11 @@ enable_testing()
 set(TEST_TARGETS squeeze)
 set(TEST_SRC_FILES ${TEST_TARGETS})
 list(TRANSFORM TEST_SRC_FILES APPEND .cpp)
+list(APPEND TEST_SRC_FILES main.cpp)
 
 set(TARGET_NAME test_all)
 add_executable(${TARGET_NAME} ${TEST_SRC_FILES})
-target_link_libraries(${TARGET_NAME} GTest::gtest_main squeeze test_tools)
+target_link_libraries(${TARGET_NAME} squeeze test_tools gtest)
 
 include(GoogleTest)
 gtest_discover_tests(${TARGET_NAME})

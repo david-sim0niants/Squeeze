@@ -44,8 +44,10 @@ protected:
 class MockRegularFile final : public MockAbstractFile {
 public:
     template<typename ...Args>
-    explicit MockRegularFile(EntryPermissions permissions, std::stringstream&& contents = std::stringstream())
-        : MockAbstractFile(EntryAttributes{EntryType::RegularFile, permissions}), contents(std::move(contents))
+    explicit MockRegularFile(EntryPermissions permissions,
+            std::stringstream&& contents = std::stringstream())
+        : MockAbstractFile(EntryAttributes{EntryType::RegularFile, permissions}),
+        contents(std::move(contents))
     {}
 
     template<typename ...Args>
@@ -54,13 +56,14 @@ public:
     {}
 
     MockRegularFile(const MockRegularFile& other)
-        : contents(other.contents.str())
+        : MockAbstractFile(other), contents(other.contents.str())
     {}
 
     MockRegularFile& operator=(const MockRegularFile& other)
     {
         if (this == &other)
             return *this;
+        MockAbstractFile::operator=(other);
         std::stringstream copied(other.contents.str());
         contents.swap(copied);
         return *this;
@@ -72,12 +75,12 @@ public:
 
 class MockSymlink : public MockAbstractFile {
 public:
-    explicit MockSymlink(EntryPermissions permissions, std::string&& target)
+    explicit MockSymlink(EntryPermissions permissions, std::string&& target = {})
         : MockAbstractFile(EntryAttributes{EntryType::Symlink, permissions}), target(std::move(target))
     {}
 
-    explicit MockSymlink(std::string&& target)
-        : MockAbstractFile(default_permissions), target(std::move(target))
+    explicit MockSymlink(std::string&& target = {})
+        : MockSymlink(default_permissions, std::move(target))
     {}
 
     std::string target;
@@ -122,11 +125,9 @@ public:
         : MockAbstractFile(EntryAttributes{EntryType::Directory, permissions}), entries(entries)
     {}
 
-    explicit MockDirectory(MockFileEntries&& entries)
+    explicit MockDirectory(MockFileEntries&& entries = {})
         : MockDirectory(default_permissions, std::move(entries))
     {}
-
-    MockDirectory() = default;
 
     template<typename MockFile, typename F>
     void list(F on_file) const
@@ -146,14 +147,14 @@ public:
     }
 
     template<typename ...MockFiles, typename ...OnFiles>
-    void list_recursively(OnFiles... on_files)
+    void list_recursively(OnFiles... on_files) const
     {
         std::string path;
         list_recursively<MockFiles...>(path, on_files...);
     }
 
     template<typename ...MockFiles, typename ...OnFiles>
-    void list_recursively(std::string& path, OnFiles... on_files)
+    void list_recursively(std::string& path, OnFiles... on_files) const
     {
         (..., ListHelp<MockFiles, OnFiles>{*this}.template list<MockFiles...>(on_files, path, on_files...));
         if constexpr (!(std::is_same_v<MockDirectory, MockFiles> || ...))
@@ -164,38 +165,23 @@ public:
                 }, path);
     }
 
-    std::shared_ptr<MockRegularFile> make_regular_file(const std::string_view path)
+    std::shared_ptr<MockDirectory> make_directories(std::string_view path);
+
+    template<typename MockFile, typename ...Args>
+    std::shared_ptr<MockFile> make(std::string_view path, Args&&... args)
     {
-        size_t i_sep = path.find_last_of(seperator);
-        MockDirectory *lastdir = this;
-        if (i_sep != std::string_view::npos)
-            lastdir = make_directories(path.substr(0, i_sep)).get();
-        return lastdir->entries.regular_files[std::string(path.substr(i_sep + 1))];
+        return MakeHelp<MockFile>{*this}.make(path, std::forward<Args>(args)...);
     }
 
-    std::shared_ptr<MockDirectory> make_directories(std::string_view path)
+    void update(const MockDirectory& another)
     {
-        std::shared_ptr<MockDirectory> curdir_shared = nullptr;
-        MockDirectory *curdir = this;
-        while (!path.empty()) {
-            size_t i_sep = path.find(seperator);
-            if (i_sep == std::string_view::npos)
-                i_sep = path.size();
-            curdir_shared = curdir->entries.directories[std::string(path.substr(0, i_sep))];
-            curdir = curdir_shared.get();
-            path = path.substr(i_sep);
-        }
-        return curdir_shared;
-    }
+        auto make_file = [this](const std::string& path, auto file)
+        {
+            *make<typename decltype(file)::element_type>(path) = *file;
+        };
 
-    std::shared_ptr<MockSymlink> make_regular_file(const std::string_view path, std::string&& target)
-    {
-        size_t i_sep = path.find_last_of(seperator);
-        MockDirectory *lastdir = this;
-        if (i_sep != std::string_view::npos)
-            lastdir = make_directories(path.substr(0, i_sep)).get();
-        return lastdir->entries.symlinks[std::string(path.substr(i_sep + 1))] =
-                std::make_shared<tools::MockSymlink>(std::move(target));
+        another.list_recursively<MockRegularFile, MockDirectory, MockSymlink>(
+                make_file, make_file, make_file);
     }
 
     static constexpr char seperator = '/';
@@ -204,10 +190,10 @@ public:
 private:
     template<typename MockFile, typename OnFile>
     struct ListHelp {
-        MockDirectory& owner;
+        const MockDirectory& owner;
 
         template<typename ...MockFiles, typename ...OnFiles>
-        inline void list(OnFile on_file, std::string& path, OnFiles&...)
+        inline void list(OnFile on_file, std::string& path, OnFiles&...) const
         {
             owner.list<MockFile>(on_file, path);
         }
@@ -215,10 +201,10 @@ private:
 
     template<typename OnDirectory>
     struct ListHelp<MockDirectory, OnDirectory> {
-        MockDirectory& owner;
+        const MockDirectory& owner;
 
         template<typename ...MockFiles, typename ...OnFiles>
-        inline void list(OnDirectory on_directory, std::string& path, OnFiles&... on_files)
+        inline void list(OnDirectory on_directory, std::string& path, OnFiles&... on_files) const
         {
             owner.list<MockDirectory>(
                 [&on_directory, &on_files...]
@@ -230,9 +216,38 @@ private:
             );
         }
     };
+
+    template<typename MockFile, typename = void>
+    struct MakeHelp {
+        MockDirectory& owner;
+
+        template<typename ...Args>
+        std::shared_ptr<MockFile> make(std::string_view path, Args&&... args)
+        {
+            size_t i_sep = path.find_last_of(seperator);
+            MockDirectory *lastdir = &owner;
+            if (i_sep != std::string_view::npos)
+                lastdir = owner.make_directories(path.substr(0, i_sep + 1)).get();
+            return lastdir->entries.get<MockFile>()[std::string(path.substr(i_sep + 1))] =
+                    std::make_shared<MockFile>(std::forward<Args>(args)...);
+        }
+    };
+
+    template<typename Explicit_Specialization_Preventing_Type>
+    struct MakeHelp<MockDirectory, Explicit_Specialization_Preventing_Type> {
+        MockDirectory& owner;
+
+        template<typename ...Args>
+        inline std::shared_ptr<MockDirectory> make(std::string_view path, Args&&...)
+        {
+            return owner.make_directories(path);
+        }
+    };
 };
 
 
 using MockFileSystem = MockDirectory; // kinda really does act like a directory
+
+MockFileEntries flatten_mockfs(const MockFileSystem& mockfs);
 
 }

@@ -89,7 +89,7 @@ Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_outpu
         break;
     }
     default:
-        throw Exception<Reader>("unexpected entry type");
+        return Error<Reader>("invalid entry type");
     }
     return success;
 }
