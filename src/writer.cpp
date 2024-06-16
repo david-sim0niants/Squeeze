@@ -43,7 +43,7 @@ void Writer::write()
     SQUEEZE_TRACE();
     perform_removes();
     perform_appends();
-    SQUEEZE_DEBUG("Stream put pointer at: {}", target.tellp());
+    SQUEEZE_DEBUG("Stream put pointer at: {}", static_cast<long long>(target.tellp()));
 }
 
 Error<Writer> Writer::append(EntryInput& entry_input)
@@ -157,7 +157,7 @@ Error<Writer> Writer::perform_append(EntryInput& entry_input)
         return {"failed initializing entry input", e.report()};
     }
 
-    SQUEEZE_DEBUG("initial_pos = {}", initial_pos);
+    SQUEEZE_DEBUG("initial_pos = {}", static_cast<long long>(initial_pos));
 
     SQUEEZE_TRACE("Encoding entry_header = {}", utils::stringify(entry_header));
     auto ehe = EntryHeader::encode(target, entry_header);
@@ -186,7 +186,7 @@ Error<Writer> Writer::perform_append(EntryInput& entry_input)
         return "failed encoding entry_header.content_size";
     }
 
-    SQUEEZE_DEBUG("final_pos = {}", final_pos);
+    SQUEEZE_DEBUG("final_pos = {}", static_cast<long long>(final_pos));
     target.seekp(final_pos);
 
     return success;

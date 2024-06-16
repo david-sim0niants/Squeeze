@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  SOURCE_DIR: ${{ github.workspace }}
+  BINARY_DIR: ${{ github.workspace }}/build
+
+jobs:
+  build:
+    name: Build and Test
+
+    strategy:
+      matrix:
+        compiler:
+          - { cc: gcc, cxx: g++ }
+          - { cc: clang, cxx: clang++ }
+        build_type: [ Release, Debug ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libspdlog-dev
+
+    - name: Create build directory
+      run: mkdir ${{env.BINARY_DIR}}
+
+    - name: Build
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        cmake ../ -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DUSE_LOGGING=ON -DBUILD_TESTS=ON
+        make -j$(nproc)
+
+    - name: Test
+      working-directory: ${{ env.BINARY_DIR }}
+      run: ./test/test_all
+
