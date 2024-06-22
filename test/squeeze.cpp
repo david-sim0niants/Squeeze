@@ -1,8 +1,8 @@
 #include "squeeze/squeeze.h"
 
-#include <gtest/gtest.h>
-
 #include <sstream>
+
+#include <gtest/gtest.h>
 
 #include "test_tools/generate_mockfs.h"
 #include "test_tools/mock_entry_input.h"
@@ -99,16 +99,16 @@ template<> void test_mock_files<tools::MockSymlink>(
 
 
 static void encode_mockfs(Squeeze& squeeze, const tools::MockFileSystem& original_mockfs,
-        CompressionMethod compression_method, int compression_level)
+        const CompressionParams& compression)
 {
     std::deque<Error<Writer>> write_errors;
     auto append_file =
-        [&squeeze, &write_errors, compression_method, compression_level]
+        [&squeeze, &write_errors, &compression]
         (const std::string& path, auto file)
         {
             write_errors.emplace_back();
             squeeze.will_append<tools::MockEntryInput>(write_errors.back(),
-                    std::string(path), compression_method, compression_level, file);
+                    std::string(path), compression, file);
         };
     original_mockfs.list_recursively<tools::MockRegularFile, tools::MockDirectory, tools::MockSymlink>(
             append_file, append_file, append_file);
@@ -131,8 +131,7 @@ static void decode_mockfs(Squeeze& squeeze, tools::MockFileSystem& restored_mock
 struct TestArgs {
     int prng_seed;
     const char *file_content_seed;
-    CompressionMethod compression_method;
-    int compression_level;
+    CompressionParams compression;
 };
 
 class SqueezeTest : public ::testing::Test, public ::testing::WithParamInterface<TestArgs> {
@@ -150,8 +149,7 @@ protected:
 
     inline void encode_mockfs(const tools::MockFileSystem& original_mockfs)
     {
-        testing::encode_mockfs(squeeze, original_mockfs,
-                GetParam().compression_method, GetParam().compression_level);
+        testing::encode_mockfs(squeeze, original_mockfs, GetParam().compression);
     }
 
     inline void decode_mockfs(tools::MockFileSystem& restored_mockfs)
@@ -161,13 +159,13 @@ protected:
 
     static inline void present_generated_mockfs(const tools::MockFileSystem& generated_mockfs)
     {
-        std::cerr << "\033[32m" << "Generated mock filesystem:" << "\033[0m" << '\n';
+        std::cerr << "\033[32m" "Generated mock filesystem:" << "\033[0m\n";
         observe_mockfs(generated_mockfs);
     }
 
     static inline void present_recreated_mockfs(const tools::MockFileSystem& recreated_mockfs)
     {
-        std::cerr << "\033[32m\n" << "Recreated mock filesystem:" << "\033[0m" << '\n';
+        std::cerr << "\033[32m\n" "Recreated mock filesystem:" << "\033[0m\n";
         observe_mockfs(recreated_mockfs);
     }
 
@@ -184,6 +182,7 @@ TEST_P(SqueezeTest, WriteRead)
     present_generated_mockfs(generated_mockfs);
 
     encode_mockfs(generated_mockfs);
+    ASSERT_FALSE(squeeze.is_corrupted());
     decode_mockfs(recreated_mockfs);
 
     present_recreated_mockfs(recreated_mockfs);
@@ -203,6 +202,7 @@ TEST_P(SqueezeTest, WriteUpdateRead)
     present_generated_mockfs(generated_mockfs);
 
     encode_mockfs(generated_mockfs);
+    ASSERT_FALSE(squeeze.is_corrupted());
     decode_mockfs(recreated_mockfs);
 
     present_recreated_mockfs(recreated_mockfs);
@@ -215,7 +215,7 @@ static constexpr int prng_seed = 1234;
 static constexpr char file_content_seed[] = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec tristique dictum ex, vitae egestas elit aliquet ac. Pellentesque consectetur sapien quis purus euismod, vel efficitur nibh lobortis. In hac habitasse platea dictumst. Proin aliquam vulputate molestie. Morbi vehicula facilisis enim, id maximus tortor mollis at. Aenean vitae consequat turpis. Proin efficitur, dui ac commodo molestie, sapien lectus dignissim lectus, eget condimentum lacus lorem nec odio. Pellentesque convallis nulla eget malesuada consectetur. Fusce ullamcorper, massa non sagittis eleifend, arcu eros euismod orci, nec malesuada mauris mauris id risus. Vestibulum ullamcorper ac mi et fringilla. Proin sed lectus tincidunt, tristique enim in, interdum elit. Duis ac tincidunt diam, a vehicula leo. Ut luctus, ex eu ultrices vehicula, lorem enim dignissim tellus, ut congue nisi velit sit amet ante. Cras nec sagittis justo.\n";
 
 INSTANTIATE_TEST_SUITE_P(AnyCompression, SqueezeTest, ::testing::Values(
-            TestArgs {prng_seed, file_content_seed, CompressionMethod::None, 0}
+            TestArgs {prng_seed, file_content_seed, {compression::CompressionMethod::None, 0}}
         )
     );
 

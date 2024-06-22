@@ -20,4 +20,6 @@ private:
     mutable std::mt19937 generator;
 };
 
+std::string generate_random_string(const Random<int>& prng, size_t size);
+
 }

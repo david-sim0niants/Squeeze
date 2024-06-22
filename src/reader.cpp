@@ -50,7 +50,7 @@ Error<Reader> Reader::extract(const ReaderIterator& it, EntryOutput& entry_outpu
     SQUEEZE_TRACE("Extracting {}", it->second.path);
 
     auto& [pos, entry_header] = *it;
-    source.seekg(pos + entry_header.get_header_size());
+    source.seekg(pos + entry_header.get_encoded_header_size());
 
     SQUEEZE_DEBUG("Entry header: {}", utils::stringify(entry_header));
 
@@ -102,15 +102,15 @@ bool Reader::is_corrupted() const
     for (auto it = begin(); it != end(); ++it)
         last_it = it;
     return last_it == end() && size > 0
-        || last_it->first + last_it->second.get_full_size() < size;
+        || last_it->first + last_it->second.get_encoded_full_size() < size;
 }
 
 Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostream& output)
 {
     SQUEEZE_TRACE();
 
-    switch (entry_header.compression_method) {
-        using enum CompressionMethod;
+    switch (entry_header.compression.method) {
+        using enum compression::CompressionMethod;
     case None:
         utils::ioscopy(source, source.tellg(), output, output.tellp(), entry_header.content_size);
         break;

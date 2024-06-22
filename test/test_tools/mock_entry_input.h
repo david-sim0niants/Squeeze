@@ -8,10 +8,10 @@ namespace squeeze::testing::tools {
 class MockEntryInput final : public BasicEntryInput {
 public:
     template<typename MockFile>
-    MockEntryInput(std::string&& path, CompressionMethod compression_method, int compression_level,
+    MockEntryInput(std::string&& path, const CompressionParams& compression,
             std::shared_ptr<MockFile> file)
         requires(std::is_base_of_v<MockAbstractFile, MockFile>)
-        : BasicEntryInput(std::move(path), compression_method, compression_level), file(file)
+        : BasicEntryInput(std::move(path), compression), file(file)
     {}
 
     Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;

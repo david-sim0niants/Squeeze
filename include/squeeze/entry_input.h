@@ -6,9 +6,11 @@
 #include "entry_common.h"
 #include "entry_header.h"
 #include "error.h"
-#include "compression_method.h"
+#include "compression/params.h"
 
 namespace squeeze {
+
+using compression::CompressionParams;
 
 /* Interface responsible for providing the data (entry header and content) required
  * for the Writer interface to perform append operation. This is the abstract class of it.
@@ -46,16 +48,13 @@ protected:
  * before being initialized. */
 class BasicEntryInput : public EntryInput {
 protected:
-    BasicEntryInput(std::string&& path, CompressionMethod compression_method, int compression_level)
-        :   EntryInput(std::move(path)),
-            compression_method(compression_method),
-            compression_level(compression_level)
+    BasicEntryInput(std::string&& path, const CompressionParams& compression)
+        :   EntryInput(std::move(path)), compression(compression)
     {}
 
     void init_entry_header(EntryHeader& entry_header);
 
-    CompressionMethod compression_method;
-    int compression_level;
+    const CompressionParams& compression;
 };
 
 
@@ -63,8 +62,8 @@ protected:
  * the file with the specified path. */
 class FileEntryInput : public BasicEntryInput {
 public:
-    FileEntryInput(std::string&& path, CompressionMethod compression_method, int compression_level)
-        :   BasicEntryInput(std::move(path), compression_method, compression_level)
+    FileEntryInput(std::string&& path, const CompressionParams& compression)
+        :   BasicEntryInput(std::move(path), compression)
     {}
 
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
@@ -80,11 +79,10 @@ protected:
 /* Entry input interface that contains the necessary entry header data and contents in advance. */
 class CustomContentEntryInput : public BasicEntryInput {
 public:
-    CustomContentEntryInput(std::string&& path,
-            CompressionMethod compression_method, int compression_level,
+    CustomContentEntryInput(std::string&& path, const CompressionParams& compression,
             ContentType&& content, EntryAttributes entry_attributes = default_attributes)
         :
-            BasicEntryInput(std::move(path), compression_method, compression_level),
+            BasicEntryInput(std::move(path), compression),
             content(std::move(content)), entry_attributes(entry_attributes)
     {}
 

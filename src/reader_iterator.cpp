@@ -15,7 +15,7 @@ ReaderIterator::ReaderIterator(const Reader& owner, bool begin)
 
 ReaderIterator& ReaderIterator::operator++() noexcept
 {
-    pos_and_entry_header.first += pos_and_entry_header.second.get_full_size();
+    pos_and_entry_header.first += pos_and_entry_header.second.get_encoded_full_size();
     read_current();
     return *this;
 }

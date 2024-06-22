@@ -5,13 +5,14 @@
 #include "squeeze/logging.h"
 #include "squeeze/utils/fs.h"
 #include "squeeze/exception.h"
+#include "squeeze/version.h"
 
 
 namespace squeeze {
 
 void EntryInput::init_entry_header(EntryHeader& entry_header)
 {
-    entry_header.path_len = path.size();
+    entry_header.major_minor_version = {version.major, version.minor};
     entry_header.path = path;
 }
 
@@ -19,8 +20,7 @@ void EntryInput::init_entry_header(EntryHeader& entry_header)
 void BasicEntryInput::init_entry_header(EntryHeader& entry_header)
 {
     EntryInput::init_entry_header(entry_header);
-    entry_header.compression_method = compression_method;
-    entry_header.compression_level = compression_level;
+    entry_header.compression = compression;
 }
 
 #undef SQUEEZE_LOG_FUNC_PREFIX

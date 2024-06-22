@@ -35,7 +35,7 @@ void Writer::will_append(EntryInput& entry_input, Error<Writer> *err)
 void Writer::will_remove(const ReaderIterator& it, Error<Writer> *err)
 {
     SQUEEZE_TRACE("Will remove {}", it->second.path);
-    future_removes.emplace(std::string(it->second.path), it->first, it->second.get_full_size(), err);
+    future_removes.emplace(std::string(it->second.path), it->first, it->second.get_encoded_full_size(), err);
 }
 
 void Writer::write()
@@ -178,11 +178,10 @@ Error<Writer> Writer::perform_append(EntryInput& entry_input)
     }
 
     SQUEEZE_TRACE("Encoding entry_header.content_size={}", entry_header.content_size);
-    target.write(reinterpret_cast<const char *>(&entry_header.content_size), sizeof(entry_header.content_size));
-    if (target.fail()) {
-        target.clear();
-        target.seekp(initial_pos);
+    e = EntryHeader::encode_content_size(target, entry_header.content_size);
+    if (e) {
         SQUEEZE_ERROR("Failed encoding entry_header.content_size");
+        target.seekp(initial_pos);
         return "failed encoding entry_header.content_size";
     }
 
@@ -214,8 +213,8 @@ Error<Writer> Writer::perform_append_stream(EntryHeader& entry_header, std::istr
 
     std::streampos start = target.tellp();
 
-    switch (entry_header.compression_method) {
-        using enum CompressionMethod;
+    switch (entry_header.compression.method) {
+        using enum compression::CompressionMethod;
     case None:
         input.seekg(0, std::ios_base::end);
         entry_header.content_size = static_cast<uint64_t>(input.tellg());
