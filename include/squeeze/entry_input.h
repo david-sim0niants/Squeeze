@@ -17,8 +17,6 @@ using compression::CompressionParams;
  * Other derivations of it could provide the data from a file or in a custom way. */
 class EntryInput {
 public:
-    virtual ~EntryInput() = default;
-
     /* The content type.
      * A monostate (no state) usually refers to a directory as directories don't have any content.
      * An input stream usually refers to a regular file contents.

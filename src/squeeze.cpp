@@ -3,7 +3,6 @@
 #include <unordered_set>
 
 #include "squeeze/logging.h"
-#include "writer_internal.h"
 
 namespace squeeze {
 

@@ -6,7 +6,7 @@ namespace squeeze::utils {
 
 void iosmove(std::iostream& ios, std::streampos dst, std::streampos src, std::streamsize len)
 {
-    char buffer[BUFSIZ];
+    thread_local char buffer[BUFSIZ] {};
 
     while (len) {
         const std::streamsize step_len = std::min(len, (std::streamsize)BUFSIZ);
@@ -26,7 +26,7 @@ void ioscopy(std::istream& src_stream, std::streampos src_pos,
              std::ostream& dst_stream, std::streampos dst_pos,
              std::streamsize cpy_len)
 {
-    char buffer[BUFSIZ];
+    thread_local char buffer[BUFSIZ] {};
 
     while (cpy_len) {
         const std::streamsize step_len = std::min(cpy_len, (std::streamsize)BUFSIZ);

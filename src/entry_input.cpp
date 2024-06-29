@@ -44,8 +44,7 @@ Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& c
     {
         SQUEEZE_TRACE("'{}' is a symlink", path);
         std::error_code ec;
-        auto symlink_target = std::filesystem::read_symlink(
-                std::filesystem::path(entry_header.path), ec);
+        auto symlink_target = std::filesystem::read_symlink(entry_header.path, ec);
         if (ec)
             return {"failed reading symlink", ErrorCode(ec).report()};
         content = symlink_target.string();
