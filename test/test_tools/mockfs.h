@@ -57,15 +57,15 @@ public:
 
     MockRegularFile(const MockRegularFile& other)
         : MockAbstractFile(other), contents(other.contents.str())
-    {}
+    {
+    }
 
     MockRegularFile& operator=(const MockRegularFile& other)
     {
         if (this == &other)
             return *this;
         MockAbstractFile::operator=(other);
-        std::stringstream copied(other.contents.str());
-        contents.swap(copied);
+        contents = std::stringstream(other.contents.str());
         return *this;
     }
 

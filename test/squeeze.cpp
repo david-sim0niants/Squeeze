@@ -54,7 +54,7 @@ static void test_mockfs(const tools::MockFileSystem& original, const tools::Mock
 }
 
 template<typename MockFile>
-static void test_mock_files(const MockFile& original, const MockFile& restored) {}
+static void test_mock_files(const MockFile& original, const MockFile& restored, std::string_view path) {}
 
 template<typename MockFile>
 static void test_mockfs_entries(
@@ -67,7 +67,7 @@ static void test_mockfs_entries(
         EXPECT_TRUE(it != restored.end());
         if (it == restored.end())
             continue;
-        test_mock_files(*it->second, *file);
+        test_mock_files(*file, *it->second, path);
     }
 }
 
@@ -78,23 +78,29 @@ static void test_mock_attributes(EntryAttributes original, EntryAttributes resto
 }
 
 template<> void test_mock_files<tools::MockRegularFile>(
-        const tools::MockRegularFile& original, const tools::MockRegularFile& restored)
+        const tools::MockRegularFile& original, const tools::MockRegularFile& restored, std::string_view path)
 {
     test_mock_attributes(original.get_attributes(), restored.get_attributes());
-    EXPECT_EQ(original.contents.view(), restored.contents.view());
+    EXPECT_TRUE(original.contents.view() == restored.contents.view())
+        << "Regular file contents didn't restore properly: " << path;
+    EXPECT_EQ(original.contents.view().size(), restored.contents.view().size())
+        << "Neither sizes matched";
 }
 
 template<> void test_mock_files<tools::MockDirectory>(
-        const tools::MockDirectory& original, const tools::MockDirectory& restored)
+        const tools::MockDirectory& original, const tools::MockDirectory& restored, std::string_view path)
 {
     test_mock_attributes(original.get_attributes(), restored.get_attributes());
 }
 
 template<> void test_mock_files<tools::MockSymlink>(
-        const tools::MockSymlink& original, const tools::MockSymlink& restored)
+        const tools::MockSymlink& original, const tools::MockSymlink& restored, std::string_view path)
 {
     test_mock_attributes(original.get_attributes(), restored.get_attributes());
-    EXPECT_EQ(original.target, restored.target);
+    EXPECT_EQ(original.target, restored.target)
+        << "Symlink target didn't restore properly: " << path;
+    EXPECT_EQ(original.target.size(), restored.target.size())
+        << "Neither sizes matched";
 }
 
 
@@ -150,11 +156,20 @@ protected:
     inline void encode_mockfs(const tools::MockFileSystem& original_mockfs)
     {
         testing::encode_mockfs(squeeze, original_mockfs, GetParam().compression);
+        if (content.tellp() < content.view().size())
+            content.str(std::string(content.view().substr(0, content.tellp())));
     }
 
     inline void decode_mockfs(tools::MockFileSystem& restored_mockfs)
     {
         testing::decode_mockfs(squeeze, restored_mockfs);
+    }
+
+    inline void assert_if_corrupted()
+    {
+        content.seekg(0, std::ios_base::end);
+        std::streamsize content_size = content.tellg();
+        ASSERT_FALSE(squeeze.is_corrupted()) << "content_size=" << content_size;
     }
 
     static inline void present_generated_mockfs(const tools::MockFileSystem& generated_mockfs)
@@ -182,7 +197,9 @@ TEST_P(SqueezeTest, WriteRead)
     present_generated_mockfs(generated_mockfs);
 
     encode_mockfs(generated_mockfs);
-    ASSERT_FALSE(squeeze.is_corrupted());
+    content.seekg(0, std::ios_base::end);
+    std::streamsize content_size = content.tellg();
+    assert_if_corrupted();
     decode_mockfs(recreated_mockfs);
 
     present_recreated_mockfs(recreated_mockfs);
@@ -196,13 +213,14 @@ TEST_P(SqueezeTest, WriteUpdateRead)
     tools::MockFileSystem generated_mockfs = generate_mockfs(), recreated_mockfs;
 
     encode_mockfs(generated_mockfs);
+    assert_if_corrupted();
     generated_mockfs.update(generate_mockfs());
 
     std::cerr << '\n';
     present_generated_mockfs(generated_mockfs);
 
     encode_mockfs(generated_mockfs);
-    ASSERT_FALSE(squeeze.is_corrupted());
+    assert_if_corrupted();
     decode_mockfs(recreated_mockfs);
 
     present_recreated_mockfs(recreated_mockfs);
