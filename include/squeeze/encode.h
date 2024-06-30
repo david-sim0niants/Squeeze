@@ -36,6 +36,11 @@ public:
         return e;
     }
 
+    inline void finalize()
+    {
+        scheduler.finalize();
+    }
+
 private:
     Error<> schedule_stream_encode_step(std::future<Buffer>& future_output,
             std::istream& stream, const CompressionParams& compression);

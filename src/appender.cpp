@@ -36,12 +36,21 @@ void Appender::will_append(EntryInput& entry_input, Error<Appender> *err)
 void Appender::perform_appends(unsigned concurrency)
 {
     SQUEEZE_TRACE();
+
+    if (future_appends.empty()) {
+        SQUEEZE_TRACE("No entry to append, exiting");
+        return;
+    }
+
     Context context(concurrency);
-    auto future_void = std::async(std::launch::async,
-            std::mem_fn(&AppendScheduler::run), &context.scheduler, std::ref(target));
-    schedule_appends(context);
-    future_void.wait();
-    SQUEEZE_DEBUG("Stream put pointer at: {}", static_cast<long long>(target.tellp()));
+    {
+        std::future<void> future_void = std::async(std::launch::async,
+            std::mem_fn(&Appender::perform_scheduled_appends), this, std::ref(context.scheduler));
+        schedule_appends(context);
+        SQUEEZE_TRACE("Waiting for scheduled append tasks to complete");
+        future_void.get();
+    }
+    SQUEEZE_TRACE("Stream put pointer at: {}", static_cast<long long>(target.tellp()));
 }
 
 Error<Appender> Appender::append(EntryInput& entry_input)

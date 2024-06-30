@@ -52,7 +52,7 @@ protected:
 
     void init_entry_header(EntryHeader& entry_header);
 
-    const CompressionParams& compression;
+    CompressionParams compression;
 };
 
 

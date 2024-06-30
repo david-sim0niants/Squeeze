@@ -78,6 +78,9 @@ public:
 
     void emplace(auto&&... args)
     {
+        if (size.load(std::memory_order::acquire) & done_flag)
+            return;
+
         Node *new_dummy_tail = new Node;
 
         Node *curr_tail = nullptr;

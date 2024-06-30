@@ -169,7 +169,6 @@ Error<> EntryAppendScheduler::run_internal(std::ostream& target)
     SQUEEZE_TRACE("Appending {}", entry_header.path);
 
     const std::streampos initial_pos = target.tellp();
-
     SQUEEZE_DEBUG("initial_pos = {}", static_cast<long long>(initial_pos));
 
     SQUEEZE_TRACE("Encoding entry_header = {}", utils::stringify(entry_header));
@@ -180,7 +179,7 @@ Error<> EntryAppendScheduler::run_internal(std::ostream& target)
         return {"failed encoding the entry header", ehe.report()};
     }
 
-    std::streampos content_pos = target.tellp();
+    const std::streampos content_pos = target.tellp();
 
     SQUEEZE_TRACE("Running scheduled tasks");
     auto e = scheduler.run_till_error(target);
@@ -233,24 +232,28 @@ void AppendScheduler::schedule_entry_append(EntryHeader&& entry_header, Error<> 
 
 void AppendScheduler::schedule_error_raise(Error<>&& error)
 {
+    SQUEEZE_TRACE();
     assert(last_entry_append_scheduler != nullptr);
     last_entry_append_scheduler->schedule_error_raise(std::move(error));
 }
 
 void AppendScheduler::schedule_buffer_append(std::future<Buffer>&& future_buffer)
 {
+    SQUEEZE_TRACE("future_buffer");
     assert(last_entry_append_scheduler != nullptr);
     last_entry_append_scheduler->schedule_buffer_append(std::move(future_buffer));
 }
 
 void AppendScheduler::schedule_buffer_append(Buffer&& buffer)
 {
+    SQUEEZE_TRACE("buffer");
     assert(last_entry_append_scheduler != nullptr);
     last_entry_append_scheduler->schedule_buffer_append(std::move(buffer));
 }
 
 void AppendScheduler::schedule_string_append(std::string&& str)
 {
+    SQUEEZE_TRACE();
     assert(last_entry_append_scheduler != nullptr);
     last_entry_append_scheduler->schedule_string_append(std::move(str));
 }

@@ -143,6 +143,9 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
 template<> std::string utils::stringify(const EntryHeader& header)
 {
     return  "{ content_size=" + utils::stringify(header.content_size) +
+            ", major_minor_version=" +
+                utils::stringify(header.major_minor_version.major) + '.' +
+                utils::stringify(header.major_minor_version.minor) +
             ", compression=" + utils::stringify(header.compression) +
             ", attributes=" + utils::stringify(header.attributes) +
             ", path=" + header.path + " }";

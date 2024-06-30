@@ -85,6 +85,11 @@ public:
     Error<Appender> append(EntryInput& entry_input);
 
 protected:
+    inline void perform_scheduled_appends(AppendScheduler& scheduler)
+    {
+        scheduler.run(target);
+    }
+
     void schedule_appends(Context& context);
     Error<Appender> schedule_append(Context& context, FutureAppend& future_append);
     static Error<Appender> schedule_append_stream(

@@ -24,12 +24,12 @@ public:
     TaskScheduler(const TaskScheduler&) = delete;
     TaskScheduler& operator=(const TaskScheduler&) = delete;
 
-    void schedule(Task&& task)
+    inline void schedule(Task&& task)
     {
         tasks.push(std::move(task));
     }
 
-    void schedule(auto&&... args)
+    inline void schedule(auto&&... args)
     {
         tasks.emplace(std::forward<decltype(args)>(args)...);
     }
@@ -46,7 +46,7 @@ public:
         while (auto task = tasks.try_wait_and_pop()) {
             Error<Task> e = (*task)(std::forward<decltype(args)>(args)...);
             if (e.failed())
-                return e;
+                return std::move(e);
         }
         return success;
     }

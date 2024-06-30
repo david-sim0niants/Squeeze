@@ -17,7 +17,7 @@ public:
         Stopping,
     };
 
-    WorkerThread() : internal(std::mem_fn(&WorkerThread::run), this)
+    WorkerThread() : state(State::Idle), internal(std::mem_fn(&WorkerThread::run), this)
     {
     }
 
@@ -45,7 +45,7 @@ public:
 
         State expected = State::Idle;
         if (!state.compare_exchange_weak(expected, State::Starting,
-                    std::memory_order::relaxed, std::memory_order::relaxed))
+                    std::memory_order::acquire, std::memory_order::relaxed))
             return false;
         this->task.swap(task);
         state.store(State::Running, std::memory_order::release);
@@ -64,28 +64,42 @@ private:
     {
         SQUEEZE_TRACE();
         while (true) {
-            State curr_state = State::Idle;
-            while (curr_state == State::Idle or curr_state == State::Starting) {
-                state.wait(curr_state, std::memory_order::acquire);
-                curr_state = state.load(std::memory_order::relaxed);
-            }
+            state.wait(State::Idle, std::memory_order::acquire);
+            state.wait(State::Starting, std::memory_order::acquire);
 
-            if (curr_state == State::Running) {
-                SQUEEZE_TRACE("Starting task");
-                task();
-                state.store(State::Idle, std::memory_order::release);
-                state.notify_one();
-                SQUEEZE_TRACE("Finished task");
-            } else {
+            if (state.load(std::memory_order::relaxed) == State::Stopping)
                 break;
-            }
+
+            SQUEEZE_TRACE("Starting task");
+            task();
+            SQUEEZE_TRACE("Finished task");
+            state.store(State::Idle, std::memory_order::release);
+            state.notify_one();
         }
+
+        auto state_to_str = [](State state)
+        {
+            switch (state) {
+            case State::Idle:
+                return "idle";
+            case State::Starting:
+                return "starting";
+            case State::Running:
+                return "running";
+            case State::Stopping:
+                return "stopping";
+            default:
+                return "<unknown>";
+            }
+        };
+
+        SQUEEZE_DEBUG("curr_state={}", state_to_str(state));
         SQUEEZE_TRACE("Returning from worker thread");
     }
 
-    std::thread internal;
+    std::atomic<State> state;
     Task task;
-    std::atomic<State> state = State::Idle;
+    std::thread internal;
 };
 
 ThreadPool::ThreadPool(const unsigned concurrency)

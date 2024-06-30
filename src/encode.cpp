@@ -1,5 +1,7 @@
 #include "squeeze/encode.h"
 
+#include "squeeze/logging.h"
+
 namespace squeeze {
 
 struct EncoderPool::Task {
@@ -19,6 +21,9 @@ struct EncoderPool::Task {
     }
 };
 
+#undef SQUEEZE_LOG_FUNC_PREFIX
+#define SQUEEZE_LOG_FUNC_PREFIX "squeeze::EncoderPool::"
+
 EncoderPool::EncoderPool(misc::ThreadPool& thread_pool) : thread_pool(thread_pool)
 {
 }
@@ -34,7 +39,9 @@ EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& com
     thread_pool.try_assign_task(
             [&scheduler = this->scheduler]()
             {
+                SQUEEZE_TRACE("Scheduler start");
                 scheduler.run();
+                SQUEEZE_TRACE("Scheduler finish");
             }
         );
     return future_output;

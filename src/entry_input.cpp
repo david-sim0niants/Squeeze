@@ -7,7 +7,6 @@
 #include "squeeze/exception.h"
 #include "squeeze/version.h"
 
-
 namespace squeeze {
 
 void EntryInput::init_entry_header(EntryHeader& entry_header)
@@ -15,7 +14,6 @@ void EntryInput::init_entry_header(EntryHeader& entry_header)
     entry_header.major_minor_version = {version.major, version.minor};
     entry_header.path = path;
 }
-
 
 void BasicEntryInput::init_entry_header(EntryHeader& entry_header)
 {
@@ -91,7 +89,7 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
         utils::convert(st.permissions(), perms);
         entry_header.attributes.type = type;
         entry_header.attributes.permissions = perms;
-        break;
+        return success;
     case not_found:
         return "no such file or directory - " + entry_header.path;
     case block:
@@ -107,10 +105,7 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
     default:
         throw Exception<EntryInput>("unexpected file type");
     }
-
-    return success;
 }
-
 
 Error<EntryInput> CustomContentEntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
