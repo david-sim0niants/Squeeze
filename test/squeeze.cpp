@@ -155,6 +155,7 @@ protected:
 
     inline void encode_mockfs(const tools::MockFileSystem& original_mockfs)
     {
+        content.seekp(0, std::ios_base::beg);
         testing::encode_mockfs(squeeze, original_mockfs, GetParam().compression);
         if (content.tellp() < content.view().size())
             content.str(std::string(content.view().substr(0, content.tellp())));
@@ -170,6 +171,7 @@ protected:
         content.seekg(0, std::ios_base::end);
         std::streamsize content_size = content.tellg();
         ASSERT_FALSE(squeeze.is_corrupted()) << "content_size=" << content_size;
+        content.seekg(0, std::ios_base::beg);
     }
 
     static inline void present_generated_mockfs(const tools::MockFileSystem& generated_mockfs)
@@ -197,8 +199,6 @@ TEST_P(SqueezeTest, WriteRead)
     present_generated_mockfs(generated_mockfs);
 
     encode_mockfs(generated_mockfs);
-    content.seekg(0, std::ios_base::end);
-    std::streamsize content_size = content.tellg();
     assert_if_corrupted();
     decode_mockfs(recreated_mockfs);
 

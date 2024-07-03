@@ -36,7 +36,7 @@ public:
 
     inline void finalize() noexcept
     {
-        tasks.push_done();
+        tasks.finish();
     }
 
     /* Supposed to be called in a different thread. */

@@ -1,7 +1,9 @@
 #include "squeeze/entry_header.h"
-#include "squeeze/exception.h"
 
 #include <limits>
+
+#include "squeeze/exception.h"
+#include "squeeze/utils/io.h"
 
 namespace squeeze {
 
@@ -11,10 +13,8 @@ template<typename T>
 Error<EntryHeader> encode_any(std::ostream& output, const T& obj)
 {
     output.write(reinterpret_cast<const char *>(&obj), sizeof(obj));
-    if (output.fail()) {
-        output.clear();
-        return "output write error";
-    }
+    if (utils::validate_stream_fail(output))
+        return {"output write error", ErrorCode::from_current_errno().report()};
     return success;
 }
 
@@ -22,10 +22,8 @@ template<typename T>
 Error<EntryHeader> decode_any(std::istream& input, T& obj)
 {
     input.read(reinterpret_cast<char *>(&obj), sizeof(obj));
-    if (input.fail()) {
-        input.clear();
-        return "input read error";
-    }
+    if (utils::validate_stream_fail(input))
+        return {"input read error", ErrorCode::from_current_errno().report()};
     return success;
 }
 
@@ -40,10 +38,9 @@ Error<EntryHeader> encode_path(std::ostream& output, const std::string& path)
     if (auto e = encode_any(output, static_cast<EntryHeader::EncodedPathSizeType>(path.size())))
         return e;
     output.write(path.data(), path.size());
-    if (output.fail()) {
-        output.clear();
-        return "output write error";
-    }
+
+    if (utils::validate_stream_fail(output))
+        return {"output write error", ErrorCode::from_current_errno().report()};
     return success;
 }
 
@@ -56,10 +53,8 @@ Error<EntryHeader> decode_path(std::istream& input, std::string& path)
     path.resize(size);
     input.read(path.data(), path.size());
 
-    if (input.fail()) {
-        input.clear();
-        return "input read error";
-    }
+    if (utils::validate_stream_fail(input))
+        return {"input read error", ErrorCode::from_current_errno().report()};
     return success;
 }
 

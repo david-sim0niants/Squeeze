@@ -2,6 +2,7 @@
 
 #include "squeeze/logging.h"
 #include "squeeze/utils/overloaded.h"
+#include "squeeze/utils/defer.h"
 #include "squeeze/utils/defer_macros.h"
 #include "squeeze/utils/iterator.h"
 

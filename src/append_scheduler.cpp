@@ -1,6 +1,7 @@
 #include "squeeze/append_scheduler.h"
 
 #include "squeeze/logging.h"
+#include "squeeze/utils/io.h"
 #include "squeeze/utils/overloaded.h"
 
 namespace squeeze {
@@ -23,8 +24,7 @@ public:
     {
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
         target.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
-        if (target.bad()) {
-            target.clear();
+        if (utils::validate_stream_bad(target)) {
             SQUEEZE_ERROR("Failed appending buffer");
             return {"failed appending buffer", ErrorCode::from_current_errno().report()};
         }
@@ -52,8 +52,7 @@ public:
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
 
         target.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
-        if (target.bad()) {
-            target.clear();
+        if (utils::validate_stream_bad(target)) {
             SQUEEZE_ERROR("Failed appending buffer");
             return {"failed appending buffer", ErrorCode::from_current_errno().report()};
         }
@@ -97,9 +96,9 @@ public:
         SQUEEZE_TRACE("Got a string: '{}'", str);
 
         target.write(str.data(), str.size() + 1);
-        if (target.bad()) {
-            target.clear();
-            return {"target writing failure", ErrorCode::from_current_errno().report()};
+        if (utils::validate_stream_bad(target)) {
+            SQUEEZE_ERROR("Failed appending string");
+            return {"failed appending string", ErrorCode::from_current_errno().report()};
         }
 
         return success;
@@ -121,6 +120,7 @@ EntryAppendScheduler::Task::~Task() = default;
 
 inline Error<EntryAppendScheduler::Task> EntryAppendScheduler::Task::operator()(std::ostream& target)
 {
+    SQUEEZE_TRACE();
     return block_appender->run(target);
 }
 

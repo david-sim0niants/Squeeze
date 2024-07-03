@@ -19,7 +19,7 @@ public:
      * operations are registered for entries that already exist with the same path in the stream.
      * It ensures that these existing entries are removed before being re-appended,
      * effectively updating the entries. */
-    void update();
+    void update(unsigned concurrency = std::thread::hardware_concurrency());
 };
 
 }

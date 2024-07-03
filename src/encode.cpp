@@ -1,6 +1,7 @@
 #include "squeeze/encode.h"
 
 #include "squeeze/logging.h"
+#include "squeeze/utils/io.h"
 
 namespace squeeze {
 
@@ -33,6 +34,7 @@ EncoderPool::~EncoderPool() = default;
 std::future<Buffer>
 EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& compression)
 {
+    SQUEEZE_TRACE();
     Task task {std::move(input), CompressionParams(compression)};
     auto future_output = task.output_promise.get_future();
     scheduler.schedule(std::move(task));
@@ -50,14 +52,13 @@ EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& com
 Error<> EncoderPool::schedule_stream_encode_step(std::future<Buffer>& future_output,
         std::istream& stream, const CompressionParams& compression)
 {
+    SQUEEZE_TRACE();
     constexpr size_t _tmp_buffer_size = 8192;
 
     Buffer buffer(_tmp_buffer_size);
     stream.read(reinterpret_cast<char *>(buffer.data()), _tmp_buffer_size);
-    if (stream.bad()) {
-        stream.clear();
+    if (utils::validate_stream_bad(stream))
         return {"output read error", ErrorCode::from_current_errno().report()};
-    }
 
     buffer.resize(stream.gcount());
 

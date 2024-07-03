@@ -8,7 +8,8 @@ Error<EntryInput> MockEntryInput::init(EntryHeader &entry_header, ContentType &c
 {
     init_entry_header(entry_header);
     content = std::visit( utils::Overloaded {
-            [](std::shared_ptr<MockRegularFile> file) -> ContentType { return &file->contents;  },
+            [](std::shared_ptr<MockRegularFile> file) -> ContentType
+                        { file->contents.seekg(0, std::ios_base::beg); return &file->contents;  },
             [](std::shared_ptr<MockDirectory> file)   -> ContentType { return std::monostate(); },
             [](std::shared_ptr<MockSymlink> file)     -> ContentType { return file->target;     },
         }, file);

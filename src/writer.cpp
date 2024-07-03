@@ -5,7 +5,6 @@
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/fs.h"
 #include "squeeze/encode.h"
-#include "squeeze/append_scheduler.h"
 
 #include <cassert>
 
@@ -122,11 +121,10 @@ void Writer::perform_removes()
         // pos - rem_len is the destination of the following non-removing data to move to
         utils::iosmove(target, pos - rem_len, mov_pos, mov_len); // do the move
 
-        if (target.fail()) {
+        if (utils::validate_stream_fail(target)) {
             SQUEEZE_ERROR("Target output stream failed");
             if (error)
                 *error = {"failed removing entry '" + path + '\'', "target output stream failed"};
-            target.clear();
         }
 
         rem_len += len; // increase the "hole" size
