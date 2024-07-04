@@ -2,68 +2,193 @@
 
 #include <optional>
 #include <mutex>
-#include <queue>
-#include <condition_variable>
+#include <atomic>
+#include <utility>
+
+#include "squeeze/utils/defer.h"
 
 namespace squeeze::misc {
 
-template<typename T>
-class ThreadSafeQueue {
+namespace detail {
+
+class BaseThreadSafeQueue {
+private:
+    struct Node {
+        Node *next = nullptr;
+    };
+
+    template<typename T>
+    struct TNode : Node {
+        explicit TNode(const T& value) : value(value)
+        {
+        }
+
+        explicit TNode(T&& value) : value(std::move(value))
+        {
+        }
+
+        explicit TNode(auto&& ...args) : value(std::forward<decltype(args)>(args)...)
+        {
+        }
+
+        T value;
+    };
+
 public:
-    void finish()
+    BaseThreadSafeQueue() = default;
+
+    BaseThreadSafeQueue(const BaseThreadSafeQueue&) = delete;
+    BaseThreadSafeQueue& operator=(const BaseThreadSafeQueue&) = delete;
+
+    BaseThreadSafeQueue(BaseThreadSafeQueue&&) = delete;
+    BaseThreadSafeQueue& operator=(BaseThreadSafeQueue&&) = delete;
+
+    template<typename T> inline bool push(T&& value)
     {
-        std::scoped_lock q_lock (mutex);
-        finish_flag = true;
-        cv.notify_all();
+        if (finished())
+            return false;
+        push_node(new TNode<T>(std::forward<T>(value)));
+        return true;
     }
 
-    void push(T&& value)
+    template<typename T, typename ...Args> inline bool emplace(Args&&... args)
     {
-        std::scoped_lock q_lock (mutex);
-        internal_q.push(std::move(value));
-        cv.notify_one();
+        if (finished())
+            return false;
+        push_node(new TNode<T>(std::forward<Args>(args)...));
+        return true;
     }
 
-    void push(const T& value)
+    inline void finish() noexcept
     {
-        std::scoped_lock q_lock (mutex);
-        internal_q.push(value);
-        cv.notify_one();
+        size.fetch_or(finish_flag, std::memory_order::acq_rel);
+        size.notify_all();
     }
 
-    void emplace(auto&&... args)
+    inline bool finished() const noexcept
     {
-        std::scoped_lock q_lock (mutex);
-        internal_q.emplace(std::forward<decltype(args)>(args)...);
-        cv.notify_one();
+        return size.load(std::memory_order::acquire) & finish_flag;
     }
 
-    std::optional<T> try_pop()
+    template<typename T> std::optional<T> try_pop()
     {
-        std::scoped_lock q_lock(mutex);
-        if (internal_q.empty())
+        return unwrap_node<T>(try_pop_node());
+    }
+
+    template<typename T> std::optional<T> try_wait_and_pop()
+    {
+        return unwrap_node<T>(try_wait_and_pop_node());
+    }
+
+    template<typename T> void clear()
+    {
+        std::scoped_lock full_lock (head_mutex, tail_mutex);
+        TNode<T> *node = static_cast<TNode<T> *>(head);
+        while (node)
+            delete std::exchange(node, static_cast<TNode<T> *>(node->next));
+        size.fetch_and(~size_bits, std::memory_order::release);
+        size.notify_all();
+    }
+
+    inline size_t get_size() const noexcept
+    {
+        return get_size_explicit(std::memory_order::acquire);
+    }
+
+    inline bool empty() const noexcept
+    {
+        return get_size() == 0;
+    }
+
+protected:
+    ~BaseThreadSafeQueue() = default;
+
+private:
+    template<typename T> static std::optional<T> unwrap_node(Node *node)
+    {
+        if (!node)
             return std::nullopt;
-        T value = std::move(internal_q.front());
-        internal_q.pop();
-        return std::move(value);
+
+        utils::Defer deferred_node_delete { [node](){ delete static_cast<TNode<T> *>(node); } };
+        return std::move(static_cast<TNode<T> *>(node)->value);
     }
 
-    std::optional<T> try_wait_and_pop()
+    void push_node(Node *node) noexcept;
+    Node *try_pop_node() noexcept;
+    Node *try_wait_and_pop_node() noexcept;
+    Node *try_pop_node_unsafe() noexcept;
+
+    inline size_t get_size_explicit(std::memory_order mo) const
     {
-        std::unique_lock q_lock(mutex);
-        cv.wait(q_lock, [this](){ return !internal_q.empty() or finish_flag; });
-        if (internal_q.empty())
-            return std::nullopt;
-        T value = std::move(internal_q.front());
-        internal_q.pop();
-        return std::move(value);
+        return size.load(mo) & size_bits;
     }
 
 private:
-    std::queue<T> internal_q;
-    bool finish_flag = false;
-    std::mutex mutex;
-    std::condition_variable cv;
+    static constexpr size_t finish_flag = (size_t)1 << (sizeof(size_t) * CHAR_WIDTH - 1);
+    static constexpr size_t max_size = finish_flag - 1;
+    static constexpr size_t size_bits = ~finish_flag;
+
+    Node *head = nullptr, *tail = nullptr;
+    std::mutex head_mutex, tail_mutex;
+    std::atomic_size_t size = 0;
+};
+
+}
+
+template<typename T>
+class ThreadSafeQueue : private detail::BaseThreadSafeQueue {
+private:
+    using Base = detail::BaseThreadSafeQueue;
+public:
+    ~ThreadSafeQueue()
+    {
+        Base::clear<T>();
+    }
+
+    inline void finish() noexcept
+    {
+        Base::finish();
+    }
+
+    inline bool push(T&& value)
+    {
+        return Base::push(std::move(value));
+    }
+
+    inline bool push(const T& value)
+    {
+        return Base::push(value);
+    }
+
+    inline bool emplace(auto&& ...args)
+    {
+        return Base::emplace<T>(std::forward<decltype(args)>(args)...);
+    }
+
+    inline std::optional<T> try_pop()
+    {
+        return Base::try_pop<T>();
+    }
+
+    inline std::optional<T> try_wait_and_pop()
+    {
+        return Base::try_wait_and_pop<T>();
+    }
+
+    inline void clear()
+    {
+        Base::clear<T>();
+    }
+
+    inline size_t get_size() const
+    {
+        return Base::get_size();
+    }
+
+    inline bool empty() const
+    {
+        return Base::empty();
+    }
 };
 
 }

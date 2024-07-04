@@ -1,12 +1,12 @@
 #include "squeeze/writer.h"
 
+#include <cassert>
+
 #include "squeeze/logging.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/fs.h"
 #include "squeeze/encode.h"
-
-#include <cassert>
 
 namespace squeeze {
 

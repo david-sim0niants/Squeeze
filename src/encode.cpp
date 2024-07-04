@@ -2,6 +2,8 @@
 
 #include "squeeze/logging.h"
 #include "squeeze/utils/io.h"
+#include "squeeze/utils/defer.h"
+#include "squeeze/utils/defer_macros.h"
 
 namespace squeeze {
 
@@ -29,7 +31,25 @@ EncoderPool::EncoderPool(misc::ThreadPool& thread_pool) : thread_pool(thread_poo
 {
 }
 
-EncoderPool::~EncoderPool() = default;
+EncoderPool::~EncoderPool()
+{
+    finalize();
+    wait_for_tasks();
+}
+
+void EncoderPool::wait_for_tasks() noexcept
+{
+    while (true) {
+        size_t curr_nr_running_threads = nr_running_threads.load(std::memory_order::relaxed);
+        if (curr_nr_running_threads == 0) {
+            if (scheduler.get_nr_tasks() == 0)
+                break;
+            else
+                try_another_thread();
+        }
+        nr_running_threads.wait(curr_nr_running_threads, std::memory_order::acquire);
+    }
+}
 
 std::future<Buffer>
 EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& compression)
@@ -38,14 +58,7 @@ EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& com
     Task task {std::move(input), CompressionParams(compression)};
     auto future_output = task.output_promise.get_future();
     scheduler.schedule(std::move(task));
-    thread_pool.try_assign_task(
-            [&scheduler = this->scheduler]()
-            {
-                SQUEEZE_TRACE("Scheduler start");
-                scheduler.run();
-                SQUEEZE_TRACE("Scheduler finish");
-            }
-        );
+    try_another_thread();
     return future_output;
 }
 
@@ -71,6 +84,19 @@ Error<> EncoderPool::schedule_stream_encode_step(std::future<Buffer>& future_out
             schedule_buffer_encode(std::move(buffer), compression)
         ;
     return success;
+}
+
+void EncoderPool::try_another_thread()
+{
+    thread_pool.try_assign_task(
+            [this]()
+            {
+                nr_running_threads.fetch_add(1, std::memory_order::acquire);
+                DEFER ( nr_running_threads.fetch_sub(1, std::memory_order::release);
+                        nr_running_threads.notify_all(); );
+                scheduler.run();
+            }
+        );
 }
 
 }

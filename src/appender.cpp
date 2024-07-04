@@ -79,7 +79,7 @@ Error<Appender> Appender::schedule_append(Context& context, FutureAppend& future
     EntryInput::ContentType content;
 
     auto e = future_append.entry_input.init(entry_header, content);
-    DEFER( [&future_append](){ future_append.entry_input.deinit(); } );
+    DEFER( future_append.entry_input.deinit(); );
     if (e) {
         SQUEEZE_ERROR("Failed initializing entry input");
         return {"failed initializing entry input", e.report()};

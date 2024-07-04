@@ -39,6 +39,11 @@ public:
         tasks.finish();
     }
 
+    inline size_t get_nr_tasks() const
+    {
+        return tasks.get_size();
+    }
+
     /* Supposed to be called in a different thread. */
     Error<Task> run_till_error(auto&&... args)
         requires std::is_convertible_v<std::invoke_result_t<Task, decltype(args)...>, Error<Task>>

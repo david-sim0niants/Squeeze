@@ -41,16 +41,21 @@ public:
         scheduler.finalize();
     }
 
+    void wait_for_tasks() noexcept;
+
 private:
     Error<> schedule_stream_encode_step(std::future<Buffer>& future_output,
             std::istream& stream, const CompressionParams& compression);
 
+    void try_another_thread();
+
     misc::ThreadPool& thread_pool;
     misc::TaskScheduler<Task> scheduler;
+    std::atomic_size_t nr_running_threads = 0;
 };
 
 template<std::input_iterator In, std::output_iterator<std::byte> Out>
-void encode_chunk(In in, In in_end, Out out, const CompressionParams& compression)
+void encode_chunk(In in, In in_end, Out out, const CompressionParams& compression) noexcept
 {
     std::copy(in, in_end, out); // temporary
 }
