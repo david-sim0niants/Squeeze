@@ -67,11 +67,14 @@ public:
         scheduler.run(target);
     }
 
-    /* Finalize the schedule. No more entry append operations can be scheduled afterwards. */
+    /* Finalize the scheduler.
+     * If the run() method was already running (perhaps in some other thread),
+     * make sure it's finished before starting to schedule tasks again, otherwise
+     * it may accidentally run newly scheduled tasks. */
     inline void finalize() noexcept
     {
         finalize_entry_append();
-        scheduler.finalize();
+        scheduler.close();
     }
 
 private:
@@ -113,9 +116,9 @@ public:
     void schedule_string_append(std::string&& str);
 
     /* Finalize the schedule. No more block append operations can be scheduled afterwards. */
-    inline void finalize() noexcept
+    inline void close() noexcept
     {
-        scheduler.finalize();
+        scheduler.close();
     }
 
     /* Run the scheduled tasks on the target output stream. */

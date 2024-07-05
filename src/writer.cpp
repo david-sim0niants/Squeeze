@@ -8,23 +8,22 @@ namespace squeeze {
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Writer::"
 
-void Writer::write(unsigned concurrency)
+void Writer::write()
 {
     SQUEEZE_TRACE();
     if (future_appends.empty()) {
         SQUEEZE_TRACE("No entry to append, performing removes synchronously");
         perform_removes();
     } else {
-        Appender::Context context(concurrency);
         auto future_void = std::async(std::launch::async,
-            [this, &scheduler = context.scheduler]()
+            [this]
             {
                 perform_removes();
-                perform_scheduled_appends(scheduler);
+                perform_scheduled_appends();
             }
         );
         SQUEEZE_TRACE("Waiting for scheduled append tasks to complete");
-        schedule_appends(context);
+        schedule_appends();
         future_void.get();
     }
     SQUEEZE_TRACE("Stream put pointer at: {}", static_cast<long long>(Appender::target.tellp()));

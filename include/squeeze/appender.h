@@ -32,14 +32,6 @@ protected:
         Error<Appender> *error;
     };
 
-    struct Context {
-        misc::ThreadPool thread_pool;
-        EncoderPool encoder_pool;
-        AppendScheduler scheduler;
-
-        explicit Context(unsigned concurrency);
-    };
-
 public:
     explicit Appender(std::ostream& target);
     ~Appender();
@@ -74,7 +66,7 @@ public:
     /* Perform the registered appends.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream */
-    void perform_appends(unsigned concurrency = std::thread::hardware_concurrency());
+    void perform_appends();
 
     /* Append an entry immediately by creating an entry input with the supplied type and parameters. */
     template<typename T, typename ...Args>
@@ -89,30 +81,37 @@ public:
 
 protected:
     /* Runs the scheduler tasks */
-    inline void perform_scheduled_appends(AppendScheduler& scheduler)
+    inline void perform_scheduled_appends()
     {
         scheduler.run(target);
     }
 
     /* Schedules all registered appends. */
-    void schedule_appends(Context& context);
+    void schedule_appends();
     /* Schedules single registered append. */
-    Error<Appender> schedule_append(Context& context, FutureAppend& future_append);
+    Error<Appender> schedule_append(FutureAppend& future_append);
     /* Schedules a registered stream append. */
-    static Error<Appender> schedule_append_stream(
-            Context& context, const CompressionParams& compression, std::istream& stream);
+    Error<Appender> schedule_append_stream(const CompressionParams& compression, std::istream& stream);
     /* Schedules a registered string append. */
-    static Error<Appender> schedule_append_string(
-            Context& context, const CompressionParams& compression, const std::string& str);
+    Error<Appender> schedule_append_string(const CompressionParams& compression, const std::string& str);
     /* Schedules a registered stream's buffer append. */
-    static Error<Appender> schedule_buffer_appends(AppendScheduler& scheduler, std::istream& stream);
+    Error<Appender> schedule_buffer_appends(std::istream& stream);
     /* Schedules a registered stream's future buffer append. */
-    static Error<Appender> schedule_future_buffer_appends(
-        Context& context, const CompressionParams& compression, std::istream& stream);
+    Error<Appender> schedule_future_buffer_appends(
+            const CompressionParams& compression, std::istream& stream);
+
+    inline EncoderPool& get_encoder_pool()
+    {
+        if (not encoder_pool.has_value()) [[unlikely]]
+            encoder_pool.emplace();
+        return *encoder_pool;
+    }
 
     std::ostream& target;
     std::vector<std::unique_ptr<EntryInput>> owned_entry_inputs;
     std::vector<FutureAppend> future_appends;
+    AppendScheduler scheduler;
+    std::optional<EncoderPool> encoder_pool;
 };
 
 }

@@ -9,7 +9,7 @@ namespace squeeze {
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Squeeze::"
 
-void Squeeze::update(unsigned concurrency)
+void Squeeze::update()
 {
     SQUEEZE_TRACE();
 
@@ -27,7 +27,7 @@ void Squeeze::update(unsigned concurrency)
         SQUEEZE_TRACE("Will update {}", it->second.path);
     }
 
-    this->write(concurrency);
+    this->write();
 }
 
 }

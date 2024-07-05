@@ -22,7 +22,7 @@ public:
      * effectively updating the entries.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream */
-    void update(unsigned concurrency = std::thread::hardware_concurrency());
+    void update();
 };
 
 }

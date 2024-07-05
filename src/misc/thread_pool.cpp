@@ -1,12 +1,7 @@
 #include "squeeze/misc/thread_pool.h"
 #include "squeeze/exception.h"
 
-#include "squeeze/logging.h"
-
 namespace squeeze::misc {
-
-#undef SQUEEZE_LOG_FUNC_PREFIX
-#define SQUEEZE_LOG_FUNC_PREFIX "squeeze::misc::ThreadPool::"
 
 class ThreadPool::WorkerThread {
 public:
@@ -39,7 +34,6 @@ public:
     /* Try assigning a task to the scheduler. Will fail if already busy but might as well fail spuriously. */
     bool try_assign_task(Task& task)
     {
-        SQUEEZE_TRACE();
         if (!task)
             throw Exception<ThreadPool>("invalid task");
 
@@ -50,7 +44,6 @@ public:
         this->task.swap(task);
         state.store(State::Running, std::memory_order::release);
         state.notify_one();
-        SQUEEZE_TRACE("succeeded");
         return true;
     }
 
@@ -63,7 +56,6 @@ public:
 private:
     void run()
     {
-        SQUEEZE_TRACE("Enter");
         while (true) {
             state.wait(State::Idle, std::memory_order::acquire);
             state.wait(State::Starting, std::memory_order::acquire);
@@ -71,13 +63,10 @@ private:
             if (state.load(std::memory_order::relaxed) == State::Stopping)
                 break;
 
-            SQUEEZE_TRACE("Starting task");
             task();
-            SQUEEZE_TRACE("Finished task");
             state.store(State::Idle, std::memory_order::release);
             state.notify_one();
         }
-        SQUEEZE_TRACE("Leave");
     }
 
     std::atomic<State> state;

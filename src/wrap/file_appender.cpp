@@ -35,10 +35,10 @@ bool FileAppender::will_append_recursively(const std::string_view path,
     return true;
 }
 
-void FileAppender::perform_appends(unsigned concurrency)
+void FileAppender::perform_appends()
 {
     appendee_path_set.clear();
-    appender.perform_appends(concurrency);
+    appender.perform_appends();
 }
 
 bool FileAppender::check_append_precondit(const std::filesystem::path& path,

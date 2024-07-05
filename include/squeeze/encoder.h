@@ -20,6 +20,7 @@ private:
     struct Task;
 
 public:
+    EncoderPool();
     explicit EncoderPool(misc::ThreadPool& thread_pool);
     ~EncoderPool();
 
@@ -34,11 +35,6 @@ public:
             *it = std::move(future_output); ++it;
         }
         return e;
-    }
-
-    inline void finalize()
-    {
-        scheduler.finalize();
     }
 
     void wait_for_tasks() noexcept;

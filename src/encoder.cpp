@@ -4,6 +4,7 @@
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/defer.h"
 #include "squeeze/utils/defer_macros.h"
+#include "squeeze/misc/singleton.h"
 
 namespace squeeze {
 
@@ -16,7 +17,7 @@ struct EncoderPool::Task {
         : input(std::move(input)), compression(std::move(compression))
     {}
 
-    void operator()()
+    void operator()() noexcept
     {
         Buffer output;
         encode_chunk(input.begin(), input.size(), std::back_insert_iterator(output), compression);
@@ -27,13 +28,17 @@ struct EncoderPool::Task {
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::EncoderPool::"
 
+EncoderPool::EncoderPool() : thread_pool(misc::Singleton<misc::ThreadPool>::instance())
+{
+}
+
 EncoderPool::EncoderPool(misc::ThreadPool& thread_pool) : thread_pool(thread_pool)
 {
 }
 
 EncoderPool::~EncoderPool()
 {
-    finalize();
+    scheduler.close();
     wait_for_tasks();
 }
 

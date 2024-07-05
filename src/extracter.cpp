@@ -72,15 +72,7 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
 
 Error<Extracter> Extracter::extract_stream(const EntryHeader& entry_header, std::ostream& output)
 {
-    SQUEEZE_TRACE();
-
-    decode(std::istreambuf_iterator(source), entry_header.content_size,
-           std::ostreambuf_iterator(output), entry_header.compression);
-
-    if (utils::validate_stream_fail(source) or output.fail())
-        return output.fail() ? "output writing failure" : "source reading failure";
-
-    return success;
+    return decode(source, entry_header.content_size, output, entry_header.compression);
 }
 
 Error<Extracter> Extracter::extract_symlink(const EntryHeader& entry_header, std::string& target)

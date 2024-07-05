@@ -36,7 +36,7 @@ public:
             const std::function<Error<Appender> *()>& get_err_ptr = [](){ return nullptr; });
 
     /* Calls perform_appends() on the appender while also resetting its own state. */
-    void perform_appends(unsigned concurrency = std::thread::hardware_concurrency());
+    void perform_appends();
 
     inline auto& get_wrappee()
     {

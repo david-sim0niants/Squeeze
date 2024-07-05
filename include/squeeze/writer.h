@@ -20,7 +20,7 @@ public:
     /* Perform all the registered entry append and remove operations.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream */
-    void write(unsigned concurrency = std::thread::hardware_concurrency());
+    void write();
 };
 
 }

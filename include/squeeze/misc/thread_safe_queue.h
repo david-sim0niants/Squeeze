@@ -83,6 +83,17 @@ public:
         return size.load(std::memory_order::acquire) & close_flag;
     }
 
+    inline void open() noexcept
+    {
+        size.fetch_and(~close_flag, std::memory_order::release);
+        size.notify_all();
+    }
+
+    inline bool is_open() const noexcept
+    {
+        return not is_closed();
+    }
+
     template<typename T> std::optional<T> try_pop()
     {
         return unwrap_node<T>(try_pop_node());
@@ -174,6 +185,16 @@ public:
     inline bool is_closed() const noexcept
     {
         return Base::is_closed();
+    }
+
+    inline void open() noexcept
+    {
+        Base::open();
+    }
+
+    inline bool is_open() const noexcept
+    {
+        return Base::is_open();
     }
 
     /* Push value (using move semantics). */
