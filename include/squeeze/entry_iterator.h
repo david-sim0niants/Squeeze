@@ -2,14 +2,13 @@
 
 #include <cstdint>
 #include <iterator>
+#include <istream>
 
 #include "entry_header.h"
 
 namespace squeeze {
 
-class Reader;
-
-class ReaderIterator {
+class EntryIterator {
 public:
     using iterator_category = std::input_iterator_tag;
     using value_type = std::pair<uint64_t, EntryHeader>;
@@ -17,8 +16,10 @@ public:
     using pointer = const value_type *;
     using reference = const value_type&;
 
-    ReaderIterator& operator++() noexcept;
-    ReaderIterator operator++(int) noexcept;
+    explicit EntryIterator(std::istream& source);
+
+    EntryIterator& operator++() noexcept;
+    EntryIterator operator++(int) noexcept;
 
     inline reference operator*() const
     {
@@ -30,30 +31,31 @@ public:
         return &pos_and_entry_header;
     }
 
-    inline bool operator==(const ReaderIterator& other) const noexcept
+    inline bool operator==(const EntryIterator& other) const noexcept
     {
         return pos_and_entry_header.first == other.pos_and_entry_header.first;
     }
 
-    inline bool operator!=(const ReaderIterator& other) const noexcept
+    inline bool operator!=(const EntryIterator& other) const noexcept
     {
         return pos_and_entry_header.first != other.pos_and_entry_header.first;
     }
 
     static constexpr uint64_t npos = uint64_t(-1);
+    static const EntryIterator end;
 
 private:
-    friend class Reader;
-    ReaderIterator()
-        : owner(nullptr), pos_and_entry_header(npos, std::move(EntryHeader()))
-    {}
-    explicit ReaderIterator(const Reader& owner, bool begin);
+    EntryIterator() : source(nullptr), pos_and_entry_header(npos, std::move(EntryHeader()))
+    {
+    }
 
     void read_current();
 
 private:
-    const Reader *owner;
+    std::istream *source;
     value_type pos_and_entry_header;
 };
+
+inline const EntryIterator EntryIterator::end {};
 
 }

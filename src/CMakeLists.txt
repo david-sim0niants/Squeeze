@@ -1,7 +1,7 @@
 set(TARGET_NAME squeeze)
 add_library(${TARGET_NAME} SHARED
-    squeeze.cpp reader.cpp writer.cpp appender.cpp
-    append_scheduler.cpp reader_iterator.cpp
+    squeeze.cpp reader.cpp writer.cpp appender.cpp remover.cpp extracter.cpp lister.cpp
+    append_scheduler.cpp entry_iterator.cpp
     entry_common.cpp entry_header.cpp entry_input.cpp entry_output.cpp
     encoder.cpp
     misc/thread_pool.cpp misc/thread_safe_queue.cpp

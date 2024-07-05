@@ -23,6 +23,8 @@ public:
      * A string usually refers to a symlink target. */
     using ContentType = std::variant<std::monostate, std::istream *, std::string>;
 
+    virtual ~EntryInput() = default;
+
     /* Initialize the entry input and get references to the entry header and its content. */
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) = 0;
     virtual void deinit() noexcept = 0;
@@ -49,6 +51,8 @@ protected:
     BasicEntryInput(std::string&& path, const CompressionParams& compression)
         :   EntryInput(std::move(path)), compression(compression)
     {}
+
+    virtual ~BasicEntryInput() = default;
 
     void init_entry_header(EntryHeader& entry_header);
 

@@ -14,6 +14,9 @@ public:
     explicit FileExtracter(Reader& reader) : reader(reader)
     {}
 
+    /* Extract an entry with the given path to a file. */
+    Error<Reader> extract(std::string_view path) const;
+
     /* Extract recursively all entries within the path.
      * get_err_ptr() is supposed to provide a pointer to the subsequent error. */
     bool extract_recursively(const std::string_view path,

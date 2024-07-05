@@ -230,7 +230,7 @@ private:
                 if (err)
                     std::cerr << err.report() << '\n';
         } else {
-            Error<Reader> err = sqz->extract(path);
+            Error<Reader> err = fsqz->extract(path);
             if (err)
                 std::cerr << err.report() << '\n';
         }
@@ -395,9 +395,7 @@ private:
 
 }
 
-
 int main(int argc, char *argv[])
 {
     return CLI().run(argc, argv);
 }
-

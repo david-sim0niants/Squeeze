@@ -3,22 +3,22 @@
 namespace squeeze::wrap {
 
 bool FileAppender::will_append(const std::filesystem::path& path,
-        const CompressionParams& compression, Error<Writer> *err)
+        const CompressionParams& compression, Error<Appender> *err)
 {
     std::string better_path;
     if (!check_append_precondit(path, err, better_path))
         return false;
     if (err)
-        writer.will_append<FileEntryInput>(*err, std::move(better_path), compression);
+        appender.will_append<FileEntryInput>(*err, std::move(better_path), compression);
     else
-        writer.will_append<FileEntryInput>(std::move(better_path), compression);
+        appender.will_append<FileEntryInput>(std::move(better_path), compression);
 
     return true;
 }
 
 bool FileAppender::will_append_recursively(const std::string_view path,
         const CompressionParams& compression,
-        const std::function<Error<Writer> *()>& get_err_ptr)
+        const std::function<Error<Appender> *()>& get_err_ptr)
 {
     namespace fs = std::filesystem;
 
@@ -35,14 +35,14 @@ bool FileAppender::will_append_recursively(const std::string_view path,
     return true;
 }
 
-void FileAppender::write()
+void FileAppender::perform_appends(unsigned concurrency)
 {
     appendee_path_set.clear();
-    writer.write();
+    appender.perform_appends(concurrency);
 }
 
 bool FileAppender::check_append_precondit(const std::filesystem::path& path,
-        Error<Writer> *err, std::string& better_path)
+        Error<Appender> *err, std::string& better_path)
 {
     auto better_path_opt = utils::make_concise_portable_path(path);
     if (!better_path_opt) {

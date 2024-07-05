@@ -6,19 +6,22 @@
 
 namespace squeeze {
 
-/* The main Squeeze interface, combining functionality of both the Reader and Writer.
- * Also provides an additional update() method as an enhancement
- * of the write() method inherited from Writer. */
+/* The main Squeeze interface, combining interfaces of both Reader and Writer.
+ * Also provides an additional update() method as an alternative for
+ * of the write() method inherited from Writer that handles cases with entries
+ * already existing in the squeeze that can be updated. */
 class Squeeze : public Reader, public Writer {
 public:
-    explicit Squeeze(std::iostream& stream)
-        : Reader(stream), Writer(stream)
-    {}
+    explicit Squeeze(std::iostream& stream) : Reader(stream), Writer(stream)
+    {
+    }
 
     /* The update method functions similarly to write(), but it handles cases where append
      * operations are registered for entries that already exist with the same path in the stream.
      * It ensures that these existing entries are removed before being re-appended,
-     * effectively updating the entries. */
+     * effectively updating the entries.
+     * The method guarantees that the put pointer of the target stream
+     * will be at the new end of the stream */
     void update(unsigned concurrency = std::thread::hardware_concurrency());
 };
 

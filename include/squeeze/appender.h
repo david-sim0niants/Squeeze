@@ -15,8 +15,8 @@ namespace squeeze {
 /* Interface responsible for performing appending operations.
  * For optimal use of these operations family of will_append methods are
  * provided for registering these operations and performing them all at once
- * by calling the provided perform_appends() method. Immediate task-running append
- * methods also exist for convenience.
+ * by calling the provided perform_appends() method.
+ * Immediate task-running append methods also exist for convenience.
  * All will_append/append operations require an entry input in some way to be passed.
  * Entry input is a generalized interface for providing an entry header and
  * corresponding entry content to be processed. */
@@ -71,6 +71,9 @@ public:
      * Pass an optional pointer to a future error to assign when the task is done. */
     void will_append(EntryInput& entry_input, Error<Appender> *err = nullptr);
 
+    /* Perform the registered appends.
+     * The method guarantees that the put pointer of the target stream
+     * will be at the new end of the stream */
     void perform_appends(unsigned concurrency = std::thread::hardware_concurrency());
 
     /* Append an entry immediately by creating an entry input with the supplied type and parameters. */
@@ -85,18 +88,25 @@ public:
     Error<Appender> append(EntryInput& entry_input);
 
 protected:
+    /* Runs the scheduler tasks */
     inline void perform_scheduled_appends(AppendScheduler& scheduler)
     {
         scheduler.run(target);
     }
 
+    /* Schedules all registered appends. */
     void schedule_appends(Context& context);
+    /* Schedules single registered append. */
     Error<Appender> schedule_append(Context& context, FutureAppend& future_append);
+    /* Schedules a registered stream append. */
     static Error<Appender> schedule_append_stream(
             Context& context, const CompressionParams& compression, std::istream& stream);
+    /* Schedules a registered string append. */
     static Error<Appender> schedule_append_string(
             Context& context, const CompressionParams& compression, const std::string& str);
+    /* Schedules a registered stream's buffer append. */
     static Error<Appender> schedule_buffer_appends(AppendScheduler& scheduler, std::istream& stream);
+    /* Schedules a registered stream's future buffer append. */
     static Error<Appender> schedule_future_buffer_appends(
         Context& context, const CompressionParams& compression, std::istream& stream);
 

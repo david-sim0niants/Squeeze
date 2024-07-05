@@ -2,6 +2,12 @@
 
 namespace squeeze::wrap {
 
+Error<Reader> FileExtracter::extract(std::string_view path) const
+{
+    auto it = reader.find(path);
+    return it == reader.end() ? "non-existing path - " + std::string(path) : reader.extract(it);
+}
+
 bool FileExtracter::extract_recursively(const std::string_view path,
         const std::function<Error<Reader> *()>& get_err_ptr)
 {

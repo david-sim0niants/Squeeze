@@ -4,7 +4,7 @@ namespace squeeze::wrap {
 
 bool FileRemover::will_remove(const std::string_view path, Error<Writer> *err)
 {
-    auto it = squeeze.find_path(path);
+    auto it = squeeze.find(path);
     if (it == squeeze.end()) {
         if (err)
             *err = "non-existent path - " + std::string(path);
