@@ -43,7 +43,7 @@ public:
      * method will return. All subsequent attempts to schedule tasks will be ignored. */
     inline void finalize() noexcept
     {
-        tasks.finish();
+        tasks.close();
     }
 
     /* Get the number of tasks left to run. */

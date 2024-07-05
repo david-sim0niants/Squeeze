@@ -2,7 +2,7 @@
 
 namespace squeeze::misc::detail {
 
-void ThreadSafeQueueCore::push_node(Node *node) noexcept
+void BaseThreadSafeQueue::push_node(Node *node) noexcept
 {
     std::scoped_lock tail_lock(tail_mutex);
     if (empty())
@@ -13,7 +13,7 @@ void ThreadSafeQueueCore::push_node(Node *node) noexcept
     size.notify_one();
 }
 
-ThreadSafeQueueCore::Node * ThreadSafeQueueCore::try_pop_node() noexcept
+BaseThreadSafeQueue::Node * BaseThreadSafeQueue::try_pop_node() noexcept
 {
     if (get_size_explicit(std::memory_order::relaxed) == 0)
         return nullptr;
@@ -21,14 +21,14 @@ ThreadSafeQueueCore::Node * ThreadSafeQueueCore::try_pop_node() noexcept
     return try_pop_node_unsafe();
 }
 
-ThreadSafeQueueCore::Node * ThreadSafeQueueCore::try_wait_and_pop_node() noexcept
+BaseThreadSafeQueue::Node * BaseThreadSafeQueue::try_wait_and_pop_node() noexcept
 {
     std::scoped_lock head_lock(head_mutex);
     size.wait(0, std::memory_order::acquire);
     return try_pop_node_unsafe();
 }
 
-ThreadSafeQueueCore::Node * ThreadSafeQueueCore::try_pop_node_unsafe() noexcept
+BaseThreadSafeQueue::Node * BaseThreadSafeQueue::try_pop_node_unsafe() noexcept
 {
     if (empty())
         return nullptr;

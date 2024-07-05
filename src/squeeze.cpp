@@ -3,14 +3,13 @@
 #include <unordered_set>
 
 #include "squeeze/logging.h"
-#include "writer_internal.h"
 
 namespace squeeze {
 
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Squeeze::"
 
-void Squeeze::update()
+void Squeeze::update(unsigned concurrency)
 {
     SQUEEZE_TRACE();
 
@@ -28,7 +27,7 @@ void Squeeze::update()
         SQUEEZE_TRACE("Will update {}", it->second.path);
     }
 
-    this->write();
+    this->write(concurrency);
 }
 
 }

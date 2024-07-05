@@ -1,7 +1,9 @@
 set(TARGET_NAME squeeze)
 add_library(${TARGET_NAME} SHARED
-    squeeze.cpp reader.cpp writer.cpp reader_iterator.cpp
+    squeeze.cpp reader.cpp writer.cpp appender.cpp
+    append_scheduler.cpp reader_iterator.cpp
     entry_common.cpp entry_header.cpp entry_input.cpp entry_output.cpp
+    encoder.cpp
     misc/thread_pool.cpp misc/thread_safe_queue.cpp
     wrap/file_appender.cpp wrap/file_remover.cpp wrap/file_extracter.cpp wrap/file_squeeze.cpp
     utils/io.cpp utils/fs.cpp)
@@ -21,4 +23,23 @@ if (USE_LOGGING)
     find_package(spdlog REQUIRED)
     target_compile_options(${TARGET_NAME} PUBLIC -DSQUEEZE_USE_LOGGING)
     target_link_libraries(${TARGET_NAME} PUBLIC spdlog::spdlog)
+endif ()
+
+
+set(SANITIZE "none" CACHE STRING "Enable sanitizer: none, address, thread")
+
+string(TOLOWER ${SANITIZE} SANITIZE)
+
+if (NOT SANITIZE MATCHES "(none|address|thread)")
+    message(FATAL_ERROR "Invalid value for SANITIZE - " ${SANITIZE})
+elseif (SANITIZE STREQUAL "none")
+    message(STATUS "Not using any sanitizer")
+else ()
+    message(STATUS "Using ${SANITIZE} sanitizer")
+    if (MSVC)
+        message(SEND_ERROR "Sanitizer not supported for MSVC")
+    else ()
+        target_compile_options(${TARGET_NAME} PUBLIC -fsanitize=${SANITIZE})
+        target_link_options(${TARGET_NAME} PUBLIC -fsanitize=${SANITIZE})
+    endif ()
 endif ()

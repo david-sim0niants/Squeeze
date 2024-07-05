@@ -16,7 +16,7 @@ namespace detail {
  * type-agnostic functionalities in the source file.
  * Internally uses a linked list and two mutexes to protect the head and tail nodes,
  * as well as an atomic size variable to optimize the lock and wait/notify usages. */
-class ThreadSafeQueueCore {
+class BaseThreadSafeQueue {
 private:
     /* Type-agnostic abstract node type. */
     struct Node {
@@ -42,16 +42,16 @@ private:
     };
 
 public:
-    ThreadSafeQueueCore() = default;
+    BaseThreadSafeQueue() = default;
 
     /* Usage of copy/move constructors and assignment operators is discouraged and
      * otherwise wouldn't have a well defined implementation (per my guess). */
 
-    ThreadSafeQueueCore(const ThreadSafeQueueCore&) = delete;
-    ThreadSafeQueueCore& operator=(const ThreadSafeQueueCore&) = delete;
+    BaseThreadSafeQueue(const BaseThreadSafeQueue&) = delete;
+    BaseThreadSafeQueue& operator=(const BaseThreadSafeQueue&) = delete;
 
-    ThreadSafeQueueCore(ThreadSafeQueueCore&&) = delete;
-    ThreadSafeQueueCore& operator=(ThreadSafeQueueCore&&) = delete;
+    BaseThreadSafeQueue(BaseThreadSafeQueue&&) = delete;
+    BaseThreadSafeQueue& operator=(BaseThreadSafeQueue&&) = delete;
 
     /* Push value of type T. */
     template<typename T> inline bool push(T&& value)
@@ -114,7 +114,7 @@ public:
     }
 
 protected:
-    ~ThreadSafeQueueCore() = default;
+    ~BaseThreadSafeQueue() = default;
 
 private:
     /* Extracts and returns the value from the node if it's not null and
@@ -152,11 +152,14 @@ private:
 
 /* A thread-safe queue interface. Supports pushing values, try popping them, try waiting and popping them, closing etc. */
 template<typename T>
-class ThreadSafeQueue {
+class ThreadSafeQueue : private detail::BaseThreadSafeQueue {
+    using Base = detail::BaseThreadSafeQueue;
 public:
+    ThreadSafeQueue() = default;
+
     ~ThreadSafeQueue()
     {
-        internal.clear<T>();
+        Base::clear<T>();
     }
 
     /* Close the queue. This makes threads, that are waiting for a value to appear,
@@ -164,66 +167,64 @@ public:
      * Any further attempts to push a value to the queue will fail gracefully. */
     inline void close() noexcept
     {
-        internal.close();
+        Base::close();
     }
 
     /* Returns whether the queue is closed. */
     inline bool is_closed() const noexcept
     {
-        return internal.is_closed();
+        return Base::is_closed();
     }
 
     /* Push value (using move semantics). */
     inline bool push(T&& value)
     {
-        return internal.push(std::move(value));
+        return Base::push(std::move(value));
     }
 
     /* Push value (using copy semantics). */
     inline bool push(const T& value)
     {
-        return internal.push(value);
+        return Base::push(value);
     }
 
     /* Emplace value using args... */
     inline bool emplace(auto&& ...args)
     {
-        return internal.emplace<T>(std::forward<decltype(args)>(args)...);
+        return Base::emplace<T>(std::forward<decltype(args)>(args)...);
     }
 
     /* Try to pop a value. Returns an optional which will have a value only if
      * the queue wasn't empty at the time of popping. */
     inline std::optional<T> try_pop()
     {
-        return internal.try_pop<T>();
+        return Base::try_pop<T>();
     }
 
     /* Try popping a value by letting the method wait for a value to appear if the queue is currently empty.
      * Returns an optional with a value only if the queue hasn't closed while it was empty. */
     inline std::optional<T> try_wait_and_pop()
     {
-        return internal.try_wait_and_pop<T>();
+        return Base::try_wait_and_pop<T>();
     }
 
     /* Empties the queue. */
     inline void clear()
     {
-        internal.clear<T>();
+        Base::clear<T>();
     }
 
     /* Returns number of elements in the queue. */
     inline size_t get_size() const
     {
-        return internal.get_size();
+        return Base::get_size();
     }
 
     /* Returns whether the queue is empty. */
     inline bool empty() const
     {
-        return internal.empty();
+        return Base::empty();
     }
-private:
-    detail::ThreadSafeQueueCore internal;
 };
 
 }

@@ -99,7 +99,7 @@ private:
     std::optional<MessageType> content;
 };
 
-template<typename RelatedType, typename MessageType = std::string>
+template<typename RelatedType = void, typename MessageType = std::string>
 using Error = BasicError<MessageType>;
 
 

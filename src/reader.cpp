@@ -118,10 +118,8 @@ Error<Reader> Reader::extract_plain(const EntryHeader& entry_header, std::ostrea
         throw Exception<Reader>("invalid compression method");
     }
 
-    if (source.fail() || output.fail()) {
-        source.clear();
+    if (utils::validate_stream_fail(source) or output.fail())
         return output.fail() ? "output writing failure" : "source reading failure";
-    }
 
     return success;
 }

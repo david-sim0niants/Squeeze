@@ -10,11 +10,12 @@ namespace squeeze::misc {
 
 class ThreadPool::WorkerThread {
 public:
+    /* Type of the state of the worker thread. */
     enum class State : uint8_t {
-        Idle,
-        Starting,
-        Running,
-        Stopping,
+        Idle, /* Free to use state. */
+        Starting, /* A short-lived state of being acquired but not ready to run */
+        Running, /* Running state */
+        Stopping, /* A short-lived state of stopping the thread. */
     };
 
     WorkerThread() : state(State::Idle), internal(std::mem_fn(&WorkerThread::run), this)
@@ -23,12 +24,10 @@ public:
 
     ~WorkerThread()
     {
-        SQUEEZE_TRACE();
         wait_for_task();
         state.store(State::Stopping, std::memory_order::relaxed);
         state.notify_one();
         internal.join();
-        SQUEEZE_TRACE("Finished");
     }
 
     WorkerThread(const WorkerThread&) = delete;
@@ -37,6 +36,7 @@ public:
     WorkerThread& operator=(const WorkerThread&) = delete;
     WorkerThread& operator=(WorkerThread&&) = delete;
 
+    /* Try assigning a task to the scheduler. Will fail if already busy but might as well fail spuriously. */
     bool try_assign_task(Task& task)
     {
         SQUEEZE_TRACE();
@@ -50,10 +50,11 @@ public:
         this->task.swap(task);
         state.store(State::Running, std::memory_order::release);
         state.notify_one();
-        SQUEEZE_TRACE("Task assign succeeded");
+        SQUEEZE_TRACE("succeeded");
         return true;
     }
 
+    /* Wait for task to complete. */
     void wait_for_task() const noexcept
     {
         state.wait(State::Running, std::memory_order::acquire);
@@ -62,7 +63,7 @@ public:
 private:
     void run()
     {
-        SQUEEZE_TRACE();
+        SQUEEZE_TRACE("Enter");
         while (true) {
             state.wait(State::Idle, std::memory_order::acquire);
             state.wait(State::Starting, std::memory_order::acquire);
@@ -76,25 +77,7 @@ private:
             state.store(State::Idle, std::memory_order::release);
             state.notify_one();
         }
-
-        auto state_to_str = [](State state)
-        {
-            switch (state) {
-            case State::Idle:
-                return "idle";
-            case State::Starting:
-                return "starting";
-            case State::Running:
-                return "running";
-            case State::Stopping:
-                return "stopping";
-            default:
-                return "<unknown>";
-            }
-        };
-
-        SQUEEZE_DEBUG("curr_state={}", state_to_str(state));
-        SQUEEZE_TRACE("Returning from worker thread");
+        SQUEEZE_TRACE("Leave");
     }
 
     std::atomic<State> state;
@@ -125,6 +108,7 @@ bool ThreadPool::try_assign_task(Task& task)
     }
 }
 
+/* "Runs over" the worker threads to find a free thread to acquire. */
 void ThreadPool::assign_task_unsafe(Task& task)
 {
     while (true)
