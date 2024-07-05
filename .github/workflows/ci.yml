@@ -19,6 +19,7 @@ jobs:
           - { cc: gcc, cxx: g++ }
           - { cc: clang, cxx: clang++ }
         build_type: [ Release, Debug ]
+        sanitizer: [none, thread]
 
     runs-on: ubuntu-latest
 
@@ -36,7 +37,7 @@ jobs:
     - name: Build
       working-directory: ${{ env.BINARY_DIR }}
       run: |
-        cmake ../ -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DUSE_LOGGING=ON -DBUILD_TESTS=ON
+        cmake ../ -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DUSE_LOGGING=ON -DBUILD_TESTS=ON -DSANITIZE=${{ matrix.sanitizer }}
         make -j$(nproc)
 
     - name: Test
