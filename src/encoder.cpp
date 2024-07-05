@@ -19,7 +19,7 @@ struct EncoderPool::Task {
     void operator()()
     {
         Buffer output;
-        encode_chunk(input.begin(), input.end(), std::back_insert_iterator(output), compression);
+        encode_chunk(input.begin(), input.size(), std::back_insert_iterator(output), compression);
         output_promise.set_value(std::move(output));
     }
 };

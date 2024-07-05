@@ -3,6 +3,7 @@
 #include "squeeze/logging.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/io.h"
+#include "squeeze/decoder.h"
 
 namespace squeeze {
 
@@ -42,9 +43,8 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
             SQUEEZE_ERROR("Failed initializing entry output");
             return {"failed initializing entry output", e.report()};
         }
-        if (output) {
-            return extract_plain(entry_header, *output);
-        }
+        if (output)
+            return extract_stream(entry_header, *output);
         break;
     }
     case Symlink:
@@ -70,18 +70,12 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
     return success;
 }
 
-Error<Extracter> Extracter::extract_plain(const EntryHeader& entry_header, std::ostream& output)
+Error<Extracter> Extracter::extract_stream(const EntryHeader& entry_header, std::ostream& output)
 {
     SQUEEZE_TRACE();
 
-    switch (entry_header.compression.method) {
-        using enum compression::CompressionMethod;
-    case None:
-        utils::ioscopy(source, source.tellg(), output, output.tellp(), entry_header.content_size);
-        break;
-    default:
-        throw Exception<Extracter>("invalid compression method");
-    }
+    decode(std::istreambuf_iterator(source), entry_header.content_size,
+           std::ostreambuf_iterator(output), entry_header.compression);
 
     if (utils::validate_stream_fail(source) or output.fail())
         return output.fail() ? "output writing failure" : "source reading failure";

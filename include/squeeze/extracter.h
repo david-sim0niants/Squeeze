@@ -24,7 +24,7 @@ public:
     Error<Extracter> extract(const EntryIterator& it, EntryOutput& entry_output);
 
 protected:
-    Error<Extracter> extract_plain(const EntryHeader& entry_header, std::ostream& output);
+    Error<Extracter> extract_stream(const EntryHeader& entry_header, std::ostream& output);
     Error<Extracter> extract_symlink(const EntryHeader& entry_header, std::string& target);
 
     std::istream& source;

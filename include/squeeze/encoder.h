@@ -54,10 +54,10 @@ private:
     std::atomic_size_t nr_running_threads = 0;
 };
 
-template<std::input_iterator In, std::output_iterator<std::byte> Out>
-void encode_chunk(In in, In in_end, Out out, const CompressionParams& compression) noexcept
+template<std::input_iterator In, std::output_iterator<char> Out>
+void encode_chunk(In in, std::size_t size, Out out, const CompressionParams& compression) noexcept
 {
-    std::copy(in, in_end, out); // temporary
+    std::copy_n(in, size, out); // temporary
 }
 
 }
