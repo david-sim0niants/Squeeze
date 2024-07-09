@@ -44,6 +44,7 @@ private:
             std::istream& stream, const CompressionParams& compression);
 
     void try_another_thread();
+    void threaded_task_run();
 
     misc::ThreadPool& thread_pool;
     misc::TaskScheduler<Task> scheduler;

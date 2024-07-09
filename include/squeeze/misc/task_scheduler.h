@@ -8,6 +8,11 @@
 
 namespace squeeze::misc {
 
+enum class TaskRunPolicy {
+    NoWait,
+    Wait
+};
+
 /* Simple task scheduler. Supports scheduling tasks of type Task and running them.
  * Users are responsible for calling the run (or run_till_error) methods on their own
  * and can choose to run it in parallel or in any other way. */
@@ -60,10 +65,11 @@ public:
     /* Run until hitting an error. This method is valid to use if calling a Task object
      * returns an error (convertible to Error<Task>).
      * This method is mainly supposed to be called within a different thread parallel to scheduling threads. */
+    template<TaskRunPolicy policy = TaskRunPolicy::Wait>
     Error<Task> run_till_error(auto&&... args)
         requires std::is_convertible_v<std::invoke_result_t<Task, decltype(args)...>, Error<Task>>
     {
-        while (auto task = task_q.try_wait_and_pop()) {
+        while (auto task = get_task<policy>()) {
             Error<Task> e = (*task)(std::forward<decltype(args)>(args)...);
             if (e.failed())
                 return std::move(e);
@@ -73,13 +79,23 @@ public:
 
     /* Plain task runner.
      * Mainly supposed to be called within a different thread parallel to scheduling threads. */
+    template<TaskRunPolicy policy = TaskRunPolicy::Wait>
     void run(auto&&... args)
     {
-        while (auto task = task_q.try_wait_and_pop())
+        while (auto task = get_task<policy>())
             (*task)(std::forward<decltype(args)>(args)...);
     }
 
 private:
+    template<TaskRunPolicy policy>
+    inline std::optional<Task> get_task()
+    {
+        if constexpr (policy == TaskRunPolicy::Wait)
+            return task_q.try_wait_and_pop();
+        else
+            return task_q.try_pop();
+    }
+
     ThreadSafeQueue<Task> task_q;
 };
 

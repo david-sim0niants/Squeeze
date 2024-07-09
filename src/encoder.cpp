@@ -93,15 +93,16 @@ Error<> EncoderPool::schedule_stream_encode_step(std::future<Buffer>& future_out
 
 void EncoderPool::try_another_thread()
 {
-    thread_pool.try_assign_task(
-            [this]()
-            {
-                nr_running_threads.fetch_add(1, std::memory_order::acquire);
-                DEFER ( nr_running_threads.fetch_sub(1, std::memory_order::release);
-                        nr_running_threads.notify_all(); );
-                scheduler.run();
-            }
-        );
+    thread_pool.try_assign_task([this](){ threaded_task_run(); });
+}
+
+void EncoderPool::threaded_task_run()
+{
+    SQUEEZE_DEBUG("Number of running threads: {}", nr_running_threads);
+    nr_running_threads.fetch_add(1, std::memory_order::acquire);
+    DEFER ( nr_running_threads.fetch_sub(1, std::memory_order::release);
+            nr_running_threads.notify_all(); );
+    scheduler.run<misc::TaskRunPolicy::NoWait>();
 }
 
 }
