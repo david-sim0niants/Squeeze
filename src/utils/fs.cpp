@@ -11,8 +11,7 @@ namespace fs = std::filesystem;
 
 static std::error_code create_directories(const fs::path& path);
 
-std::variant<std::fstream, ErrorCode>
-    make_regular_file(std::string_view path_str, EntryPermissions entry_perms)
+std::variant<std::fstream, ErrorCode> make_regular_file(std::string_view path_str)
 {
     fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
@@ -21,16 +20,11 @@ std::variant<std::fstream, ErrorCode>
 
     std::fstream file(path, std::ios_base::binary | std::ios_base::in | std::ios_base::out);
     if (!file)
-        return std::make_error_code(static_cast<std::errc>(errno));
-
-    ErrorCode ec_ = set_permissions(path, entry_perms);
-    if (ec_)
-        return ec_;
+        return ErrorCode::from_current_errno();
     return file;
 }
 
-std::variant<std::ofstream, ErrorCode>
-    make_regular_file_out(std::string_view path_str, EntryPermissions entry_perms)
+std::variant<std::ofstream, ErrorCode> make_regular_file_out(std::string_view path_str)
 {
     fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
@@ -39,11 +33,7 @@ std::variant<std::ofstream, ErrorCode>
 
     std::ofstream file(path, std::ios_base::binary | std::ios_base::out);
     if (!file)
-        return std::make_error_code(static_cast<std::errc>(errno));
-
-    ErrorCode ec_ = set_permissions(path, entry_perms);
-    if (ec_)
-        return ec_;
+        return ErrorCode::from_current_errno();
     return file;
 }
 

@@ -16,14 +16,15 @@ Error<EntryOutput> FileEntryOutput::init(const EntryHeader& entry_header, std::o
     case EntryType::RegularFile:
         {
             SQUEEZE_TRACE("'{}' is a regular file", entry_header.path);
-            auto result = utils::make_regular_file_out(
-                    entry_header.path, entry_header.attributes.permissions);
+            this->final_entry_header = entry_header;
+            auto result = utils::make_regular_file_out(entry_header.path);
             if (auto *f = std::get_if<std::ofstream>(&result)) {
                 file = std::move(*f);
                 stream = &*file;
                 return success;
             } else {
-                return {"failed making regular file '" + entry_header.path + '\'', get<ErrorCode>(result).report()};
+                return {"failed making a regular file '" + entry_header.path + '\'',
+                        get<ErrorCode>(result).report()};
             }
         }
     case EntryType::Directory:
@@ -54,6 +55,20 @@ Error<EntryOutput> FileEntryOutput::init_symlink(
         return success;
 }
 
+Error<EntryOutput> FileEntryOutput::finalize()
+{
+    SQUEEZE_TRACE();
+    if (not final_entry_header)
+        return success;
+
+    auto e = utils::set_permissions(final_entry_header->path, final_entry_header->attributes.permissions);
+    if (e) {
+        SQUEEZE_ERROR("Failed setting file permissions");
+        return {"failed setting file permissions", e.report()};
+    }
+    return success;
+}
+
 void FileEntryOutput::deinit() noexcept
 {
     file.reset();
@@ -70,7 +85,7 @@ Error<EntryOutput> CustomStreamEntryOutput::init(
 Error<EntryOutput> CustomStreamEntryOutput::init_symlink(
         const EntryHeader &entry_header, const std::string& target)
 {
-    stream << target;
+    stream.write(target.data(), target.size());
     return success;
 }
 

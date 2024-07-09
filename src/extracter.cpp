@@ -3,6 +3,8 @@
 #include "squeeze/logging.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/io.h"
+#include "squeeze/utils/defer.h"
+#include "squeeze/utils/defer_macros.h"
 #include "squeeze/decoder.h"
 
 namespace squeeze {
@@ -39,12 +41,23 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
     {
         std::ostream *output;
         auto e = entry_output.init(entry_header, output);
+        DEFER( entry_output.deinit() );
         if (e) {
             SQUEEZE_ERROR("Failed initializing entry output");
             return {"failed initializing entry output", e.report()};
         }
-        if (output)
-            return extract_stream(entry_header, *output);
+        if (output) {
+            Error<Extracter> e = extract_stream(entry_header, *output);
+            if (e) {
+                SQUEEZE_ERROR("Failed extracting stream");
+                return {"failed extracting stream", e.report()};
+            }
+        }
+        e = entry_output.finalize();
+        if (e) {
+            SQUEEZE_ERROR("Failed finalizing entry output");
+            return {"failed finalizing entry output", e.report()};
+        }
         break;
     }
     case Symlink:
@@ -56,12 +69,17 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
             return {"failed extracting symlink", e.report()};
         }
 
-        auto ee = entry_output.init_symlink(entry_header, target);
-        if (ee) {
+        e = entry_output.init_symlink(entry_header, target);
+        DEFER( entry_output.deinit() );
+        if (e) {
             SQUEEZE_ERROR("Failed extracting symlink");
-            return {"failed extracting symlink", ee.report()};
+            return {"failed extracting symlink", e.report()};
         }
-
+        e = entry_output.finalize();
+        if (e) {
+            SQUEEZE_ERROR("Failed finalizing entry output");
+            return {"failed finalizing entry output", e.report()};
+        }
         break;
     }
     default:
@@ -72,7 +90,14 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
 
 Error<Extracter> Extracter::extract_stream(const EntryHeader& entry_header, std::ostream& output)
 {
-    return decode(source, entry_header.content_size, output, entry_header.compression);
+    SQUEEZE_TRACE();
+
+    auto e = decode(source, entry_header.content_size, output, entry_header.compression);
+    if (e) {
+        SQUEEZE_ERROR("Failed decoding entry");
+        return {"failed decoding entry", e.report()};
+    }
+    return success;
 }
 
 Error<Extracter> Extracter::extract_symlink(const EntryHeader& entry_header, std::string& target)
@@ -85,8 +110,10 @@ Error<Extracter> Extracter::extract_symlink(const EntryHeader& entry_header, std
     }
     target.resize(static_cast<std::size_t>(entry_header.content_size) - 1);
     source.read(target.data(), target.size());
-    if (source.fail())
-        return "source reading failure";
+    if (utils::validate_stream_bad(source)) {
+        SQUEEZE_ERROR("Input read error");
+        return "input read error";
+    }
     return success;
 }
 

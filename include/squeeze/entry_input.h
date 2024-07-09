@@ -12,21 +12,22 @@ namespace squeeze {
 
 using compression::CompressionParams;
 
-/* Interface responsible for providing the data (entry header and content) required
- * for the Writer interface to perform append operation. This is the abstract class of it.
- * Other derivations of it could provide the data from a file or in a custom way. */
+/* Abstract class used by append operations as a source to read from for appending contents.
+ * Could as well be called EntrySource or something. */
 class EntryInput {
 public:
     /* The content type.
-     * A monostate (no state) usually refers to a directory as directories don't have any content.
-     * An input stream usually refers to a regular file contents.
-     * A string usually refers to a symlink target. */
+     * A monostate (no state) mainly refers to a directory as directories don't have any content.
+     * An input stream mainly refers to a regular file contents.
+     * A string mainly refers to a symlink target. */
     using ContentType = std::variant<std::monostate, std::istream *, std::string>;
 
     virtual ~EntryInput() = default;
 
     /* Initialize the entry input and get references to the entry header and its content. */
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) = 0;
+    /* De-initialize the entry output. This always needs to be called if an init method
+     * has been called, including exception handling cases. */
     virtual void deinit() noexcept = 0;
 
     inline const std::string& get_path() const
@@ -36,21 +37,22 @@ public:
 
 protected:
     EntryInput(std::string&& path) : path(std::move(path))
-    {}
+    {
+    }
 
     void init_entry_header(EntryHeader& entry_header);
 
     std::string path;
 };
 
-
-/* Entry input base class for all classes that store the path, compression_method and compression_level
+/* Entry input base class for all classes that store the path and compression params
  * before being initialized. */
 class BasicEntryInput : public EntryInput {
 protected:
     BasicEntryInput(std::string&& path, const CompressionParams& compression)
         :   EntryInput(std::move(path)), compression(compression)
-    {}
+    {
+    }
 
     virtual ~BasicEntryInput() = default;
 
@@ -59,14 +61,13 @@ protected:
     CompressionParams compression;
 };
 
-
-/* Entry input interface that provides the entry header and content by opening
- * the file with the specified path. */
+/* Derived class of BasicEntryInput that opens a file for reading contents from. */
 class FileEntryInput : public BasicEntryInput {
 public:
     FileEntryInput(std::string&& path, const CompressionParams& compression)
         :   BasicEntryInput(std::move(path), compression)
-    {}
+    {
+    }
 
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
     virtual void deinit() noexcept override;
@@ -77,8 +78,7 @@ protected:
     std::optional<std::ifstream> file;
 };
 
-
-/* Entry input interface that contains the necessary entry header data and contents in advance. */
+/* Derived class of BasicEntryInput that relies on a pre-existing content and entry header to read from. */
 class CustomContentEntryInput : public BasicEntryInput {
 public:
     CustomContentEntryInput(std::string&& path, const CompressionParams& compression,
@@ -86,7 +86,8 @@ public:
         :
             BasicEntryInput(std::move(path), compression),
             content(std::move(content)), entry_attributes(entry_attributes)
-    {}
+    {
+    }
 
     virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
     virtual void deinit() noexcept override;
@@ -102,6 +103,7 @@ public:
 protected:
     void init_entry_header(EntryHeader& entry_header);
 
+protected:
     ContentType content;
     EntryAttributes entry_attributes;
 };

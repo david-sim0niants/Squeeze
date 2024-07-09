@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <istream>
-#include <ostream>
 
 #include "utils/stringify.h"
 #include "utils/enum.h"
@@ -38,9 +36,6 @@ struct EntryAttributes {
     EntryType type : 7;
     EntryPermissions permissions : 9;
 };
-
-std::istream& operator>>(std::istream& input, EntryAttributes& entry_attributes);
-std::ostream& operator<<(std::ostream& output, const EntryAttributes& entry_attributes);
 
 template<> std::string utils::stringify(const EntryAttributes& attributes);
 
