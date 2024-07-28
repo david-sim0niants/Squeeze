@@ -178,11 +178,11 @@ private:
         state |= Dirty;
 
         if (state & RecurseFlag) {
-            fsqz->will_append_recursively(path, CompressionParams{},
+            fsqz->will_append_recursively(path, {.method = compression::CompressionMethod::Huffman},
                     make_back_inserter_lambda(write_errors));
         } else {
             write_errors.emplace_back();
-            fsqz->will_append(path, CompressionParams{}, &write_errors.back());
+            fsqz->will_append(path, {.method = compression::CompressionMethod::Huffman}, &write_errors.back());
         }
 
         return EXIT_SUCCESS;

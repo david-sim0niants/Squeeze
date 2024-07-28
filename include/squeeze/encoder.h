@@ -8,6 +8,7 @@
 #include "common.h"
 #include "error.h"
 #include "compression/params.h"
+#include "compression/huffman.h"
 #include "misc/thread_pool.h"
 #include "misc/task_scheduler.h"
 
@@ -51,10 +52,18 @@ private:
     std::atomic_size_t nr_running_threads = 0;
 };
 
-template<std::input_iterator In, std::output_iterator<char> Out>
-void encode_chunk(In in, std::size_t size, Out out, const CompressionParams& compression) noexcept
+template<std::input_iterator In, std::output_iterator<std::iter_value_t<In>> Out>
+void encode_chunk(In in, std::size_t size, Out out, const CompressionParams& compression)
 {
-    std::copy_n(in, size, out); // temporary
+    switch (compression.method) {
+    case compression::CompressionMethod::None:
+    case compression::CompressionMethod::Huffman:
+        std::copy_n(in, size, out);
+        break;
+    // case compression::CompressionMethod::Huffman:
+        // compression::huffman_encode(in, size, out);
+        break;
+    }
 }
 
 }

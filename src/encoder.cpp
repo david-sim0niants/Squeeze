@@ -17,11 +17,15 @@ struct EncoderPool::Task {
         : input(std::move(input)), compression(std::move(compression))
     {}
 
-    void operator()() noexcept
+    void operator()()
     {
-        Buffer output;
-        encode_chunk(input.begin(), input.size(), std::back_insert_iterator(output), compression);
-        output_promise.set_value(std::move(output));
+        try {
+            Buffer output;
+            encode_chunk(input.begin(), input.size(), std::back_insert_iterator(output), compression);
+            output_promise.set_value(std::move(output));
+        } catch (...) {
+            output_promise.set_exception(std::current_exception());
+        }
     }
 };
 
@@ -71,7 +75,7 @@ Error<> EncoderPool::schedule_stream_encode_step(std::future<Buffer>& future_out
         std::istream& stream, const CompressionParams& compression)
 {
     SQUEEZE_TRACE();
-    constexpr size_t _tmp_buffer_size = 8192;
+    constexpr size_t _tmp_buffer_size = 1 << 10;
 
     Buffer buffer(_tmp_buffer_size);
     stream.read(reinterpret_cast<char *>(buffer.data()), _tmp_buffer_size);

@@ -77,6 +77,7 @@ Error<EntryHeader> EntryHeader::encode(std::ostream& output, const EntryHeader& 
     switch (entry_header.compression.method) {
         using enum compression::CompressionMethod;
     case None:
+    case Huffman:
         break;
     default:
         throw Exception<EntryHeader>("invalid compression method");
@@ -117,6 +118,7 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
     switch (entry_header.compression.method) {
         using enum compression::CompressionMethod;
     case None:
+    case Huffman:
         break;
     default:
         return "invalid compression method";

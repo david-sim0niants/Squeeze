@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-set(TEST_TARGETS squeeze entry_header)
+set(TEST_TARGETS squeeze entry_header compression/huffman)
 set(TEST_SRC_FILES ${TEST_TARGETS})
 list(TRANSFORM TEST_SRC_FILES APPEND .cpp)
 list(APPEND TEST_SRC_FILES main.cpp)

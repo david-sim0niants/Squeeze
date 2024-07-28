@@ -94,9 +94,9 @@ protected:
     Error<Appender> schedule_append_stream(const CompressionParams& compression, std::istream& stream);
     /* Schedules a registered string append. */
     Error<Appender> schedule_append_string(const CompressionParams& compression, const std::string& str);
-    /* Schedules a registered stream's buffer append. */
+    /* Schedules a registered stream's buffer appends. */
     Error<Appender> schedule_buffer_appends(std::istream& stream);
-    /* Schedules a registered stream's future buffer append. */
+    /* Schedules a registered stream's future buffer appends. */
     Error<Appender> schedule_future_buffer_appends(
             const CompressionParams& compression, std::istream& stream);
 
