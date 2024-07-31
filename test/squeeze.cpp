@@ -140,7 +140,7 @@ struct TestArgs {
     CompressionParams compression;
 };
 
-class SqueezeTest : public ::testing::Test, public ::testing::WithParamInterface<TestArgs> {
+class SqueezeTest : public ::testing::TestWithParam<TestArgs> {
 protected:
     SqueezeTest() :
         prng(GetParam().prng_seed),
