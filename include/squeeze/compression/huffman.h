@@ -166,7 +166,7 @@ private:
     HuffmanTreeNode *root = nullptr;
 };
 
-template<HuffmanPolicy Policy = BasicHuffmanPolicy<16>>
+template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>>
 class Huffman {
 public:
     using Freq = typename Policy::Freq;
@@ -195,7 +195,7 @@ private:
 
     using PackSet = std::vector<Pack>;
 
-    enum SortAssumption {
+    enum SortAssume {
         AssumeSorted, DontAssumeSorted
     };
 
@@ -237,10 +237,10 @@ public:
             CodeLen code_len = *code_len_it;
             if (code_len == 0 or code_len > code_len_limit)
                 return false;
-            sum_code += (unsigned long long)(1) << (code_len_limit - *code_len_it);
+            sum_code += 1ULL << (code_len_limit - *code_len_it);
         }
 
-        return sum_code == (unsigned long long)(1) << code_len_limit;
+        return sum_code == (1ULL << code_len_limit);
     }
 
     template<std::input_iterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
@@ -262,22 +262,15 @@ public:
         }
     }
 
-    template<std::input_iterator CodeIt, std::input_iterator CodeLenIt>
-    static inline Error<HuffmanTree> make_tree(CodeIt code_it, CodeIt code_it_end,
-            CodeLenIt code_len_it, CodeLenIt code_len_it_end, HuffmanTree& tree)
-    {
-        return tree.build_from_codes(code_it, code_it_end, code_len_it, code_len_it_end);
-    }
-
 private:
-    template<SortAssumption sort_assumption,
+    template<SortAssume sort_assume,
         std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static void package_merge(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it, CodeLen depth)
     {
         if (freq_it == freq_it_end)
             return;
 
-        const PackSet packset_per_level = package_freqs<sort_assumption>(freq_it, freq_it_end);
+        const PackSet packset_per_level = package_freqs<sort_assume>(freq_it, freq_it_end);
         if (packset_per_level.size() > (1 << depth))
             throw Exception<Huffman>("too many symbols or too small depth");
         if (depth == 0) {
@@ -293,14 +286,14 @@ private:
         calc_length(packset, packset_per_level.size(), code_len_it);
     }
 
-    template<SortAssumption sort_assumption, std::input_iterator FreqIt>
+    template<SortAssume sort_assume, std::input_iterator FreqIt>
     static PackSet package_freqs(FreqIt freq_it, FreqIt freq_it_end)
     {
         PackSet packset;
         for (; freq_it != freq_it_end; ++freq_it)
             packset.emplace_back(
                     *freq_it, Symset{static_cast<Symset::value_type>(packset.size())});
-        if constexpr (sort_assumption == DontAssumeSorted)
+        if constexpr (sort_assume == DontAssumeSorted)
             std::sort(packset.begin(), packset.end(), compare_packs);
         return packset;
     }
@@ -334,11 +327,11 @@ private:
 
     template<RandomAccessInputIterator CodeLenIt>
     static std::vector<std::pair<CodeLen, std::size_t>>
-        get_sorted_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_end)
+        get_sorted_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_it_end)
     {
         std::vector<std::pair<CodeLen, std::size_t>> code_lens;
-        code_lens.reserve(std::distance(code_len_it, code_len_end));
-        for (; code_len_it != code_len_end; ++code_len_it)
+        code_lens.reserve(std::distance(code_len_it, code_len_it_end));
+        for (; code_len_it != code_len_it_end; ++code_len_it)
             code_lens.emplace_back(*code_len_it, code_lens.size());
         std::sort(code_lens.begin(), code_lens.end());
         return code_lens;

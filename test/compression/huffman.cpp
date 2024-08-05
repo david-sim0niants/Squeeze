@@ -84,8 +84,7 @@ TEST_P(HuffmanTest, GenCodes)
     for (std::size_t i = 0; i < codes.size(); ++i) {
         ASSERT_GT(code_lens[i], 0);
         ASSERT_LE(code_lens[i], codes[i].size());
-        EXPECT_TRUE(
-            (codes[i] & Huffman<>::Code(((unsigned long long)(1) << (code_lens[i])) - 1)) == codes[i]);
+        EXPECT_TRUE((codes[i] & Huffman<>::Code((1ULL << code_lens[i]) - 1)) == codes[i]);
     }
 }
 
@@ -96,14 +95,12 @@ TEST_P(HuffmanTest, MakeTree)
     std::vector<Huffman<>::Code> codes = gen_codes(code_lens);
     ASSERT_EQ(codes.size(), code_lens.size());
     HuffmanTree tree;
-    EXPECT_TRUE(Huffman<>::make_tree(codes.begin(), codes.end(),
-                code_lens.begin(), code_lens.end(), tree).successful());
+    EXPECT_TRUE(tree.build_from_codes(codes.begin(), codes.end(),
+                    code_lens.begin(), code_lens.end()).successful());
     EXPECT_TRUE(tree.get_root()->validate_full_tree());
 }
 
-namespace {
-
-auto make_huffman_test_inputs()
+static auto make_huffman_test_inputs()
 {
     constexpr std::size_t nr_test_inputs = 128;
     std::vector<HuffmanTestInput> huffman_test_inputs;
@@ -114,8 +111,6 @@ auto make_huffman_test_inputs()
     huffman_test_inputs.push_back(HuffmanTestInputCustom({1, 2, 4, 8, 16, 32}));
     huffman_test_inputs.push_back(HuffmanTestInputCustom({1, 1, 1, 1, 1, 64}));
     return huffman_test_inputs;
-}
-
 }
 
 INSTANTIATE_TEST_SUITE_P(AnyFrequencies, HuffmanTest, ::testing::ValuesIn(make_huffman_test_inputs()));
