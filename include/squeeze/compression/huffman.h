@@ -1,170 +1,18 @@
 #pragma once
 
-#include <type_traits>
-#include <iterator>
-#include <concepts>
+#include <bitset>
 #include <vector>
 #include <algorithm>
-#include <bitset>
-#include <climits>
 
-#include "squeeze/error.h"
+#include "huffman_policy.h"
+#include "huffman_tree.h"
 #include "squeeze/exception.h"
+#include "squeeze/utils/iterator_concepts.h"
 
 namespace squeeze::compression {
 
-template<typename T>
-concept AddableComparable = requires(T a, T b) { { a + b } -> std::same_as<T>; } and
-                            requires(T a, T b) { { a < b } -> std::convertible_to<bool>; };
-
-template<typename Iter>
-concept RandomAccessInputIterator = std::random_access_iterator<Iter> and std::input_iterator<Iter>;
-
-template<typename Iter, typename T>
-concept RandomAccessOutputIterator = std::random_access_iterator<Iter> and std::output_iterator<Iter, T>;
-
-template<typename T>
-concept HuffmanCode = std::is_default_constructible_v<T>
-    and std::is_copy_constructible_v<T> and std::is_copy_assignable_v<T>
-    and requires(T t, int x)
-        {
-            { ++t } -> std::same_as<T>;
-            { t << x } -> std::same_as<T>;
-        };
-
-template<typename T>
-concept HuffmanPolicy = requires
-    {
-        typename T::Freq; typename T::CodeLen;
-        requires AddableComparable<typename T::Freq>;
-        requires std::integral<typename T::CodeLen>;
-        { T::code_len_limit } -> std::same_as<const typename T::CodeLen&>;
-        requires T::code_len_limit <= sizeof(unsigned long long) * CHAR_BIT;
-    };
-
-template<unsigned int codelen_limit> requires (codelen_limit <= sizeof(unsigned long long) * CHAR_BIT)
-struct BasicHuffmanPolicy {
-    using Freq = unsigned int;
-    using CodeLen = unsigned int;
-    static constexpr CodeLen code_len_limit = codelen_limit;
-};
-
-class HuffmanTreeNode {
-public:
-    HuffmanTreeNode() = default;
-
-    explicit HuffmanTreeNode(unsigned int symbol) noexcept : symbol(0)
-    {
-    }
-
-    explicit HuffmanTreeNode(HuffmanTreeNode *left, HuffmanTreeNode *right) noexcept
-        : left(left), right(right)
-    {
-    }
-
-    inline HuffmanTreeNode *get_left() const noexcept
-    {
-        return left;
-    }
-
-    inline HuffmanTreeNode *get_right() const noexcept
-    {
-        return right;
-    }
-
-    inline unsigned int get_symbol() const noexcept
-    {
-        return symbol;
-    }
-
-    inline bool is_leaf() const noexcept
-    {
-        return left == nullptr and right == nullptr;
-    }
-
-    template<typename Code, typename CodeLen, typename CreateNode>
-    Error<HuffmanTreeNode> insert(Code code, CodeLen code_len,
-            unsigned int symbol, CreateNode create_node)
-    {
-        HuffmanTreeNode *node = this;
-        while (code_len--) {
-            if (code[code_len]) {
-                if (nullptr == node->right) {
-                    node->right = create_node();
-                    if (nullptr == node->right)
-                        return "can't create a node anymore";
-                }
-                node = node->right;
-            } else {
-                if (nullptr == node->left) {
-                    node->left = create_node();
-                    if (nullptr == node->left)
-                        return "can't create a node anymore";
-                }
-                node = node->left;
-            }
-        }
-
-        if (not node->is_leaf())
-            return "attempt to insert a code that is a prefix of another code";
-
-        node->symbol = symbol;
-        return success;
-    }
-
-    inline bool validate_full_tree() const
-    {
-        return ((left and right) and (left->validate_full_tree() and right->validate_full_tree())
-             or (not left and not right));
-    }
-
-private:
-    HuffmanTreeNode *left = nullptr, *right = nullptr;
-    unsigned int symbol = 0;
-};
-
-class HuffmanTree {
-public:
-    inline const HuffmanTreeNode *get_root() const noexcept
-    {
-        return root;
-    }
-
-    template<std::input_iterator CodeIt, std::input_iterator CodeLenIt>
-    Error<HuffmanTree> build_from_codes(CodeIt code_it, CodeIt code_it_end,
-            CodeLenIt code_len_it, CodeLenIt code_len_it_end)
-    {
-        if (code_it == code_it_end)
-            return success;
-
-        std::size_t nr_codes = std::distance(code_it, code_it_end);
-        nodes_storage.reserve(2 * nr_codes - 1);
-        nodes_storage.emplace_back();
-        root = &nodes_storage.back();
-
-        unsigned int symbol = 0;
-        for (; code_it != code_it_end && code_len_it != code_len_it_end;
-                ++code_it, ++code_len_it) {
-            auto e = root->insert(*code_it, *code_len_it, symbol,
-                    [&nodes_storage = this->nodes_storage]() -> HuffmanTreeNode *
-                    {
-                        if (nodes_storage.size() == nodes_storage.capacity())
-                            return nullptr;
-                        nodes_storage.emplace_back();
-                        return &nodes_storage.back();
-                    });
-            if (e)
-                return {"failed to build Huffman tree", e.report()};
-            ++symbol;
-        }
-
-        return success;
-    }
-
-private:
-    std::vector<HuffmanTreeNode> nodes_storage;
-    HuffmanTreeNode *root = nullptr;
-};
+using squeeze::utils::RandomAccessInputIterator;
+using squeeze::utils::RandomAccessOutputIterator;
 
 template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>>
 class Huffman {
@@ -181,7 +29,7 @@ private:
         Freq freq;
         Symset symset;
 
-        explicit Pack(Freq freq, Symset symset = {}) : freq(freq), symset(symset)
+        explicit Pack(Freq freq, Symset&& symset = {}) : freq(freq), symset(std::move(symset))
         {
         }
 
@@ -232,15 +80,20 @@ public:
         if (code_len_it == code_len_it_end)
             return true;
 
+        std::size_t nr_nz_code_lens = 0;
         unsigned long long sum_code = 0;
         for (; code_len_it != code_len_it_end; ++code_len_it) {
             CodeLen code_len = *code_len_it;
-            if (code_len == 0 or code_len > code_len_limit)
+            if (code_len > code_len_limit)
                 return false;
+            if (code_len == 0)
+                continue;
+            else
+                ++nr_nz_code_lens;
             sum_code += 1ULL << (code_len_limit - *code_len_it);
         }
 
-        return sum_code == (1ULL << code_len_limit);
+        return nr_nz_code_lens <= 1 or sum_code == (1ULL << code_len_limit);
     }
 
     template<std::input_iterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
@@ -250,10 +103,16 @@ public:
             return;
 
         auto code_lens = get_sorted_code_lens(code_len_it, code_len_it_end);
-        Code prev_code {};
-        *(code_it + code_lens.front().second) = prev_code;
 
-        for (std::size_t i = 1; i < code_lens.size(); ++i) {
+        std::size_t i = 0;
+        for (; i < code_lens.size() && code_lens[i].first == 0; ++i); // skip 0 code lengths
+        if (i == code_lens.size())
+            return;
+
+        Code prev_code {};
+        *(code_it + code_lens[i].second) = prev_code; // set the shortest non-zero-length code to 0
+
+        for (++i; i < code_lens.size(); ++i) {
             const auto [code_len, code_idx] = code_lens[i];
             const auto [prev_code_len, _] = code_lens[i - 1];
             const Code code = Code(prev_code.to_ullong() + 1) << (code_len - prev_code_len);
@@ -271,12 +130,17 @@ private:
             return;
 
         const PackSet packset_per_level = package_freqs<sort_assume>(freq_it, freq_it_end);
+        switch (packset_per_level.size()) {
+        case 1:
+            ++*(code_len_it + packset_per_level.front().symset.front());
+        case 0:
+            return;
+        default:
+            break;
+        }
+
         if (packset_per_level.size() > (1 << depth))
             throw Exception<Huffman>("too many symbols or too small depth");
-        if (depth == 0) {
-            *code_len_it = 1;
-            return;
-        }
 
         PackSet packset;
         while (depth--) {
@@ -290,9 +154,9 @@ private:
     static PackSet package_freqs(FreqIt freq_it, FreqIt freq_it_end)
     {
         PackSet packset;
-        for (; freq_it != freq_it_end; ++freq_it)
-            packset.emplace_back(
-                    *freq_it, Symset{static_cast<Symset::value_type>(packset.size())});
+        for (Symset::value_type sym = 0; freq_it != freq_it_end; ++freq_it, ++sym)
+            if (*freq_it != 0) // ignore 0 frequencies, code lengths for them will be set to 0
+                packset.emplace_back(*freq_it, Symset{static_cast<Symset::value_type>(sym)});
         if constexpr (sort_assume == DontAssumeSorted)
             std::sort(packset.begin(), packset.end(), compare_packs);
         return packset;
@@ -340,6 +204,85 @@ private:
     inline static bool compare_packs(const Pack& left, const Pack& right)
     {
         return left.freq < right.freq;
+    }
+};
+
+template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>>
+    requires (Policy::code_len_limit == 15 and CodeLenPolicy::code_len_limit == 7)
+class DeflateHuffman {
+public:
+    using Freq = typename Policy::Freq;
+    using CodeLen = typename Policy::CodeLen;
+    static constexpr CodeLen code_len_limit = Policy::code_len_limit;
+    using Code = std::bitset<code_len_limit>;
+
+    using CodeLenHuffman = Huffman<CodeLenPolicy>;
+    using CodeLenFreq = typename CodeLenHuffman::Freq;
+    using CodeLenCodeLen = typename CodeLenHuffman::CodeLen;
+    using CodeLenCode = typename CodeLenHuffman::Code;
+
+    static constexpr std::size_t code_len_alphabet_size = 19;
+
+public:
+    template<std::input_iterator CodeLenIt, RandomAccessOutputIterator<CodeLenCodeLen> CodeLenCodeLenIt>
+    static void gen_code_len_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_it_end,
+            CodeLenCodeLenIt clcl_it)
+    {
+        CodeLenFreq code_len_freqs[code_len_alphabet_size] {};
+        count_code_len_freqs(code_len_it, code_len_it_end, code_len_freqs);
+        CodeLenHuffman::sort_find_code_lengths(
+                std::begin(code_len_freqs), std::end(code_len_freqs), clcl_it);
+    }
+
+    template<std::input_iterator CodeLenCodeLenIt>
+    inline static bool validate_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
+    {
+        return CodeLenHuffman::validate_code_lens(clcl_it, clcl_it_end);
+    }
+
+    template<std::input_iterator CodeLenCodeLenIt, std::output_iterator<CodeLenCode> CodeLenCodeIt>
+    inline static void gen_code_len_codes(
+            CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end, CodeLenCodeIt clc_it)
+    {
+        return CodeLenHuffman::gen_codes(clcl_it, clcl_it_end, clc_it);
+    }
+
+private:
+    template<std::input_iterator CodeLenIt, RandomAccessOutputIterator<CodeLenFreq> CodeLenFreqIt>
+    static void count_code_len_freqs(CodeLenIt code_len_it, CodeLenIt code_len_it_end,
+            CodeLenFreqIt code_len_freq_it)
+    {
+        std::size_t nr_reps = 0; CodeLen prev_len = 0;
+        for (; code_len_it != code_len_it_end; ++code_len_it) {
+            CodeLen curr_len = *code_len_it;
+            if (curr_len == prev_len) {
+                ++nr_reps;
+                continue;
+            }
+
+            update_code_len_sym_freqs(prev_len, nr_reps, code_len_freq_it[prev_len],
+                    code_len_freq_it[0x10], code_len_freq_it[0x11], code_len_freq_it[0x12]);
+            prev_len = curr_len;
+            nr_reps = 1;
+        }
+        update_code_len_sym_freqs(prev_len, nr_reps, code_len_freq_it[prev_len],
+                code_len_freq_it[0x10], code_len_freq_it[0x11], code_len_freq_it[0x12]);
+    }
+
+    static void update_code_len_sym_freqs(CodeLen code_len, std::size_t nr_reps,
+            CodeLenFreq& code_len_sym, CodeLenFreq& sym16, CodeLenFreq& sym17, CodeLenFreq& sym18)
+    {
+        code_len_sym += nr_reps > 0;
+        nr_reps -= nr_reps > 0;
+        if (0 == code_len) {
+            sym18 += nr_reps / 138;
+            sym18 += nr_reps % 138 >= 11;
+            sym17 += nr_reps % 138 >= 3;
+            code_len_sym += nr_reps % 138 < 3 ? nr_reps % 138 : 0;
+        } else {
+            sym16 += (nr_reps / 6) + (nr_reps % 6 >= 3);
+            code_len_sym += nr_reps % 6 < 3 ? nr_reps % 6 : 0;
+        }
     }
 };
 
