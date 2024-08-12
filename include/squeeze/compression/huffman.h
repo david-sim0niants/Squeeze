@@ -3,11 +3,13 @@
 #include <bitset>
 #include <vector>
 #include <algorithm>
+#include <cassert>
 
 #include "huffman_policy.h"
 #include "huffman_tree.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/iterator_concepts.h"
+#include "squeeze/misc/bitcoder.h"
 
 namespace squeeze::compression {
 
@@ -223,6 +225,17 @@ public:
 
     static constexpr std::size_t code_len_alphabet_size = 19;
 
+    static constexpr unsigned char code_len_alphabet[code_len_alphabet_size] = {
+        16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15
+    };
+
+    static constexpr unsigned char code_len_sym_2_idx[code_len_alphabet_size] = {
+        3, 17, 15, 13, 11, 9, 7, 5, 4, 6, 8, 10, 12, 14, 16, 18, 0, 1, 2
+    };
+
+    template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT>
+    class Coder;
+
 public:
     template<std::input_iterator CodeLenIt, RandomAccessOutputIterator<CodeLenCodeLen> CodeLenCodeLenIt>
     static void gen_code_len_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_it_end,
@@ -260,13 +273,15 @@ private:
                 continue;
             }
 
-            update_code_len_sym_freqs(prev_len, nr_reps, code_len_freq_it[prev_len],
-                    code_len_freq_it[0x10], code_len_freq_it[0x11], code_len_freq_it[0x12]);
+            assert(prev_len < 16 && "code length exceeding 15");
+
+            update_code_len_sym_freqs(prev_len, nr_reps, code_len_freq_it[code_len_sym_2_idx[prev_len]],
+                    code_len_freq_it[0], code_len_freq_it[1], code_len_freq_it[2]);
             prev_len = curr_len;
             nr_reps = 1;
         }
-        update_code_len_sym_freqs(prev_len, nr_reps, code_len_freq_it[prev_len],
-                code_len_freq_it[0x10], code_len_freq_it[0x11], code_len_freq_it[0x12]);
+        update_code_len_sym_freqs(prev_len, nr_reps, code_len_freq_it[code_len_sym_2_idx[prev_len]],
+                code_len_freq_it[0], code_len_freq_it[1], code_len_freq_it[2]);
     }
 
     static void update_code_len_sym_freqs(CodeLen code_len, std::size_t nr_reps,
@@ -284,6 +299,48 @@ private:
             code_len_sym += nr_reps % 6 < 3 ? nr_reps % 6 : 0;
         }
     }
+};
+
+template<HuffmanPolicy Policy, HuffmanPolicy CodeLenPolicy>
+    requires (Policy::code_len_limit == 15 and CodeLenPolicy::code_len_limit == 7)
+template<typename Char, std::size_t char_size>
+class DeflateHuffman<Policy, CodeLenPolicy>::Coder {
+public:
+    using BitEncoder = misc::BitEncoder<Char, char_size>;
+    using BitDecoder = misc::BitDecoder<Char, char_size>;
+    using BitCoder = misc::BitCoder<Char, char_size>;
+
+    explicit Coder(BitCoder& bit_coder) : bit_encoder(bit_coder), bit_decoder(bit_coder)
+    {
+    }
+
+    explicit Coder(BitEncoder& bit_encoder, BitDecoder& bit_decoder)
+        : bit_encoder(bit_encoder), bit_decoder(bit_decoder)
+    {
+    }
+
+    template<RandomAccessInputIterator CodeLenCodeLenIt, std::output_iterator<Char> OutIt>
+    OutIt encode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end, OutIt out_it)
+    {
+        for (; clcl_it != clcl_it_end; ++clcl_it)
+            out_it = bit_encoder.encode_bits(std::bitset<3>(*clcl_it), out_it);
+        return out_it;
+    }
+
+    template<std::input_iterator InIt, std::output_iterator<CodeLenCodeLen> CodeLenCodeLenIt>
+    InIt decode_code_len_code_lens(InIt in_it, CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
+    {
+        for (; clcl_it != clcl_it_end; ++clcl_it) {
+            std::bitset<3> bits;
+            in_it = bit_decoder.decode_bits(in_it, bits);
+            *clcl_it = bits.to_ulong();
+        }
+        return in_it;
+    }
+
+private:
+    misc::BitEncoder<Char, char_size>& bit_encoder;
+    misc::BitDecoder<Char, char_size>& bit_decoder;
 };
 
 }

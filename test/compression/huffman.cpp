@@ -123,10 +123,29 @@ TEST_P(HuffmanTest, EncodeDecodeCodeLens)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
-    DeflateHuffman<>::CodeLenCodeLen code_len_code_lens[DeflateHuffman<>::code_len_alphabet_size] {};
-    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), code_len_code_lens);
-    EXPECT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(
-                std::begin(code_len_code_lens), std::end(code_len_code_lens)));
+
+    DeflateHuffman<>::CodeLenCodeLen orig_clcl[DeflateHuffman<>::code_len_alphabet_size] {};
+    DeflateHuffman<>::CodeLenCodeLen rest_clcl[DeflateHuffman<>::code_len_alphabet_size] {};
+
+    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), orig_clcl);
+
+    constexpr std::size_t clcl_encoded_buffer_size = (DeflateHuffman<>::code_len_alphabet_size * 3 + 7) / 8;
+    char buffer[clcl_encoded_buffer_size] {};
+
+    EXPECT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(std::begin(orig_clcl), std::end(orig_clcl)));
+
+    misc::BitCoder bit_coder;
+    DeflateHuffman<>::Coder<> dh_coder(bit_coder);
+
+    auto out_it = dh_coder.encode_code_len_code_lens(
+            std::begin(orig_clcl), std::end(orig_clcl), std::begin(buffer));
+    bit_coder.BitEncoder::finalize(*out_it); ++out_it;
+
+    dh_coder.decode_code_len_code_lens(
+            std::begin(buffer), std::begin(rest_clcl), std::end(rest_clcl));
+
+    for (std::size_t i = 0; i < DeflateHuffman<>::code_len_alphabet_size; ++i)
+        EXPECT_EQ(orig_clcl[i], rest_clcl[i]);
 }
 
 class GeneratedTestInputs {
