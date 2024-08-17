@@ -119,33 +119,38 @@ TEST_P(HuffmanTest, MakeTree)
     }
 }
 
-TEST_P(HuffmanTest, EncodeDecodeCodeLens)
+TEST_P(HuffmanTest, EncodeDecodeCodeLenCodeLens)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
 
-    DeflateHuffman<>::CodeLenCodeLen orig_clcl[DeflateHuffman<>::code_len_alphabet_size] {};
+    DeflateHuffman<>::CodeLenCodeLen clcl[DeflateHuffman<>::code_len_alphabet_size] {};
+    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl);
+
+    ASSERT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(std::begin(clcl), std::end(clcl)));
+
+    std::size_t clcl_size = std::size(clcl);
+    for (; clcl_size > DeflateHuffman<>::min_nr_code_len_codes && clcl[clcl_size - 1] == 0; --clcl_size);
+
+    constexpr std::size_t buffer_size = (DeflateHuffman<>::code_len_alphabet_size * 3 + 4 + 7) / 8;
+    char buffer[buffer_size] {};
+
+    auto bit_encoder = misc::make_bit_encoder(buffer);
+    auto dh_encoder = DeflateHuffman<>::make_encoder(bit_encoder);
+    EXPECT_EQ(dh_encoder.encode_nr_code_len_codes(clcl_size), 0);
+    EXPECT_EQ(dh_encoder.encode_code_len_code_lens(clcl, clcl + clcl_size), 0);
+    EXPECT_EQ(bit_encoder.finalize(), 0);
+
     DeflateHuffman<>::CodeLenCodeLen rest_clcl[DeflateHuffman<>::code_len_alphabet_size] {};
+    std::size_t rest_clcl_size = 0;
 
-    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), orig_clcl);
-
-    constexpr std::size_t clcl_encoded_buffer_size = (DeflateHuffman<>::code_len_alphabet_size * 3 + 7) / 8;
-    char buffer[clcl_encoded_buffer_size] {};
-
-    EXPECT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(std::begin(orig_clcl), std::end(orig_clcl)));
-
-    misc::BitCoder bit_coder;
-    DeflateHuffman<>::Coder<> dh_coder(bit_coder);
-
-    auto out_it = dh_coder.encode_code_len_code_lens(
-            std::begin(orig_clcl), std::end(orig_clcl), std::begin(buffer));
-    bit_coder.BitEncoder::finalize(*out_it); ++out_it;
-
-    dh_coder.decode_code_len_code_lens(
-            std::begin(buffer), std::begin(rest_clcl), std::end(rest_clcl));
+    auto bit_decoder = misc::make_bit_decoder(buffer);
+    auto dh_decoder = DeflateHuffman<>::make_decoder(bit_decoder);
+    EXPECT_EQ(dh_decoder.decode_nr_code_len_codes(rest_clcl_size), 0);
+    EXPECT_EQ(dh_decoder.decode_code_len_code_lens(rest_clcl, rest_clcl + rest_clcl_size), 0);
 
     for (std::size_t i = 0; i < DeflateHuffman<>::code_len_alphabet_size; ++i)
-        EXPECT_EQ(orig_clcl[i], rest_clcl[i]);
+        EXPECT_EQ(clcl[i], rest_clcl[i]);
 }
 
 class GeneratedTestInputs {
