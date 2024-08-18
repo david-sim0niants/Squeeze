@@ -94,34 +94,39 @@ public:
         if (code_it == code_it_end)
             return success;
 
+        auto node_creater =
+            [&nodes_storage = this->nodes_storage]() -> HuffmanTreeNode *
+            {
+                nodes_storage.emplace_back();
+                return &nodes_storage.back();
+            };
+
         nodes_storage.emplace_back();
         root = &nodes_storage.back();
 
-        unsigned int symbol = 0;
-        for (; code_it != code_it_end && code_len_it != code_len_it_end; ++code_it, ++code_len_it) {
+        for (unsigned int symbol = 0; code_it != code_it_end && code_len_it != code_len_it_end;
+                ++code_it, ++code_len_it, ++symbol) {
             auto code = *code_it;
             auto code_len = *code_len_it;
             if (code_len == 0)
                 continue;
 
-            auto e = root->insert(code, code_len, symbol,
-                    [&nodes_storage = this->nodes_storage]() -> HuffmanTreeNode *
-                    {
-                        nodes_storage.emplace_back();
-                        return &nodes_storage.back();
-                    });
+            auto e = root->insert(code, code_len, symbol, node_creater);
             if (e)
                 return {"failed to build a Huffman tree", e.report()};
-            ++symbol;
         }
 
         if (root->is_leaf()) {
             root = nullptr;
             nodes_storage.clear();
+        } else if (root->get_left()->is_leaf() and root->get_right() == nullptr) {
+            root->insert(std::iter_value_t<CodeIt>(1), 1, sentinel_symbol, node_creater);
         }
 
         return success;
     }
+
+    static constexpr unsigned int sentinel_symbol = (unsigned int)(-1);
 
 private:
     std::deque<HuffmanTreeNode> nodes_storage;

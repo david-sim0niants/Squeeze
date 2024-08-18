@@ -110,11 +110,18 @@ TEST_P(HuffmanTest, MakeTree)
         EXPECT_TRUE(tree.get_root() == nullptr);
         break;
     case 1:
-        EXPECT_TRUE(tree.get_root()->get_left() != nullptr &&
-                tree.get_root()->get_left()->is_leaf() && tree.get_root()->get_right() == nullptr);
-        break;
+        // EXPECT_TRUE(tree.get_root()->get_left() != nullptr &&
+        //         tree.get_root()->get_left()->is_leaf() && tree.get_root()->get_right() == nullptr);
+        ASSERT_NE(tree.get_root(), nullptr);
+        ASSERT_NE(tree.get_root()->get_left(), nullptr);
+        ASSERT_NE(tree.get_root()->get_right(), nullptr);
+        EXPECT_TRUE(tree.get_root()->get_left()->is_leaf());
+        EXPECT_TRUE(tree.get_root()->get_right()->is_leaf());
+        EXPECT_EQ(tree.get_root()->get_left()->get_symbol(), 0);
+        EXPECT_EQ(tree.get_root()->get_right()->get_symbol(), HuffmanTree::sentinel_symbol);
     default:
-        EXPECT_TRUE(tree.get_root() != nullptr && tree.get_root()->validate_full_tree());
+        ASSERT_NE(tree.get_root(), nullptr);
+        EXPECT_TRUE(tree.get_root()->validate_full_tree());
         break;
     }
 }
@@ -149,8 +156,46 @@ TEST_P(HuffmanTest, EncodeDecodeCodeLenCodeLens)
     EXPECT_EQ(dh_decoder.decode_nr_code_len_codes(rest_clcl_size), 0);
     EXPECT_EQ(dh_decoder.decode_code_len_code_lens(rest_clcl, rest_clcl + rest_clcl_size), 0);
 
+    EXPECT_EQ(clcl_size, rest_clcl_size);
     for (std::size_t i = 0; i < DeflateHuffman<>::code_len_alphabet_size; ++i)
         EXPECT_EQ(clcl[i], rest_clcl[i]);
+}
+
+TEST_P(HuffmanTest, EncodeDecodeCodeLens)
+{
+    std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
+    ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
+
+    DeflateHuffman<>::CodeLenCodeLen clcl[DeflateHuffman<>::code_len_alphabet_size] {};
+    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl);
+
+    ASSERT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(std::begin(clcl), std::end(clcl)));
+
+    std::size_t clcl_size = std::size(clcl);
+    for (; clcl_size > DeflateHuffman<>::min_nr_code_len_codes && clcl[clcl_size - 1] == 0; --clcl_size);
+
+    DeflateHuffman<>::CodeLenCode clc[std::size(clcl)];
+    DeflateHuffman<>::gen_code_len_codes(clcl, clcl + clcl_size, clc);
+
+    std::vector<char> buffer;
+    auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
+    auto dh_encoder  = DeflateHuffman<>::make_encoder(bit_encoder);
+    EXPECT_EQ(dh_encoder.encode_code_len_syms(clc, clcl, code_lens.begin(), code_lens.end()), 0);
+    EXPECT_EQ(bit_encoder.finalize(), 0);
+
+    std::vector<unsigned int> rest_code_lens(code_lens.size());
+
+    HuffmanTree tree; tree.build_from_codes(clc, clc + clcl_size, clcl, clcl + clcl_size);
+    const HuffmanTreeNode *root = tree.get_root();
+    ASSERT_TRUE(root == nullptr || root->validate_full_tree());
+
+    auto bit_decoder = misc::make_bit_decoder(std::begin(buffer));
+    auto dh_decoder = DeflateHuffman<>::make_decoder(bit_decoder);
+
+    EXPECT_EQ(dh_decoder.decode_code_len_syms(root, rest_code_lens.begin(), rest_code_lens.end()), 0);
+
+    for (std::size_t i = 0; i < code_lens.size(); ++i)
+        EXPECT_EQ(code_lens[i], rest_code_lens[i]);
 }
 
 class GeneratedTestInputs {
