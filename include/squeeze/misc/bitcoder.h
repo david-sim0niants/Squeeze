@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "squeeze/utils/iterator.h"
+
 namespace squeeze::misc {
 
 namespace detail {
@@ -225,6 +227,24 @@ public:
         return nr_bits;
     }
 
+    bool read_bit(std::size_t& nr_bits_unread)
+    {
+        if (0 == mid_pos) {
+            if (not it_handle.is_valid()) {
+                ++nr_bits_unread;
+                return false;
+            }
+
+            mid_chr = *it_handle.it; ++it_handle.it;
+            mid_pos = char_size;
+        }
+
+        --mid_pos;
+        const bool bit = !!(mid_chr >> mid_pos);
+        mid_chr &= (Char(1) << mid_pos) - 1;
+        return bit;
+    }
+
     template<std::size_t max_nr_bits>
     void finalize(std::bitset<max_nr_bits>& bits, std::size_t nr_bits = max_nr_bits)
     {
@@ -255,6 +275,20 @@ public:
     {
         const std::size_t N = (nr_bits + char_size - mid_pos);
         return (N / char_size) - !(N % char_size);
+    }
+
+    auto make_bit_reader_iterator(std::size_t& nr_bits_unread)
+    {
+        struct ReadBit {
+            BitDecoder *self;
+            std::size_t *nr_bits_unread;
+
+            inline bool operator()() const
+            {
+                return self->read_bit(*nr_bits_unread);
+            }
+        };
+        return utils::FunctionInputIterator(ReadBit{this, &nr_bits_unread});
     }
 
 private:

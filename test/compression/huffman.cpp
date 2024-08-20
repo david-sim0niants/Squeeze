@@ -1,17 +1,21 @@
 #include <gtest/gtest.h>
 
 #include "squeeze/compression/huffman.h"
+#include "squeeze/compression/deflate_huffman.h"
 #include "../test_tools/random.h"
+#include "../test_tools/generate_mock_contents.h"
 #include "squeeze/utils/overloaded.h"
 
 namespace squeeze::compression::testing {
 
-struct HuffmanTestInput {
+class HuffmanFreqTestInput {
+public:
     virtual std::vector<unsigned int> get_freqs() const = 0;
 };
 
-struct HuffmanTestInputRandom : HuffmanTestInput {
-    HuffmanTestInputRandom(
+class HuffmanFreqTestInputRandom : public HuffmanFreqTestInput {
+public:
+    HuffmanFreqTestInputRandom(
             int seed, int min_freq, int max_freq,
             std::size_t min_nr_freqs, std::size_t max_nr_freqs)
         :   seed(seed), min_freq(min_freq), max_freq(max_freq),
@@ -28,13 +32,15 @@ struct HuffmanTestInputRandom : HuffmanTestInput {
         return freqs;
     }
 
+private:
     int seed;
     int min_freq, max_freq;
     std::size_t min_nr_freqs, max_nr_freqs;
 };
 
-struct HuffmanTestInputCustom : HuffmanTestInput {
-    HuffmanTestInputCustom(std::vector<unsigned int>&& freqs) : freqs(std::move(freqs))
+class HuffmanFreqTestInputCustom : public HuffmanFreqTestInput {
+public:
+    HuffmanFreqTestInputCustom(std::vector<unsigned int>&& freqs) : freqs(std::move(freqs))
     {
     }
 
@@ -43,10 +49,11 @@ struct HuffmanTestInputCustom : HuffmanTestInput {
         return freqs;
     }
 
+private:
     std::vector<unsigned int> freqs;
 };
 
-void PrintTo(const HuffmanTestInput *value, std::ostream *os)
+void PrintTo(const HuffmanFreqTestInput *value, std::ostream *os)
 {
     *os << "Fs: { ";
     for (auto freq : value->get_freqs())
@@ -54,7 +61,7 @@ void PrintTo(const HuffmanTestInput *value, std::ostream *os)
     *os << '}' << std::endl;
 }
 
-class HuffmanTest : public ::testing::TestWithParam<const HuffmanTestInput *> {
+class HuffmanFreqBasedTest : public ::testing::TestWithParam<const HuffmanFreqTestInput *> {
 protected:
     static std::vector<unsigned int> gen_code_lengths(const std::vector<unsigned int>& freqs)
     {
@@ -71,13 +78,13 @@ protected:
     }
 };
 
-TEST_P(HuffmanTest, GenCodeLens)
+TEST_P(HuffmanFreqBasedTest, GenCodeLens)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     EXPECT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
 }
 
-TEST_P(HuffmanTest, GenCodes)
+TEST_P(HuffmanFreqBasedTest, GenCodes)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
@@ -91,7 +98,7 @@ TEST_P(HuffmanTest, GenCodes)
     }
 }
 
-TEST_P(HuffmanTest, MakeTree)
+TEST_P(HuffmanFreqBasedTest, MakeTree)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
@@ -110,15 +117,13 @@ TEST_P(HuffmanTest, MakeTree)
         EXPECT_TRUE(tree.get_root() == nullptr);
         break;
     case 1:
-        // EXPECT_TRUE(tree.get_root()->get_left() != nullptr &&
-        //         tree.get_root()->get_left()->is_leaf() && tree.get_root()->get_right() == nullptr);
         ASSERT_NE(tree.get_root(), nullptr);
         ASSERT_NE(tree.get_root()->get_left(), nullptr);
         ASSERT_NE(tree.get_root()->get_right(), nullptr);
         EXPECT_TRUE(tree.get_root()->get_left()->is_leaf());
         EXPECT_TRUE(tree.get_root()->get_right()->is_leaf());
         EXPECT_EQ(tree.get_root()->get_left()->get_symbol(), 0);
-        EXPECT_EQ(tree.get_root()->get_right()->get_symbol(), HuffmanTree::sentinel_symbol);
+        EXPECT_EQ(tree.get_root()->get_right()->get_symbol(), HuffmanTreeNode::sentinel_symbol);
     default:
         ASSERT_NE(tree.get_root(), nullptr);
         EXPECT_TRUE(tree.get_root()->validate_full_tree());
@@ -126,7 +131,7 @@ TEST_P(HuffmanTest, MakeTree)
     }
 }
 
-TEST_P(HuffmanTest, EncodeDecodeCodeLenCodeLens)
+TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLenCodeLens)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
@@ -161,7 +166,7 @@ TEST_P(HuffmanTest, EncodeDecodeCodeLenCodeLens)
         EXPECT_EQ(clcl[i], rest_clcl[i]);
 }
 
-TEST_P(HuffmanTest, EncodeDecodeCodeLens)
+TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLens)
 {
     std::vector<unsigned int> code_lens = gen_code_lengths(GetParam()->get_freqs());
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
@@ -198,11 +203,11 @@ TEST_P(HuffmanTest, EncodeDecodeCodeLens)
         EXPECT_EQ(code_lens[i], rest_code_lens[i]);
 }
 
-class GeneratedTestInputs {
+class GeneratedFreqTestInputs {
 public:
-    std::vector<const HuffmanTestInput *> collect() const
+    std::vector<const HuffmanFreqTestInput *> collect() const
     {
-        std::vector<const HuffmanTestInput *> inputs;
+        std::vector<const HuffmanFreqTestInput *> inputs;
         inputs.reserve(random_inputs.size() + custom_inputs.size());
         for (auto& random_input : random_inputs)
             inputs.emplace_back(&random_input);
@@ -211,10 +216,10 @@ public:
         return inputs;
     }
 
-    static const GeneratedTestInputs instance;
+    static const GeneratedFreqTestInputs instance;
 
 private:
-    GeneratedTestInputs()
+    GeneratedFreqTestInputs()
     {
         init_random_inputs();
         init_custom_inputs();
@@ -233,20 +238,164 @@ private:
     {
         constexpr std::size_t nr_custom_test_inputs = 5;
         custom_inputs.reserve(nr_custom_test_inputs);
-        custom_inputs.push_back(HuffmanTestInputCustom({1, 2, 4, 8, 16, 32}));
-        custom_inputs.push_back(HuffmanTestInputCustom({1, 1, 1, 1, 1, 64}));
-        custom_inputs.push_back(HuffmanTestInputCustom({1}));
-        custom_inputs.push_back(HuffmanTestInputCustom({0, 0, 0}));
-        custom_inputs.push_back(HuffmanTestInputCustom({}));
+        custom_inputs.push_back(HuffmanFreqTestInputCustom({1, 2, 4, 8, 16, 32}));
+        custom_inputs.push_back(HuffmanFreqTestInputCustom({1, 1, 1, 1, 1, 64}));
+        custom_inputs.push_back(HuffmanFreqTestInputCustom({1}));
+        custom_inputs.push_back(HuffmanFreqTestInputCustom({0, 0, 0}));
+        custom_inputs.push_back(HuffmanFreqTestInputCustom({}));
     }
 
-    std::vector<HuffmanTestInputRandom> random_inputs;
-    std::vector<HuffmanTestInputCustom> custom_inputs;
+    std::vector<HuffmanFreqTestInputRandom> random_inputs;
+    std::vector<HuffmanFreqTestInputCustom> custom_inputs;
 };
 
-const GeneratedTestInputs GeneratedTestInputs::instance;
+const GeneratedFreqTestInputs GeneratedFreqTestInputs::instance;
 
-INSTANTIATE_TEST_SUITE_P(AnyFrequencies, HuffmanTest,
-        ::testing::ValuesIn(GeneratedTestInputs::instance.collect()));
+INSTANTIATE_TEST_SUITE_P(Freq, HuffmanFreqBasedTest,
+        ::testing::ValuesIn(GeneratedFreqTestInputs::instance.collect()));
 
+
+class HuffmanDataTestInput {
+public:
+    virtual std::vector<char> get_data() const = 0;
+};
+
+class HuffmanDataTestInputCustom : public HuffmanDataTestInput {
+public:
+    explicit HuffmanDataTestInputCustom(std::vector<char>&& data) : data(std::move(data))
+    {
+    }
+
+    std::vector<char> get_data() const override
+    {
+        return data;
+    }
+
+private:
+    std::vector<char> data;
+};
+
+class HuffmanDataTestInputRandom : public HuffmanDataTestInput {
+public:
+    explicit HuffmanDataTestInputRandom(int prng_seed, std::string_view content_seed)
+        : prng_seed(prng_seed), content_seed(content_seed)
+    {
+    }
+
+    std::vector<char> get_data() const override
+    {
+        using namespace ::squeeze::testing::tools;
+        const MockContentsGeneratorParams params = {
+            .size_limit = 2 << 20,
+            .min_nr_reps = 20,
+            .max_nr_reps = 2000,
+            .noise_probability = 10,
+            .flags = MockContentsGeneratorParams::ApplyNoise
+                   | MockContentsGeneratorParams::RandomizedRange
+                   | MockContentsGeneratorParams::RandomizedRepCount,
+        };
+        std::stringstream contents;
+        generate_mock_contents(params, Random<int>(prng_seed), content_seed, contents);
+        return std::vector(contents.view().begin(), contents.view().end());
+    }
+
+private:
+    int prng_seed;
+    std::string_view content_seed;
+};
+
+class HuffmanDataBasedTest : public ::testing::TestWithParam<const HuffmanDataTestInput *> {
+public:
+    static void count_freqs(const std::vector<char>& data, std::array<Huffman<>::CodeLen, 256>& freqs)
+    {
+        for (char c : data)
+            ++freqs[static_cast<unsigned char>(c)];
+    }
+};
+
+TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
+{
+    std::vector<char> data = GetParam()->get_data();
+
+    std::array<Huffman<>::Freq, 256> freqs {};
+    count_freqs(data, freqs);
+
+    std::array<Huffman<>::CodeLen, 256> code_lens {};
+    Huffman<>::sort_find_code_lengths(freqs.begin(), freqs.end(), code_lens.begin());
+    ASSERT_TRUE(Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
+
+    std::array<Huffman<>::Code, 256> codes {};
+    Huffman<>::gen_codes(code_lens.begin(), code_lens.end(), codes.begin());
+
+    std::vector<char> buffer;
+    auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
+    auto huffman_encoder = Huffman<>::make_encoder(bit_encoder);
+
+    auto e = huffman_encoder.encode_codes(codes.data(), code_lens.data(), data.begin(), data.end());
+    ASSERT_TRUE(e.successful()) << e.report();
+
+    bit_encoder.finalize();
+
+    double compression_ratio = data.size() / (double)buffer.size();
+    std::cerr << "\033[32m" "Compression ratio: " << compression_ratio
+        << " | Compressed " << 100 * (1 - 1.0 / compression_ratio) << '%' << "\033[0m\n";
+    EXPECT_GE(compression_ratio, 1.0F);
+
+    auto bit_decoder = misc::make_bit_decoder(buffer.begin(), buffer.end());
+    auto huffman_decoder = Huffman<>::make_decoder(bit_decoder);
+    HuffmanTree tree; tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());
+    ASSERT_TRUE(tree.get_root()->validate_full_tree());
+
+    std::vector<char> rest_data (data.size());
+    auto ee = huffman_decoder.decode_codes(tree.get_root(), rest_data.begin(), rest_data.end());
+    ASSERT_TRUE(ee.successful()) << ee.report();
+
+    for (std::size_t i = 0; i < data.size(); ++i)
+        ASSERT_EQ(data[i], rest_data[i]);
+}
+
+class GeneratedDataTestInputs {
+public:
+    std::vector<const HuffmanDataTestInput *> collect() const
+    {
+        std::vector<const HuffmanDataTestInput *> inputs;
+        inputs.reserve(random_inputs.size() + custom_inputs.size());
+        for (auto& input : random_inputs)
+            inputs.push_back(&input);
+        for (auto& input : custom_inputs)
+            inputs.push_back(&input);
+        return inputs;
+    }
+
+    static const GeneratedDataTestInputs instance;
+
+private:
+    GeneratedDataTestInputs()
+    {
+        init_random_inputs();
+        init_custom_inputs();
+    }
+
+    void init_random_inputs()
+    {
+        constexpr std::size_t nr_random_test_inputs = 128;
+        random_inputs.reserve(nr_random_test_inputs);
+        for (std::size_t i = 0; i < nr_random_test_inputs; ++i)
+            random_inputs.emplace_back(i + 1234, content_seed);
+    }
+
+    void init_custom_inputs()
+    {
+    }
+
+    static constexpr char content_seed[] = "Pellentesque finibus feugiat quam, non posuere velit varius sed. Pellentesque in consequat mauris, in elementum sapien. In pellentesque consectetur nisl, vel aliquam lectus accumsan ut. Morbi sed efficitur tellus. Sed tincidunt, eros ut tincidunt sagittis, tortor metus rutrum justo, eget sollicitudin libero leo rhoncus est. Sed efficitur nisi id mauris dictum, sit amet hendrerit risus efficitur. Integer ac pharetra lacus. Maecenas eget risus lacinia, volutpat libero at, dignissim nibh. Sed viverra libero et ipsum tempor, quis sagittis neque hendrerit. Cras nibh tortor, blandit in pretium quis, ornare non mauris. In vitae fermentum tortor, quis euismod sem.";
+
+    std::vector<HuffmanDataTestInputRandom> random_inputs;
+    std::vector<HuffmanDataTestInputCustom> custom_inputs;
+};
+
+const GeneratedDataTestInputs GeneratedDataTestInputs::instance;
+
+INSTANTIATE_TEST_SUITE_P(Data, HuffmanDataBasedTest,
+        ::testing::ValuesIn(GeneratedDataTestInputs::instance.collect()));
 }

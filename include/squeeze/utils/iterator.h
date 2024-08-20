@@ -6,18 +6,18 @@
 
 namespace squeeze::utils {
 
-template<std::invocable F>
+template<std::invocable F> requires (not std::is_void_v<std::invoke_result_t<F>>)
 class FunctionInputIterator {
 public:
     using iterator_category = std::input_iterator_tag;
-    using value_type = std::result_of_t<F>;
+    using value_type = std::invoke_result_t<F>;
     using difference_type = std::ptrdiff_t;
-    using pointer = void;
-    using reference = void;
+    using pointer = value_type *;
+    using reference = value_type&;
 
-    explicit FunctionInputIterator(F f) : f(f) {}
+    explicit FunctionInputIterator(F f) : f(std::move(f)) {}
 
-    constexpr inline value_type operator*()
+    constexpr inline value_type operator*() const
     {
         return f();
     }

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cassert>
 #include <deque>
 
 #include "squeeze/error.h"
+#include "squeeze/exception.h"
 
 namespace squeeze::compression {
 
@@ -69,11 +71,29 @@ public:
         return success;
     }
 
+    template<std::input_iterator BoolInIt>
+    unsigned int find_symbol(BoolInIt bool_it) const
+    {
+        const HuffmanTreeNode *node = this;
+        while (not node->is_leaf()) {
+            node = *bool_it ? node->right : node->left;
+            ++bool_it;
+            assert(node != nullptr && "non-full binary tree passed to the decoder");
+        }
+
+        if (node->symbol == sentinel_symbol)
+            throw Exception<HuffmanTreeNode>("reached a sentinel symbol index while decoding Huffman codes");
+
+        return node->symbol;
+    }
+
     inline bool validate_full_tree() const
     {
         return ((left and right) and (left->validate_full_tree() and right->validate_full_tree())
              or (not left and not right));
     }
+
+    static constexpr unsigned int sentinel_symbol = (unsigned int)(-1);
 
 private:
     HuffmanTreeNode *left = nullptr, *right = nullptr;
@@ -120,13 +140,11 @@ public:
             root = nullptr;
             nodes_storage.clear();
         } else if (root->get_left()->is_leaf() and root->get_right() == nullptr) {
-            root->insert(std::iter_value_t<CodeIt>(1), 1, sentinel_symbol, node_creater);
+            root->insert(std::iter_value_t<CodeIt>(1), 1, HuffmanTreeNode::sentinel_symbol, node_creater);
         }
 
         return success;
     }
-
-    static constexpr unsigned int sentinel_symbol = (unsigned int)(-1);
 
 private:
     std::deque<HuffmanTreeNode> nodes_storage;

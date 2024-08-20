@@ -1,4 +1,5 @@
 #include "generate_mockfs.h"
+#include "generate_mock_contents.h"
 #include "random.h"
 
 namespace squeeze::testing::tools {
@@ -48,53 +49,13 @@ static MockDirectory generate_mockfs_entries(const Random<int>& prng, int max_br
     return entry;
 }
 
-struct MockRegularFileGenerateParams {
-    size_t size_limit;
-    int min_nr_reps;
-    int max_nr_reps;
-    unsigned char noise_probability = 25;
-    enum {
-        NoneFlags = 0,
-        ApplyNoise = 1,
-        RandomizedRepCount = 2,
-        RandomizedRange = 4,
-    }; int flags;
-};
-
-static void generate_mock_regular_file_contents(
-        const Random<int>& prng, const std::string_view seed, std::stringstream& contents,
-        const MockRegularFileGenerateParams& params)
-{
-    int nr_reps = (params.flags & MockRegularFileGenerateParams::RandomizedRepCount) ?
-            prng(params.min_nr_reps, params.max_nr_reps) : params.min_nr_reps;
-    size_t curr_size = 0;
-    while (nr_reps-- && curr_size < params.size_limit) {
-        size_t pos = 0, len = seed.size();
-        if (params.flags & MockRegularFileGenerateParams::RandomizedRange) {
-            pos = prng(0, len - 1);
-            len = prng(0, len - 1 - pos);
-        }
-        len = std::min(len, params.size_limit - curr_size);
-
-        std::string data {seed.substr(pos, len)};
-        if (params.flags & MockRegularFileGenerateParams::ApplyNoise) {
-            for (char& c : data) {
-                c = static_cast<unsigned char>(prng(0, 256)) <= params.noise_probability ?
-                        static_cast<char>(prng(0, 256)) : c;
-            }
-        }
-        contents.write(data.data(), data.size());
-        curr_size += len;
-    }
-}
-
 static std::shared_ptr<MockRegularFile> generate_mock_regular_file(
         const Random<int>& prng, const std::string_view seed,
-        const MockRegularFileGenerateParams& params)
+        const MockContentsGeneratorParams& params)
 {
     std::shared_ptr<MockRegularFile> regular_file = std::make_shared<MockRegularFile>(
             generate_random_permissions(prng));
-    generate_mock_regular_file_contents(prng, seed, regular_file->contents, params);
+    generate_mock_contents(params, prng, seed, regular_file->contents);
     return regular_file;
 }
 
@@ -118,14 +79,14 @@ MockFileSystem generate_mockfs(const Random<int>& prng, const std::string_view s
         }
     );
 
-    MockRegularFileGenerateParams params = {
+    MockContentsGeneratorParams params = {
         .size_limit = 2 << 20,
         .min_nr_reps = 20,
         .max_nr_reps = 20000,
         .noise_probability = 25,
-        .flags = MockRegularFileGenerateParams::ApplyNoise
-               | MockRegularFileGenerateParams::RandomizedRange
-               | MockRegularFileGenerateParams::RandomizedRepCount,
+        .flags = MockContentsGeneratorParams::ApplyNoise
+               | MockContentsGeneratorParams::RandomizedRange
+               | MockContentsGeneratorParams::RandomizedRepCount,
     };
 
     std::vector<std::shared_ptr<MockRegularFile>> regular_files;

@@ -40,15 +40,18 @@ public:
     constexpr BasicError() = default;
 
     constexpr BasicError(Success)
-    {}
+    {
+    }
 
     constexpr BasicError(MessageType&& content) : content(std::forward<MessageType>(content))
-    {}
+    {
+    }
 
     template<typename U>
     constexpr BasicError(U&& content) requires std::is_convertible_v<U, MessageType>
     : content(static_cast<MessageType>(std::forward<U>(content)))
-    {}
+    {
+    }
 
     template<typename U, typename Internal>
     constexpr BasicError(U&& content, const Internal& internal,
