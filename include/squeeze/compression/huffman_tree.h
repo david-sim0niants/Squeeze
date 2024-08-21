@@ -114,8 +114,7 @@ public:
         if (code_it == code_it_end)
             return success;
 
-        auto node_creater =
-            [&nodes_storage = this->nodes_storage]() -> HuffmanTreeNode *
+        auto node_creater = [&nodes_storage = this->nodes_storage]() -> HuffmanTreeNode *
             {
                 nodes_storage.emplace_back();
                 return &nodes_storage.back();
@@ -133,7 +132,7 @@ public:
 
             auto e = root->insert(code, code_len, symbol, node_creater);
             if (e)
-                return {"failed to build a Huffman tree", e.report()};
+                return {"failed inserting a code into a Huffman tree", e.report()};
         }
 
         if (root->is_leaf()) {

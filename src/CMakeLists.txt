@@ -6,7 +6,6 @@ add_library(${TARGET_NAME} SHARED
     encoder.cpp decoder.cpp
     misc/thread_pool.cpp misc/thread_safe_queue.cpp
     wrap/file_appender.cpp wrap/file_remover.cpp wrap/file_extracter.cpp wrap/file_squeeze.cpp
-    compression/huffman.cpp compression/deflate_huffman.cpp
     utils/io.cpp utils/fs.cpp)
 target_include_directories(${TARGET_NAME} PUBLIC ${MAIN_INCLUDE_DIR})
 

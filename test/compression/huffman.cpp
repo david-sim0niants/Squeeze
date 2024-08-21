@@ -2,9 +2,11 @@
 
 #include "squeeze/compression/huffman.h"
 #include "squeeze/compression/deflate_huffman.h"
+#include "squeeze/compression/huffman_15.h"
+#include "squeeze/utils/overloaded.h"
+
 #include "../test_tools/random.h"
 #include "../test_tools/generate_mock_contents.h"
-#include "squeeze/utils/overloaded.h"
 
 namespace squeeze::compression::testing {
 
@@ -190,7 +192,8 @@ TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLens)
 
     std::vector<unsigned int> rest_code_lens(code_lens.size());
 
-    HuffmanTree tree; tree.build_from_codes(clc, clc + clcl_size, clcl, clcl + clcl_size);
+    HuffmanTree tree;
+    ASSERT_TRUE(tree.build_from_codes(clc, clc + clcl_size, clcl, clcl + clcl_size).successful());
     const HuffmanTreeNode *root = tree.get_root();
     ASSERT_TRUE(root == nullptr || root->validate_full_tree());
 
@@ -313,7 +316,7 @@ public:
     }
 };
 
-TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
+TEST_P(HuffmanDataBasedTest, EncodeDecodeCodes)
 {
     std::vector<char> data = GetParam()->get_data();
 
@@ -333,22 +336,71 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
 
     auto e = huffman_encoder.encode_codes(codes.data(), code_lens.data(), data.begin(), data.end());
     ASSERT_TRUE(e.successful()) << e.report();
+    ASSERT_EQ(bit_encoder.finalize(), 0);
 
     bit_encoder.finalize();
 
-    double compression_ratio = data.size() / (double)buffer.size();
+    const double compression_ratio = data.size() / (double)buffer.size();
     std::cerr << "\033[32m" "Compression ratio: " << compression_ratio
         << " | Compressed " << 100 * (1 - 1.0 / compression_ratio) << '%' << "\033[0m\n";
     EXPECT_GE(compression_ratio, 1.0F);
 
-    auto bit_decoder = misc::make_bit_decoder(buffer.begin(), buffer.end());
+    auto bit_decoder = misc::make_bit_decoder(buffer.begin());
     auto huffman_decoder = Huffman<>::make_decoder(bit_decoder);
-    HuffmanTree tree; tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());
+    HuffmanTree tree;
+    ASSERT_FALSE(tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end()));
     ASSERT_TRUE(tree.get_root()->validate_full_tree());
 
     std::vector<char> rest_data (data.size());
     auto ee = huffman_decoder.decode_codes(tree.get_root(), rest_data.begin(), rest_data.end());
     ASSERT_TRUE(ee.successful()) << ee.report();
+
+    for (std::size_t i = 0; i < data.size(); ++i)
+        ASSERT_EQ(data[i], rest_data[i]);
+}
+
+TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
+{
+    std::vector<char> data = GetParam()->get_data();
+    std::vector<char> buffer;
+    auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
+    auto huffman15_encoder = Huffman15<>::make_encoder(bit_encoder);
+
+    auto ene = huffman15_encoder.encode_data(data.begin(), data.end());
+    ASSERT_TRUE(ene.successful()) << ene.report();
+    ASSERT_EQ(bit_encoder.finalize(), 0);
+
+    const double compression_ratio = data.size() / (double)buffer.size();
+    std::cerr << "\033[32m" "Compression ratio: " << compression_ratio
+        << " | Compressed " << 100 * (1 - 1.0 / compression_ratio) << '%' << "\033[0m\n";
+    EXPECT_GE(compression_ratio, 1.0F);
+
+    auto bit_decoder = misc::make_bit_decoder(buffer.begin(), buffer.end());
+    auto huffman15_decoder = Huffman15<>::make_decoder(bit_decoder);
+
+    std::vector<char> rest_data(data.size());
+    auto dee = huffman15_decoder.decode_data(rest_data.begin(), rest_data.end());
+    EXPECT_TRUE(dee.successful()) << dee.report();
+
+    for (std::size_t i = 0; i < data.size(); ++i)
+        ASSERT_EQ(data[i], rest_data[i]);
+}
+
+TEST_P(HuffmanDataBasedTest, EncodeDecode)
+{
+    std::vector<char> data = GetParam()->get_data();
+    std::vector<char> buffer;
+    auto ene = huffman15_encode(data.begin(), data.end(), std::back_inserter(buffer));
+    ASSERT_TRUE(ene.successful()) << ene.report();
+
+    const double compression_ratio = data.size() / (double)buffer.size();
+    std::cerr << "\033[32m" "Compression ratio: " << compression_ratio
+        << " | Compressed " << 100 * (1 - 1.0 / compression_ratio) << '%' << "\033[0m\n";
+    EXPECT_GE(compression_ratio, 1.0F);
+
+    std::vector<char> rest_data(data.size());
+    auto dee = huffman15_decode(rest_data.begin(), rest_data.end(), buffer.begin(), buffer.end());
+    EXPECT_TRUE(dee.successful()) << dee.report();
 
     for (std::size_t i = 0; i < data.size(); ++i)
         ASSERT_EQ(data[i], rest_data[i]);

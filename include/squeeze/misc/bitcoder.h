@@ -94,7 +94,8 @@ public:
     std::size_t encode_bits(const std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
     {
         encode_mid_bits(bits, nr_bits);
-        encode_main_bits(bits, nr_bits);
+        if constexpr (max_nr_bits + 1 >= 2 * char_size)
+            encode_main_bits(bits, nr_bits);
         encode_remainder_bits(bits, nr_bits);
         return nr_bits;
     }
@@ -221,7 +222,8 @@ public:
     std::size_t decode_bits(std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
     {
         decode_mid_bits(bits, nr_bits);
-        decode_main_bits(bits, nr_bits);
+        if constexpr (max_nr_bits + 1 >= 2 * char_size)
+            decode_main_bits(bits, nr_bits);
         if (0 != nr_bits)
             decode_remainder_bits(bits, nr_bits);
         return nr_bits;

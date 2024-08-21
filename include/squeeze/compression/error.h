@@ -1,3 +1,5 @@
+#pragma once
+
 #include "squeeze/error.h"
 #include "squeeze/utils/stringify.h"
 
