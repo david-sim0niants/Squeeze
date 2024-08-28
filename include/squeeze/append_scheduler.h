@@ -47,7 +47,7 @@ public:
      * to be satisfied and append it to the target
      * NOTE: calling the method after finalize_entry_append() will result in null pointer access
      * and therefore is undefined. It must be called only after schedule_entry_append(). */
-    void schedule_buffer_append(std::future<Buffer>&& future_buffer);
+    void schedule_buffer_append(std::future<std::pair<Buffer, Error<>>>&& future_buffer);
     /* Schedule buffer append operation. The runner will just append it to the target.
      * NOTE: calling the method after finalize_entry_append() will result in null pointer access
      * and therefore is undefined. It must be called only after schedule_entry_append(). */
@@ -109,7 +109,7 @@ public:
     void schedule_error_raise(Error<>&& error);
     /* Schedule future buffer append operation. The runner will wait for the future
      * to be satisfied and append it to the target. */
-    void schedule_buffer_append(std::future<Buffer>&& future_buffer);
+    void schedule_buffer_append(std::future<std::pair<Buffer, Error<>>>&& future_buffer);
     /* Schedule buffer append operation. The runner will just append it to the target. */
     void schedule_buffer_append(Buffer&& buffer);
     /* Schedule string append operation. The runner will just append it to the target. */

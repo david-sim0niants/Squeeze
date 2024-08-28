@@ -152,7 +152,7 @@ TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLenCodeLens)
     auto bit_encoder = misc::make_bit_encoder(buffer);
     auto dh_encoder = DeflateHuffman<>::make_encoder(bit_encoder);
     EXPECT_EQ(dh_encoder.encode_nr_code_len_codes(clcl_size), 0);
-    EXPECT_EQ(dh_encoder.encode_code_len_code_lens(clcl, clcl + clcl_size), 0);
+    EXPECT_EQ(dh_encoder.encode_code_len_code_lens(clcl, clcl + clcl_size), clcl + clcl_size);
     EXPECT_EQ(bit_encoder.finalize(), 0);
 
     DeflateHuffman<>::CodeLenCodeLen rest_clcl[DeflateHuffman<>::code_len_alphabet_size] {};
@@ -161,7 +161,8 @@ TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLenCodeLens)
     auto bit_decoder = misc::make_bit_decoder(buffer);
     auto dh_decoder = DeflateHuffman<>::make_decoder(bit_decoder);
     EXPECT_EQ(dh_decoder.decode_nr_code_len_codes(rest_clcl_size), 0);
-    EXPECT_EQ(dh_decoder.decode_code_len_code_lens(rest_clcl, rest_clcl + rest_clcl_size), 0);
+    EXPECT_EQ(dh_decoder.decode_code_len_code_lens(rest_clcl, rest_clcl + rest_clcl_size),
+              rest_clcl + rest_clcl_size);
 
     EXPECT_EQ(clcl_size, rest_clcl_size);
     for (std::size_t i = 0; i < DeflateHuffman<>::code_len_alphabet_size; ++i)
@@ -187,20 +188,21 @@ TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLens)
     std::vector<char> buffer;
     auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
     auto dh_encoder  = DeflateHuffman<>::make_encoder(bit_encoder);
-    EXPECT_EQ(dh_encoder.encode_code_len_syms(clc, clcl, code_lens.begin(), code_lens.end()), 0);
+    EXPECT_EQ(dh_encoder.encode_code_len_syms(clc, clcl, code_lens.begin(), code_lens.end()),
+              code_lens.end());
     EXPECT_EQ(bit_encoder.finalize(), 0);
-
-    std::vector<unsigned int> rest_code_lens(code_lens.size());
 
     HuffmanTree tree;
     ASSERT_TRUE(tree.build_from_codes(clc, clc + clcl_size, clcl, clcl + clcl_size).successful());
     const HuffmanTreeNode *root = tree.get_root();
     ASSERT_TRUE(root == nullptr || root->validate_full_tree());
 
+    std::vector<unsigned int> rest_code_lens(code_lens.size());
+
     auto bit_decoder = misc::make_bit_decoder(std::begin(buffer));
     auto dh_decoder = DeflateHuffman<>::make_decoder(bit_decoder);
-
-    EXPECT_EQ(dh_decoder.decode_code_len_syms(root, rest_code_lens.begin(), rest_code_lens.end()), 0);
+    EXPECT_EQ(dh_decoder.decode_code_len_syms(root, rest_code_lens.begin(), rest_code_lens.end()),
+              rest_code_lens.end());
 
     for (std::size_t i = 0; i < code_lens.size(); ++i)
         EXPECT_EQ(code_lens[i], rest_code_lens[i]);
@@ -288,17 +290,18 @@ public:
     std::vector<char> get_data() const override
     {
         using namespace ::squeeze::testing::tools;
+        Random<int> prng(prng_seed);
         const MockContentsGeneratorParams params = {
-            .size_limit = 2 << 20,
-            .min_nr_reps = 20,
-            .max_nr_reps = 2000,
+            .size_limit = static_cast<std::size_t>(prng(0x1000, 2 << 20)),
+            .min_nr_reps = prng(10, 30),
+            .max_nr_reps = prng(1000, 3000),
             .noise_probability = 10,
             .flags = MockContentsGeneratorParams::ApplyNoise
                    | MockContentsGeneratorParams::RandomizedRange
                    | MockContentsGeneratorParams::RandomizedRepCount,
         };
         std::stringstream contents;
-        generate_mock_contents(params, Random<int>(prng_seed), content_seed, contents);
+        generate_mock_contents(params, prng, content_seed, contents);
         return std::vector(contents.view().begin(), contents.view().end());
     }
 
@@ -334,11 +337,10 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeCodes)
     auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
     auto huffman_encoder = Huffman<>::make_encoder(bit_encoder);
 
-    auto e = huffman_encoder.encode_codes(codes.data(), code_lens.data(), data.begin(), data.end());
-    ASSERT_TRUE(e.successful()) << e.report();
-    ASSERT_EQ(bit_encoder.finalize(), 0);
+    auto it = huffman_encoder.encode_codes(codes.data(), code_lens.data(), data.begin(), data.end());
+    ASSERT_EQ(it, data.end());
 
-    bit_encoder.finalize();
+    ASSERT_EQ(bit_encoder.finalize(), 0);
 
     const double compression_ratio = data.size() / (double)buffer.size();
     std::cerr << "\033[32m" "Compression ratio: " << compression_ratio
@@ -352,8 +354,8 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeCodes)
     ASSERT_TRUE(tree.get_root()->validate_full_tree());
 
     std::vector<char> rest_data (data.size());
-    auto ee = huffman_decoder.decode_codes(tree.get_root(), rest_data.begin(), rest_data.end());
-    ASSERT_TRUE(ee.successful()) << ee.report();
+    auto rest_it = huffman_decoder.decode_codes(tree.get_root(), rest_data.begin(), rest_data.end());
+    ASSERT_EQ(rest_it, rest_data.end());
 
     for (std::size_t i = 0; i < data.size(); ++i)
         ASSERT_EQ(data[i], rest_data[i]);
@@ -366,8 +368,9 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
     auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
     auto huffman15_encoder = Huffman15<>::make_encoder(bit_encoder);
 
-    auto ene = huffman15_encoder.encode_data(data.begin(), data.end());
+    auto [in_it, ene] = huffman15_encoder.encode_data(data.begin(), data.end());
     ASSERT_TRUE(ene.successful()) << ene.report();
+    ASSERT_EQ(in_it, data.end());
     ASSERT_EQ(bit_encoder.finalize(), 0);
 
     const double compression_ratio = data.size() / (double)buffer.size();
@@ -379,8 +382,9 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
     auto huffman15_decoder = Huffman15<>::make_decoder(bit_decoder);
 
     std::vector<char> rest_data(data.size());
-    auto dee = huffman15_decoder.decode_data(rest_data.begin(), rest_data.end());
+    auto [out_it, dee] = huffman15_decoder.decode_data(rest_data.begin(), rest_data.end());
     EXPECT_TRUE(dee.successful()) << dee.report();
+    ASSERT_EQ(out_it, rest_data.end());
 
     for (std::size_t i = 0; i < data.size(); ++i)
         ASSERT_EQ(data[i], rest_data[i]);
@@ -390,7 +394,7 @@ TEST_P(HuffmanDataBasedTest, EncodeDecode)
 {
     std::vector<char> data = GetParam()->get_data();
     std::vector<char> buffer;
-    auto ene = huffman15_encode(data.begin(), data.end(), std::back_inserter(buffer));
+    auto ene = std::get<2>(huffman15_encode(data.begin(), data.end(), std::back_inserter(buffer)));
     ASSERT_TRUE(ene.successful()) << ene.report();
 
     const double compression_ratio = data.size() / (double)buffer.size();
@@ -399,7 +403,8 @@ TEST_P(HuffmanDataBasedTest, EncodeDecode)
     EXPECT_GE(compression_ratio, 1.0F);
 
     std::vector<char> rest_data(data.size());
-    auto dee = huffman15_decode(rest_data.begin(), rest_data.end(), buffer.begin(), buffer.end());
+    auto dee = std::get<2>(huffman15_decode(rest_data.begin(), rest_data.end(),
+                           buffer.begin(), buffer.end()));
     EXPECT_TRUE(dee.successful()) << dee.report();
 
     for (std::size_t i = 0; i < data.size(); ++i)
@@ -440,7 +445,7 @@ private:
     {
     }
 
-    static constexpr char content_seed[] = "Pellentesque finibus feugiat quam, non posuere velit varius sed. Pellentesque in consequat mauris, in elementum sapien. In pellentesque consectetur nisl, vel aliquam lectus accumsan ut. Morbi sed efficitur tellus. Sed tincidunt, eros ut tincidunt sagittis, tortor metus rutrum justo, eget sollicitudin libero leo rhoncus est. Sed efficitur nisi id mauris dictum, sit amet hendrerit risus efficitur. Integer ac pharetra lacus. Maecenas eget risus lacinia, volutpat libero at, dignissim nibh. Sed viverra libero et ipsum tempor, quis sagittis neque hendrerit. Cras nibh tortor, blandit in pretium quis, ornare non mauris. In vitae fermentum tortor, quis euismod sem.";
+    static constexpr char content_seed[] = "Morbi id posuere augue. Interdum et malesuada fames ac ante ipsum primis in faucibus. Maecenas a quam felis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed dapibus leo eget odio imperdiet posuere. Mauris pretium mi at commodo pellentesque. Suspendisse nec velit ligula. Nullam volutpat quis dui a mollis. Donec quis nisi lectus. Cras congue dapibus feugiat. Sed scelerisque suscipit finibus. Pellentesque felis arcu, faucibus in dui sit amet, consequat tristique massa. Aliquam venenatis, lacus id facilisis luctus, libero nunc aliquam lorem, nec sagittis eros erat eget ex. Vestibulum congue, ex in ornare rhoncus, ipsum arcu molestie elit, eu aliquet mi nisi eget massa. Sed sollicitudin, enim luctus suscipit sagittis, sem justo tempor diam, tempus ornare urna nisl sit amet sem. Nunc lacus lacus, ornare eu magna quis, laoreet lobortis diam.";
 
     std::vector<HuffmanDataTestInputRandom> random_inputs;
     std::vector<HuffmanDataTestInputCustom> custom_inputs;

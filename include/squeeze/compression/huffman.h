@@ -7,7 +7,6 @@
 
 #include "huffman_policy.h"
 #include "huffman_tree.h"
-#include "error.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/iterator_concepts.h"
 #include "squeeze/misc/bitcoder.h"
@@ -243,24 +242,21 @@ public:
     template<RandomAccessInputIterator CodeIt, RandomAccessInputIterator CodeLenIt,
              std::input_iterator InIt, typename Sym = std::iter_value_t<InIt>,
              std::invocable<Sym> Sym2Idx = unsigned int (*)(Sym)>
-    EncodeError<Encoder> encode_codes(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
+    InIt encode_codes(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
             Sym2Idx sym2idx = [](Sym sym) -> unsigned int
             {
                 return static_cast<unsigned int>(static_cast<std::make_unsigned_t<Sym>>(sym));
             })
         requires std::convertible_to<std::invoke_result_t<Sym2Idx, Sym>, unsigned int>
     {
-        std::size_t nr_bits_left = 0;
         for (; in_it != in_it_end; ++in_it) {
             const auto sym = *in_it;
             const unsigned int idx = sym2idx(sym);
-            nr_bits_left += bit_encoder.encode_bits(code_it[idx], code_len_it[idx]);
+            const std::size_t nr_bits_left = bit_encoder.encode_bits(code_it[idx], code_len_it[idx]);
+            if (nr_bits_left)
+                break;
         }
-
-        if (nr_bits_left)
-            return {{"failed encoding", nr_bits_left}};
-        else
-            return success;
+        return in_it;
     }
 
 private:
@@ -279,21 +275,21 @@ public:
 
     template<typename Sym = char, std::output_iterator<Sym> OutIt,
         std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
-    DecodeError<Decoder> decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
+    OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
             Idx2Sym idx2sym = [](unsigned int idx) -> Sym
             {
                 return static_cast<Sym>(static_cast<int>(idx));
             })
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {
-        std::size_t nr_bits_left = 0;
-        for (; out_it != out_it_end && 0 == nr_bits_left; ++out_it)
-            *out_it = idx2sym(root->find_symbol(bit_decoder.make_bit_reader_iterator(nr_bits_left)));
-
-        if (nr_bits_left)
-            return {{"failed decoding", nr_bits_left}};
-        else
-            return success;
+        for (; out_it != out_it_end; ++out_it) {
+            std::size_t nr_bits_left = 0;
+            const unsigned int idx = root->find_symbol(bit_decoder.make_bit_reader_iterator(nr_bits_left));
+            if (nr_bits_left)
+                break;
+            *out_it = idx2sym(idx);
+        }
+        return out_it;
     }
 
 private:

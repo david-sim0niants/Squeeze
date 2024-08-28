@@ -98,7 +98,8 @@ void Remover::perform_removes()
         if (utils::validate_stream_fail(target)) {
             SQUEEZE_ERROR("Target output stream failed");
             if (error)
-                *error = {"failed removing entry '" + path + '\'', "target output stream failed"};
+                *error = {"failed removing entry '" + path + '\'',
+                          Error<>("target output stream failed").report()};
         }
 
         gap_len += len; // increase the gap size

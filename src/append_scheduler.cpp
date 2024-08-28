@@ -40,10 +40,12 @@ private:
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::FutureBufferAppender::"
 
+using FutureBuffer = std::future<std::pair<Buffer, Error<>>>;
+
 /* Future buffer appender task. */
 class FutureBufferAppender final : public BlockAppender {
 public:
-    explicit FutureBufferAppender(std::future<Buffer>&& future_buffer)
+    explicit FutureBufferAppender(FutureBuffer&& future_buffer)
         : future_buffer(std::move(future_buffer))
     {
     }
@@ -51,7 +53,12 @@ public:
     Error<> run(std::ostream& target)
     {
         SQUEEZE_TRACE("Waiting for future to complete.");
-        Buffer buffer = future_buffer.get();
+        const auto& [buffer, e] = future_buffer.get();
+        if (e) {
+            SQUEEZE_ERROR("Buffer encoding failed");
+            return {"buffer encoding failed", e.report()};
+        }
+
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
 
         target.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
@@ -63,7 +70,7 @@ public:
     }
 
 private:
-    std::future<Buffer> future_buffer;
+    FutureBuffer future_buffer;
 };
 
 #undef SQUEEZE_LOG_FUNC_PREFIX
@@ -143,7 +150,7 @@ inline void EntryAppendScheduler::schedule_error_raise(Error<>&& error)
     scheduler.schedule(std::make_unique<ErrorRaiser>(std::move(error)));
 }
 
-inline void EntryAppendScheduler::schedule_buffer_append(std::future<Buffer>&& future_buffer)
+inline void EntryAppendScheduler::schedule_buffer_append(FutureBuffer&& future_buffer)
 {
     scheduler.schedule(std::make_unique<FutureBufferAppender>(std::move(future_buffer)));
 }
@@ -249,7 +256,7 @@ void AppendScheduler::schedule_error_raise(Error<>&& error)
     last_entry_append_scheduler->schedule_error_raise(std::move(error));
 }
 
-void AppendScheduler::schedule_buffer_append(std::future<Buffer>&& future_buffer)
+void AppendScheduler::schedule_buffer_append(FutureBuffer&& future_buffer)
 {
     SQUEEZE_TRACE("future_buffer");
     assert(last_entry_append_scheduler != nullptr);

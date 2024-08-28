@@ -78,7 +78,7 @@ public:
     }
 
     template<std::output_iterator<Char> PrevOutIt>
-    explicit BitEncoder(const BitEncoder<Char, char_size, PrevOutIt>& prev,
+    explicit BitEncoder(const BitEncoder<Char, char_size, PrevOutIt, PrevOutIt>& prev,
             OutIt out_it, OutIt out_it_end) requires (IteratorHandle::bounded)
         : mid_off(prev.mid_off), mid_chr(prev.mid_off), it_handle(out_it, out_it_end)
     {
@@ -123,13 +123,13 @@ public:
     template<std::output_iterator<Char> NextOutIt>
     inline auto continue_by(NextOutIt it) const
     {
-        return BitEncoder<Char, char_size>(*this, it);
+        return BitEncoder<Char, char_size, NextOutIt>(*this, it);
     }
 
     template<std::output_iterator<Char> NextOutIt>
     inline auto continue_by(NextOutIt it, NextOutIt it_end) const
     {
-        return BitEncoder<Char, char_size>(*this, it, it_end);
+        return BitEncoder<Char, char_size, NextOutIt, NextOutIt>(*this, it, it_end);
     }
 
     inline std::size_t find_chars_required_for(std::size_t nr_bits) const
@@ -206,7 +206,8 @@ public:
     }
 
     template<std::input_iterator PrevInIt>
-    explicit BitDecoder(const BitDecoder<Char, char_size, PrevInIt>& prev, InIt in_it, InIt in_it_end)
+    explicit BitDecoder(const BitDecoder<Char, char_size, PrevInIt, PrevInIt>& prev,
+            InIt in_it, InIt in_it_end)
         requires (IteratorHandle::bounded)
         : mid_chr(prev.mid_chr), mid_pos(prev.mid_pos), it_handle(in_it, in_it_end)
     {
@@ -261,16 +262,21 @@ public:
         mid_pos = 0;
     }
 
+    inline InIt get_it() const
+    {
+        return it_handle.it;
+    }
+
     template<std::input_iterator NextInIt>
     inline auto continue_by(NextInIt next_it) const
     {
-        return BitDecoder<Char, char_size>(*this, next_it);
+        return BitDecoder<Char, char_size, NextInIt>(*this, next_it);
     }
 
     template<std::input_iterator NextInIt>
     inline auto continue_by(NextInIt next_it, NextInIt next_it_end) const
     {
-        return BitDecoder<Char, char_size>(*this, next_it, next_it_end);
+        return BitDecoder<Char, char_size, NextInIt, NextInIt>(*this, next_it, next_it_end);
     }
 
     inline std::size_t find_chars_required_for(std::size_t nr_bits) const
@@ -281,7 +287,7 @@ public:
 
     auto make_bit_reader_iterator(std::size_t& nr_bits_unread)
     {
-        struct ReadBit {
+        struct ReadBitFunctor {
             BitDecoder *self;
             std::size_t *nr_bits_unread;
 
@@ -290,7 +296,7 @@ public:
                 return self->read_bit(*nr_bits_unread);
             }
         };
-        return utils::FunctionInputIterator(ReadBit{this, &nr_bits_unread});
+        return utils::FunctionInputIterator(ReadBitFunctor{this, &nr_bits_unread});
     }
 
 private:

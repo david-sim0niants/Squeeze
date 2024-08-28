@@ -3,11 +3,13 @@
 #include <iostream>
 #include <deque>
 #include <filesystem>
+#include <charconv>
 
 #include "squeeze/squeeze.h"
 #include "squeeze/logging.h"
 #include "squeeze/wrap/file_squeeze.h"
 #include "squeeze/exception.h"
+#include "squeeze/compression/config.h"
 
 #include "utils/argparser.h"
 
@@ -34,7 +36,7 @@ public:
     };
 
     enum class Option {
-        Append, Remove, Extract, List, Recurse, NoRecurse, Help
+        Append, Remove, Extract, List, Recurse, NoRecurse, Compression, Help
     };
 
 public:
@@ -51,13 +53,13 @@ public:
                 short_options, long_options, long_options + std::size(long_options));
         int exit_code = handle_arguments();
         arg_parser.reset();
-        state = 0;
+        state.flags = 0;
         mode = Append;
         return exit_code;
     }
 
-    static constexpr char short_options[] = "ARXLhr";
-    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse"};
+    static constexpr char short_options[] = "ARXLhrC";
+    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse", "compression"};
 
 private:
     int handle_arguments()
@@ -100,11 +102,11 @@ private:
     {
         int exit_code = EXIT_SUCCESS;
 
-        if (!(state & Processing)) {
+        if (!(state.flags & Processing)) {
             exit_code = init_sqz(arg_value);
             if (exit_code != EXIT_SUCCESS)
                 return exit_code;
-            state |= Processing;
+            state.flags |= Processing;
             return EXIT_SUCCESS;
         }
 
@@ -145,7 +147,7 @@ private:
             break;
         case Option::List:
         {
-            if (!(state & Processing)) {
+            if (!(state.flags & Processing)) {
                 std::cerr << "Error: no file specified.\n";
                 return EXIT_FAILURE;
             }
@@ -156,11 +158,22 @@ private:
             break;
         }
         case Option::Recurse:
-            state |= RecurseFlag;
+            state.flags |= RecurseFlag;
             break;
         case Option::NoRecurse:
-            state &= ~RecurseFlag;
+            state.flags &= ~RecurseFlag;
             break;
+        case Option::Compression:
+        {
+            auto arg = arg_parser->raw_next();
+            if (!arg) {
+                std::cerr << "Error: no compression info specified.\n";
+                return EXIT_FAILURE;
+            }
+            if (not parse_compression_params(*arg, state.compression))
+                return EXIT_FAILURE;
+            break;
+        }
         case Option::Help:
             usage();
             break;
@@ -175,14 +188,13 @@ private:
     {
         assert(sqz.has_value());
         assert(fsqz.has_value());
-        state |= Dirty;
+        state.flags |= Dirty;
 
-        if (state & RecurseFlag) {
-            fsqz->will_append_recursively(path, {.method = compression::CompressionMethod::Huffman},
-                    make_back_inserter_lambda(write_errors));
+        if (state.flags & RecurseFlag) {
+            fsqz->will_append_recursively(path, state.compression, make_back_inserter_lambda(write_errors));
         } else {
             write_errors.emplace_back();
-            fsqz->will_append(path, {.method = compression::CompressionMethod::Huffman}, &write_errors.back());
+            fsqz->will_append(path, state.compression, &write_errors.back());
         }
 
         return EXIT_SUCCESS;
@@ -192,14 +204,14 @@ private:
     {
         assert(sqz.has_value());
         assert(fsqz.has_value());
-        state |= Dirty;
+        state.flags |= Dirty;
 
         if (path == "*") {
             fsqz->will_remove_all(make_back_inserter_lambda(write_errors));
             return EXIT_SUCCESS;
         }
 
-        if (state & RecurseFlag) {
+        if (state.flags & RecurseFlag) {
             fsqz->will_remove_recursively(path, make_back_inserter_lambda(write_errors));
         } else {
             write_errors.emplace_back();
@@ -223,7 +235,7 @@ private:
             return EXIT_SUCCESS;
         }
 
-        if (state & RecurseFlag) {
+        if (state.flags & RecurseFlag) {
             std::deque<Error<Reader>> read_errors;
             fsqz->extract_recursively(path, make_back_inserter_lambda(read_errors));
             for (auto& err : read_errors)
@@ -246,7 +258,7 @@ private:
         std::ios_base::openmode file_mode = std::ios_base::in | std::ios_base::out | std::ios_base::binary;
         if (!std::filesystem::exists(sqz_fn)) {
             file_mode |= std::ios_base::trunc;
-            state |= FileCreated;
+            state.flags |= FileCreated;
         }
 
         sqz_file.open(sqz_fn, file_mode);
@@ -274,11 +286,11 @@ private:
         sqz.reset();
 
         bool delete_file = false;
-        if (state & FileCreated) {
+        if (state.flags & FileCreated) {
             sqz_file.seekp(0, std::ios_base::end);
             if (sqz_file.tellp() == 0)
                 delete_file = true;
-            state &= ~FileCreated;
+            state.flags &= ~FileCreated;
         }
 
         sqz_file.close();
@@ -292,7 +304,7 @@ private:
 
     int run_update()
     {
-        if (!(state & Dirty))
+        if (!(state.flags & Dirty))
             return EXIT_SUCCESS;
 
         fsqz->update();
@@ -306,7 +318,7 @@ private:
         write_errors.clear();
         std::filesystem::resize_file(sqz_fn, sqz_file.tellp());
 
-        state &= ~Dirty;
+        state.flags &= ~Dirty;
         return exit_code;
     }
 
@@ -338,6 +350,8 @@ private:
             return Option::List;
         case 'r':
             return Option::Recurse;
+        case 'C':
+            return Option::Compression;
         case 'h':
             return Option::Help;
         default:
@@ -359,9 +373,86 @@ private:
             return Option::Recurse;
         if (option == "no-recurse")
             return Option::NoRecurse;
+        if (option == "compression")
+            return Option::Compression;
         if (option == "help")
             return Option::Help;
         throw BaseException("unexpected long option");
+    }
+
+    static bool parse_compression_params(std::string_view str, compression::CompressionParams& params)
+    {
+        if (str.empty())
+            return false;
+
+        using namespace std::string_view_literals;
+        using enum compression::CompressionMethod;
+
+        constexpr std::array str_methods = {"none"sv, "huffman"sv};
+        constexpr std::array methods = {None, Huffman};
+
+        auto report_invalid_info = [str]()
+        {
+            std::cerr << "Error: invalid compression info specified - " << str << '\n';
+        };
+
+        compression::CompressionParams new_params = params;
+
+        bool compr_method_set = false;
+        for (std::size_t i = 0; i < str_methods.size(); ++i) {
+            if (str.starts_with(str_methods[i])) {
+                new_params.method = methods[i];
+                str = str.substr(str_methods[i].size());
+                compr_method_set = true;
+                break;
+            }
+        }
+
+        if (str.empty()) {
+            params = new_params;
+            return true;
+        }
+
+        if (compr_method_set) {
+            if (str.front() != '/') {
+                report_invalid_info();
+                return false;
+            }
+            str = str.substr(1);
+        }
+
+        if (str.empty()) {
+            report_invalid_info();
+            return false;
+        }
+
+        if (std::isdigit(str.front())) {
+            uint8_t level = 0;
+            std::from_chars_result result = std::from_chars(str.begin(), str.end(), level);
+            switch (result.ec) {
+            case std::errc::invalid_argument:
+            case std::errc::result_out_of_range:
+                std::cerr << "Error: out of range compression level value.\n";
+                return false;
+            default:
+                break;
+            }
+
+            auto [min_level, max_level] = compression::get_min_max_levels(new_params.method);
+            if (level < min_level or level > max_level) {
+                std::cerr << "Error: compression level is out of range - " << (int)level
+                          << ". Min: " << (int)min_level << " Max: " << (int)max_level << '\n';
+                return false;
+            }
+
+            new_params.level = level;
+        } else if (not compr_method_set) {
+            report_invalid_info();
+            return false;
+        }
+
+        params = new_params;
+        return true;
     }
 
     static void usage()
@@ -377,13 +468,19 @@ Options:
     -L, --list          List all entries in the sqz file
     -r, --recurse       Enable recursive mode: directories will be processed recursively
         --no-recurse    Disable non-recursive mode: directories won't be processed recursively
+    -C, --compression   Specify compression info in a form of 'method' or 'level' or 'method/level',
+                        where method is one of the following: {none, huffman}; and level is an integer with
+                        the following bounds for each method: {[0-0], [0-8]}
     -h, --help          Display usage information
 )"""";
     }
 
 private:
     ModeFlags mode = Append;
-    int state = 0;
+    struct State {
+        int flags = 0;
+        compression::CompressionParams compression;
+    } state;
 
     std::optional<ArgParser> arg_parser;
     std::filesystem::path sqz_fn;

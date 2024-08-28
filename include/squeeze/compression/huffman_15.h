@@ -1,10 +1,11 @@
 #pragma once
 
 #include <array>
+#include <tuple>
 
 #include "huffman.h"
 #include "deflate_huffman.h"
-#include "error.h"
+#include "squeeze/error.h"
 
 namespace squeeze::compression {
 
@@ -65,7 +66,7 @@ public:
     }
 
     template<std::forward_iterator CodeLenIt>
-    EncodeError<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    Error<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         std::array<CodeLenCodeLen, DHuffman::code_len_alphabet_size> clcl {};
         DHuffman::gen_code_len_code_lens(cl_it, cl_it_end, clcl.begin());
@@ -76,25 +77,25 @@ public:
         for (; clcl_size > DHuffman::min_nr_code_len_codes && clcl[clcl_size - 1] == 0; --clcl_size);
 
         auto dh_encoder = DHuffman::make_encoder(bit_encoder);
-        std::size_t nr_bits_left = 0;
 
-        nr_bits_left = dh_encoder.encode_nr_code_len_codes(clcl_size);
+        std::size_t nr_bits_left = dh_encoder.encode_nr_code_len_codes(clcl_size);
         if (nr_bits_left)
-            return {{"failed encoding number of code length codes", nr_bits_left}};
+            return "failed encoding number of code length codes";
 
-        nr_bits_left = dh_encoder.encode_code_len_code_lens(clcl.begin(), clcl.begin() + clcl_size);
-        if (nr_bits_left)
-            return {{"failed encoding code lengths for the code length alphabet", nr_bits_left}};
+        auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
+        clcl_it = dh_encoder.encode_code_len_code_lens(clcl.begin(), clcl.begin() + clcl_size);
+        if (clcl_it != clcl_it_end)
+            return "failed encoding code lengths for the code length alphabet";
 
-        nr_bits_left = dh_encoder.encode_code_len_syms(clc.begin(), clcl.begin(), cl_it, cl_it_end);
-        if (nr_bits_left)
-            return {{"failed encoding code lengths", nr_bits_left}};
+        cl_it = dh_encoder.encode_code_len_syms(clc.begin(), clcl.begin(), cl_it, cl_it_end);
+        if (cl_it != cl_it_end)
+            return "failed encoding code lengths";
 
         return success;
     }
 
     template<std::forward_iterator InIt>
-    EncodeError<Encoder> encode_data(InIt in_it, InIt in_it_end)
+    std::tuple<InIt, Error<Encoder>> encode_data(InIt in_it, InIt in_it_end)
         requires std::convertible_to<std::iter_value_t<InIt>, char>
     {
         std::array<Freq, alphabet_size> freqs {};
@@ -106,12 +107,11 @@ public:
 
         auto e = encode_code_lens(code_lens.begin(), code_lens.end());
         if (e)
-            return e;
+            return {in_it, {"failed encoding code lengths", e.report()}};
+
         auto huffman_encoder = Huffman<Policy>::make_encoder(bit_encoder);
-        auto ee = huffman_encoder.encode_codes(codes.begin(), code_lens.begin(), in_it, in_it_end);
-        if (ee)
-            return ee;
-        return success;
+        in_it = huffman_encoder.encode_codes(codes.begin(), code_lens.begin(), in_it, in_it_end);
+        return {in_it, success};
     }
 
 private:
@@ -130,130 +130,132 @@ public:
     }
 
     template<std::output_iterator<CodeLen> CodeLenIt>
-    DecodeError<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    Error<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         auto dh_decoder = DHuffman::make_decoder(bit_decoder);
-        std::size_t nr_bits_left = 0;
 
         std::size_t clcl_size = 0;
-        nr_bits_left = dh_decoder.decode_nr_code_len_codes(clcl_size);
+        std::size_t nr_bits_left = dh_decoder.decode_nr_code_len_codes(clcl_size);
         if (nr_bits_left)
-            return {{"failed decoding number of code lengths codes", nr_bits_left}};
+            return "failed decoding number of code lengths codes";
 
         std::array<CodeLenCodeLen, DHuffman::code_len_alphabet_size> clcl {};
-        nr_bits_left = dh_decoder.decode_code_len_code_lens(clcl.begin(), clcl.begin() + clcl_size);
-        if (nr_bits_left)
-            return {{"failed decoding code lengths for the code length alphabet"}};
+        auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
+
+        clcl_it = dh_decoder.decode_code_len_code_lens(clcl_it, clcl_it_end);
+        if (clcl_it != clcl_it_end)
+            return "failed decoding code lengths for the code length alphabet";
+        else if (not DHuffman::validate_code_len_code_lens(clcl.begin(), clcl_it_end))
+            return "invalid code lengths for the code length alphabet decoded";
 
         std::array<CodeLenCode, DHuffman::code_len_alphabet_size> clc {};
         DHuffman::gen_code_len_codes(clcl.begin(), clcl.begin() + clcl_size, clc.begin());
         HuffmanTree tree;
-        tree.build_from_codes(clc.begin(), clc.begin() + clcl_size,
-                clcl.begin(), clcl.begin() + clcl_size);
+        tree.build_from_codes(clc.begin(),  clc.begin() + clcl_size,
+                             clcl.begin(), clcl.begin() + clcl_size);
 
-        nr_bits_left = dh_decoder.decode_code_len_syms(tree.get_root(), cl_it, cl_it_end);
-        if (nr_bits_left)
-            return {{"failed decoding code lengths", nr_bits_left}};
-
-        return success;
+        cl_it = dh_decoder.decode_code_len_syms(tree.get_root(), cl_it, cl_it_end);
+        if (cl_it != cl_it_end)
+            return "failed decoding code lengths";
+        else
+            return success;
     }
 
     template<std::output_iterator<char> OutIt>
-    DecodeError<Decoder> decode_data(OutIt out_it, OutIt out_it_end)
+    std::tuple<OutIt, Error<Decoder>> decode_data(OutIt out_it, OutIt out_it_end)
     {
         std::array<CodeLen, alphabet_size> code_lens {};
         auto e = decode_code_lens(code_lens.begin(), code_lens.end());
         if (e)
-            return e;
+            return {out_it, {"failed decoding code lengths", e.report()}};
+        else if (not Huffman<Policy>::validate_code_lens(code_lens.begin(), code_lens.end()))
+            return {out_it, "invalid code lengths decoded"};
 
         std::array<Code, alphabet_size> codes {};
         Huffman<Policy>::gen_codes(code_lens.begin(), code_lens.end(), codes.data());
 
-        auto huffman_decoder = Huffman<Policy>::make_decoder(bit_decoder);
         HuffmanTree tree;
         auto ee = tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());
         if (ee)
-            return {{"failed building a Huffman tree", 0}};
+            return {out_it, "failed building a Huffman tree"};
 
-        auto eee = huffman_decoder.decode_codes(tree.get_root(), out_it, out_it_end);
-        if (eee)
-            return eee;
-
-        return success;
+        auto huffman_decoder = Huffman<Policy>::make_decoder(bit_decoder);
+        out_it = huffman_decoder.decode_codes(tree.get_root(), out_it, out_it_end);
+        return {out_it, success};
     }
 
 private:
     BitDecoder& bit_decoder;
 };
 
-template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+        HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
+        std::input_iterator InIt = typename std::vector<char>::iterator,
         std::output_iterator<Char> OutIt = typename std::vector<Char>::iterator,
-        std::input_iterator InIt = typename std::vector<char>::iterator>
-    requires ((Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
-              (sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT))
-EncodeError<> huffman15_encode(InIt in_it, InIt in_it_end, OutIt out_it)
+        typename ...OutItEnd>
+    requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
+              (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
+              sizeof...(OutItEnd) <= 1)
+inline std::tuple<InIt, Error<>> huffman15_encode(
+        misc::BitEncoder<Char, char_size, OutIt, OutItEnd...>& bit_encoder, InIt in_it, InIt in_it_end)
 {
-    auto bit_encoder = misc::make_bit_encoder(out_it);
-    auto huffman_encoder = Huffman15<Policy, CodeLenPolicy>::make_encoder(bit_encoder);
-    auto e = huffman_encoder.encode_data(in_it, in_it_end);
-    if (e)
-        return e;
-    std::size_t nr_bits_left = bit_encoder.finalize();
-    if (nr_bits_left) [[unlikely]]
-        return {{"failed finalizing bit encoding", nr_bits_left}};
-    return success;
+    return Huffman15<Policy, CodeLenPolicy>::make_encoder(bit_encoder).encode_data(in_it, in_it_end);
 }
 
-template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+        HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
+        std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
+        std::input_iterator InIt = typename std::vector<Char>::iterator,
+        typename ...InItEnd>
+    requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
+              (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
+              sizeof...(InItEnd) <= 1)
+inline std::tuple<OutIt, Error<>> huffman15_decode(
+        OutIt out_it, OutIt out_it_end, misc::BitDecoder<Char, char_size, InIt, InItEnd...>& bit_decoder)
+{
+    return Huffman15<Policy, CodeLenPolicy>::make_decoder(bit_decoder).decode_data(out_it, out_it_end);
+}
+
+template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+        HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
+        std::input_iterator InIt = typename std::vector<char>::iterator,
         std::output_iterator<Char> OutIt = typename std::vector<Char>::iterator,
-        std::input_iterator InIt = typename std::vector<char>::iterator>
-    requires ((Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
-              (sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT))
-EncodeError<> huffman15_encode(InIt in_it, InIt in_it_end, OutIt out_it, OutIt out_it_end)
+        typename ...OutItEnd>
+    requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
+              (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
+              sizeof...(OutItEnd) <= 1)
+std::tuple<InIt, OutIt, Error<>> huffman15_encode(
+        InIt in_it, InIt in_it_end, OutIt out_it, OutItEnd... out_it_end)
 {
-    auto bit_encoder = misc::make_bit_encoder(out_it, out_it_end);
-    auto huffman_encoder = Huffman15<Policy, CodeLenPolicy>::make_encoder(bit_encoder);
-    auto e = huffman_encoder.encode_data(in_it, in_it_end);
+    auto bit_encoder = misc::make_bit_encoder<Char, char_size>(out_it, out_it_end...);
+
+    Error<> e;
+    std::tie(in_it, e) = huffman15_encode(bit_encoder, in_it, in_it_end);
+    out_it = bit_encoder.get_it();
     if (e)
-        return e;
-    std::size_t nr_bits_left = bit_encoder.finalize();
-    if (nr_bits_left) [[unlikely]]
-        return {{"failed finalizing bit encoding", nr_bits_left}};
-    return success;
+        return std::make_tuple(in_it, out_it, e);
+
+    bit_encoder.finalize();
+    out_it = bit_encoder.get_it();
+    return std::make_tuple(in_it, out_it, success);
 }
 
-template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
-        std::output_iterator<Char> InIt = typename std::vector<Char>::iterator,
-        std::input_iterator OutIt = typename std::vector<char>::iterator>
-    requires ((Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
-              (sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT))
-DecodeError<> huffman15_decode(OutIt out_it, OutIt out_it_end, InIt in_it)
+template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+        HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
+        std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
+        std::input_iterator InIt = typename std::vector<Char>::iterator,
+        typename ...InItEnd>
+    requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
+              (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
+              sizeof...(InItEnd) <= 1)
+std::tuple<OutIt, InIt, Error<>> huffman15_decode(
+        OutIt out_it, OutIt out_it_end, InIt in_it, InItEnd... in_it_end)
 {
-    auto bit_decoder = misc::make_bit_decoder(in_it);
-    auto huffman_decoder = Huffman15<Policy, CodeLenPolicy>::make_decoder(bit_decoder);
-    auto e = huffman_decoder.decode_data(out_it, out_it_end);
-    if (e)
-        return e;
-    return success;
-}
-
-template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
-        std::output_iterator<Char> InIt = typename std::vector<Char>::iterator,
-        std::input_iterator OutIt = typename std::vector<char>::iterator>
-    requires ((Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
-              (sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT))
-DecodeError<> huffman15_decode(OutIt out_it, OutIt out_it_end, InIt in_it, InIt in_it_end)
-{
-    auto bit_decoder = misc::make_bit_decoder(in_it, in_it_end);
-    auto huffman_decoder = Huffman15<Policy, CodeLenPolicy>::make_decoder(bit_decoder);
-    auto e = huffman_decoder.decode_data(out_it, out_it_end);
-    if (e)
-        return e;
-    return success;
+    auto bit_decoder = misc::make_bit_decoder<Char, char_size>(in_it, in_it_end...);
+    Error<> e;
+    std::tie(out_it, e) = huffman15_decode(out_it, out_it_end, bit_decoder);
+    in_it = bit_decoder.get_it();
+    return std::make_tuple(out_it, in_it, e);
 }
 
 }

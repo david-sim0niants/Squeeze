@@ -73,6 +73,20 @@ public:
         return Arg {valid_option ? ArgType::LongOption : ArgType::UnknownLongOption, current_arg_val};
     }
 
+    std::optional<std::string_view> raw_next()
+    {
+        if (curr_arg_type == ArgType::ShortOption && *++curr_arg) {
+            std::string_view arg = curr_arg;
+            curr_arg = nullptr;
+            curr_arg_type = ArgType::None;
+            return arg;
+        }
+        if (++curr_arg_index >= argc)
+            return std::nullopt;
+        curr_arg_type = ArgType::None;
+        return curr_arg = argv[curr_arg_index];
+    }
+
 private:
     int argc;
     const char *const *argv;

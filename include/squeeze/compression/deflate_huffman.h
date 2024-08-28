@@ -142,13 +142,12 @@ public:
         return bit_encoder.encode_bits(std::bitset<4>(n - 4));
     }
 
-    template<RandomAccessInputIterator CodeLenCodeLenIt>
-    std::size_t encode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
+    template<std::input_iterator CodeLenCodeLenIt>
+    CodeLenCodeLenIt encode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
     {
-        std::size_t nr_bits_left = 0;
-        for (; clcl_it != clcl_it_end; ++clcl_it)
-            nr_bits_left += bit_encoder.encode_bits(std::bitset<3>(*clcl_it));
-        return nr_bits_left;
+        for (; clcl_it != clcl_it_end &&
+               (0 == bit_encoder.encode_bits(std::bitset<3>(*clcl_it))); ++clcl_it);
+        return clcl_it;
     }
 
     template<RandomAccessInputIterator CodeLenCodeIt, RandomAccessInputIterator CodeLenCodeLenIt>
@@ -210,22 +209,20 @@ public:
 
     template<RandomAccessInputIterator CodeLenCodeIt, RandomAccessInputIterator CodeLenCodeLenIt,
         std::input_iterator CodeLenIt>
-    std::size_t encode_code_len_syms(CodeLenCodeIt clc_it, CodeLenCodeLenIt clcl_it,
+    CodeLenIt encode_code_len_syms(CodeLenCodeIt clc_it, CodeLenCodeLenIt clcl_it,
             CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         if (cl_it == cl_it_end)
-            return 0;
-        std::size_t nr_bits_left = 0;
+            return cl_it;
 
         while (true) {
             CodeLen curr_len = *cl_it; ++cl_it;
             auto [nr_reps, next_len] = count_code_len_freq(curr_len, cl_it, cl_it_end);
-            nr_bits_left += encode_code_len_sym(clc_it, clcl_it, nr_reps, curr_len);
-            if (curr_len == next_len)
+            if (encode_code_len_sym(clc_it, clcl_it, nr_reps, curr_len) || curr_len == next_len)
                 break;
         }
 
-        return nr_bits_left;
+        return cl_it;
     }
 
 private:
@@ -252,15 +249,12 @@ public:
     }
 
     template<std::output_iterator<CodeLenCodeLen> CodeLenCodeLenIt>
-    std::size_t decode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
+    CodeLenCodeLenIt decode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
     {
-        std::size_t nr_bits_left = 0;
-        for (; clcl_it != clcl_it_end; ++clcl_it) {
-            std::bitset<3> bits;
-            nr_bits_left += bit_decoder.decode_bits(bits);
+        std::bitset<3> bits;
+        for (; clcl_it != clcl_it_end && (0 == bit_decoder.decode_bits(bits)); ++clcl_it)
             *clcl_it = bits.to_ulong();
-        }
-        return nr_bits_left;
+        return clcl_it;
     }
 
     std::size_t decode_code_len_sym(const HuffmanTreeNode *node, std::size_t& nr_reps, CodeLen& code_len)
@@ -306,15 +300,14 @@ public:
     }
 
     template<std::output_iterator<CodeLen> CodeLenIt>
-    std::size_t decode_code_len_syms(const HuffmanTreeNode *tree_root, CodeLenIt cl_it, CodeLenIt cl_it_end)
+    CodeLenIt decode_code_len_syms(const HuffmanTreeNode *tree_root, CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         std::size_t nr_bits_left = 0;
         std::size_t nr_reps = 0; CodeLen code_len = 0;
-        while (cl_it != cl_it_end && !(nr_bits_left += decode_code_len_sym(tree_root, nr_reps, code_len))) {
+        while (cl_it != cl_it_end && (0 == decode_code_len_sym(tree_root, nr_reps, code_len)))
             for (; nr_reps != 0 && cl_it != cl_it_end; --nr_reps, ++cl_it)
                 *cl_it = code_len;
-        }
-        return nr_bits_left;
+        return cl_it;
     }
 
 private:

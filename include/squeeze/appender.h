@@ -97,8 +97,7 @@ protected:
     /* Schedules a registered stream's buffer appends. */
     Error<Appender> schedule_buffer_appends(std::istream& stream);
     /* Schedules a registered stream's future buffer appends. */
-    Error<Appender> schedule_future_buffer_appends(
-            const CompressionParams& compression, std::istream& stream);
+    Error<Appender> schedule_future_buffer_appends(const CompressionParams& compression, std::istream& stream);
 
     inline EncoderPool& get_encoder_pool()
     {

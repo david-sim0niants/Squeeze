@@ -8,13 +8,14 @@
 #include "common.h"
 #include "error.h"
 #include "compression/params.h"
-#include "compression/huffman.h"
 #include "misc/thread_pool.h"
 #include "misc/task_scheduler.h"
 
 namespace squeeze {
 
 using compression::CompressionParams;
+
+using EncodedBuffer = std::pair<Buffer, Error<>>;
 
 class EncoderPool {
 private:
@@ -25,12 +26,12 @@ public:
     explicit EncoderPool(misc::ThreadPool& thread_pool);
     ~EncoderPool();
 
-    std::future<Buffer> schedule_buffer_encode(Buffer&& input, const CompressionParams& compression);
+    std::future<EncodedBuffer> schedule_buffer_encode(Buffer&& input, const CompressionParams& compression);
 
     template<std::output_iterator<Buffer> It>
     Error<> schedule_stream_encode(std::istream& stream, const CompressionParams& compression, It it)
     {
-        std::future<Buffer> future_output; Error<> e = success;
+        std::future<EncodedBuffer> future_output; Error<> e = success;
         while ((e = schedule_stream_encode_step(future_output, stream, compression)).successful()
                and future_output.valid()) {
             *it = std::move(future_output); ++it;
@@ -41,7 +42,7 @@ public:
     void wait_for_tasks() noexcept;
 
 private:
-    Error<> schedule_stream_encode_step(std::future<Buffer>& future_output,
+    Error<> schedule_stream_encode_step(std::future<EncodedBuffer>& future_output,
             std::istream& stream, const CompressionParams& compression);
 
     void try_another_thread();
@@ -52,18 +53,6 @@ private:
     std::atomic_size_t nr_running_threads = 0;
 };
 
-template<std::input_iterator In, std::output_iterator<std::iter_value_t<In>> Out>
-void encode_chunk(In in, std::size_t size, Out out, const CompressionParams& compression)
-{
-    switch (compression.method) {
-    case compression::CompressionMethod::None:
-    case compression::CompressionMethod::Huffman:
-        std::copy_n(in, size, out);
-        break;
-    // case compression::CompressionMethod::Huffman:
-        // compression::huffman_encode(in, size, out);
-        break;
-    }
-}
+Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression);
 
 }

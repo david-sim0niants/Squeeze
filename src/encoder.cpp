@@ -1,5 +1,6 @@
 #include "squeeze/encoder.h"
 
+#include "squeeze/compression/compression.h"
 #include "squeeze/logging.h"
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/defer.h"
@@ -11,7 +12,7 @@ namespace squeeze {
 struct EncoderPool::Task {
     Buffer input;
     CompressionParams compression;
-    std::promise<Buffer> output_promise;
+    std::promise<EncodedBuffer> output_promise;
 
     Task(Buffer&& input, CompressionParams&& compression)
         : input(std::move(input)), compression(std::move(compression))
@@ -21,8 +22,8 @@ struct EncoderPool::Task {
     {
         try {
             Buffer output;
-            encode_chunk(input.begin(), input.size(), std::back_insert_iterator(output), compression);
-            output_promise.set_value(std::move(output));
+            auto e = encode_buffer(input, output, compression);
+            output_promise.set_value(std::make_pair(output, e));
         } catch (...) {
             output_promise.set_exception(std::current_exception());
         }
@@ -60,8 +61,8 @@ void EncoderPool::wait_for_tasks() noexcept
     }
 }
 
-std::future<Buffer>
-EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& compression)
+std::future<std::pair<Buffer, Error<>>> EncoderPool::
+    schedule_buffer_encode(Buffer&& input, const CompressionParams& compression)
 {
     SQUEEZE_TRACE();
     Task task {std::move(input), CompressionParams(compression)};
@@ -71,24 +72,25 @@ EncoderPool::schedule_buffer_encode(Buffer&& input, const CompressionParams& com
     return future_output;
 }
 
-Error<> EncoderPool::schedule_stream_encode_step(std::future<Buffer>& future_output,
+Error<> EncoderPool::schedule_stream_encode_step(std::future<EncodedBuffer>& future_output,
         std::istream& stream, const CompressionParams& compression)
 {
     SQUEEZE_TRACE();
-    constexpr size_t _tmp_buffer_size = 1 << 10;
+    const size_t buffer_size = compression.method == compression::CompressionMethod::None ?
+        BUFSIZ : compression::get_block_size(compression);
 
-    Buffer buffer(_tmp_buffer_size);
-    stream.read(reinterpret_cast<char *>(buffer.data()), _tmp_buffer_size);
+    Buffer buffer(buffer_size);
+    stream.read(reinterpret_cast<char *>(buffer.data()), buffer_size);
     if (utils::validate_stream_bad(stream))
         return {"output read error", ErrorCode::from_current_errno().report()};
 
     buffer.resize(stream.gcount());
 
-    future_output = buffer.size() == _tmp_buffer_size ?
+    future_output = buffer.size() == buffer_size ?
         schedule_buffer_encode(Buffer(buffer), compression)
         :
         buffer.empty() ?
-            std::future<Buffer>{}
+            std::future<EncodedBuffer>{}
             :
             schedule_buffer_encode(std::move(buffer), compression)
         ;
@@ -107,6 +109,30 @@ void EncoderPool::threaded_task_run()
     DEFER ( nr_running_threads.fetch_sub(1, std::memory_order::release);
             nr_running_threads.notify_all(); );
     scheduler.run<misc::TaskRunPolicy::NoWait>();
+}
+
+template<std::input_iterator In, std::output_iterator<char> Out>
+auto encode_block(In in, In in_end, Out out, const CompressionParams& compression)
+{
+    switch (compression.method) {
+        using enum compression::CompressionMethod;
+    case Huffman:
+        return compression::compress<Huffman>(in, in_end, out);
+        break;
+    default:
+        throw BaseException("invalid compression method or an unimplemented one");
+    }
+}
+
+Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression)
+{
+    if (compression.method == compression::CompressionMethod::None) {
+        std::copy(in.begin(), in.end(), std::back_inserter(out));
+        return success;
+    }
+
+    auto e = std::get<2>(encode_block(in.begin(), in.end(), std::back_inserter(out), compression));
+    return e ? Error<>{"failed encoding buffer", e.report()} : success;
 }
 
 }

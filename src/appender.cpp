@@ -144,7 +144,7 @@ Error<Appender> Appender::schedule_future_buffer_appends(
 {
     auto e = get_encoder_pool().schedule_stream_encode(stream, compression,
             utils::FunctionOutputIterator {
-                [this](std::future<Buffer>&& future_buffer)
+                [this](std::future<EncodedBuffer>&& future_buffer)
                 {
                     scheduler.schedule_buffer_append(std::move(future_buffer));
                 }

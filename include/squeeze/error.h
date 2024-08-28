@@ -55,7 +55,7 @@ public:
 
     template<typename U, typename Internal>
     constexpr BasicError(U&& content, const Internal& internal,
-            const std::string& infix = " because of -> ")
+            const std::string& infix = " because of ")
         requires std::is_convertible_v<Internal, std::string> and
                  std::is_convertible_v<std::string, MessageType> and
                  std::is_convertible_v<U, std::string>
