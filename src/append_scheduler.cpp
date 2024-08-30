@@ -10,6 +10,7 @@ namespace squeeze {
 class BlockAppender {
 public:
     virtual Error<> run(std::ostream& target) = 0;
+    virtual ~BlockAppender() = default;
 };
 
 #undef SQUEEZE_LOG_FUNC_PREFIX

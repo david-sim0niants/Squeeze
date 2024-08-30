@@ -16,7 +16,8 @@ struct EncoderPool::Task {
 
     Task(Buffer&& input, CompressionParams&& compression)
         : input(std::move(input)), compression(std::move(compression))
-    {}
+    {
+    }
 
     void operator()()
     {
@@ -61,7 +62,7 @@ void EncoderPool::wait_for_tasks() noexcept
     }
 }
 
-std::future<std::pair<Buffer, Error<>>> EncoderPool::
+std::future<EncodedBuffer> EncoderPool::
     schedule_buffer_encode(Buffer&& input, const CompressionParams& compression)
 {
     SQUEEZE_TRACE();
@@ -97,6 +98,7 @@ Error<> EncoderPool::schedule_stream_encode_step(std::future<EncodedBuffer>& fut
     return success;
 }
 
+
 void EncoderPool::try_another_thread()
 {
     thread_pool.try_assign_task([this](){ threaded_task_run(); });
@@ -111,13 +113,13 @@ void EncoderPool::threaded_task_run()
     scheduler.run<misc::TaskRunPolicy::NoWait>();
 }
 
-template<std::input_iterator In, std::output_iterator<char> Out>
+template<bool use_terminator, std::input_iterator In, std::output_iterator<char> Out>
 auto encode_block(In in, In in_end, Out out, const CompressionParams& compression)
 {
     switch (compression.method) {
         using enum compression::CompressionMethod;
     case Huffman:
-        return compression::compress<Huffman>(in, in_end, out);
+        return compression::compress<Huffman, use_terminator>(in, in_end, out);
         break;
     default:
         throw BaseException("invalid compression method or an unimplemented one");
@@ -131,8 +133,58 @@ Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& co
         return success;
     }
 
-    auto e = std::get<2>(encode_block(in.begin(), in.end(), std::back_inserter(out), compression));
+    const bool use_term = in.size() < compression::get_block_size(compression);
+
+    auto e = use_term ?
+        std::get<2>(encode_block<true> (in.begin(), in.end(), std::back_inserter(out), compression))
+        :
+        std::get<2>(encode_block<false>(in.begin(), in.end(), std::back_inserter(out), compression))
+    ;
+
     return e ? Error<>{"failed encoding buffer", e.report()} : success;
+}
+
+Error<> encode(std::istream& in, std::size_t size, std::ostream& out,
+               const compression::CompressionParams& compression)
+{
+    SQUEEZE_TRACE();
+
+    if (compression.method == compression::CompressionMethod::None) {
+        SQUEEZE_TRACE("Compression method is none, plain copying...");
+        auto e = utils::ioscopy(in, in.tellg(), out, out.tellp(), size);
+        return e ? Error<>{"failed copying stream", e.report()} : success;
+    }
+
+    const std::size_t buffer_size = compression::get_block_size(compression);
+
+    Buffer inbuf(buffer_size);
+    Buffer outbuf;
+
+    while (size) {
+        inbuf.resize(std::min(buffer_size, size));
+        in.read(inbuf.data(), inbuf.size());
+        size -= inbuf.size();
+        if (utils::validate_stream_bad(in)) [[unlikely]] {
+            SQUEEZE_ERROR("Input read error");
+            return {"input read error", ErrorCode::from_current_errno().report()};
+        }
+        inbuf.resize(in.gcount());
+
+        auto e = encode_buffer(inbuf, outbuf, compression);
+        if (e) {
+            SQUEEZE_ERROR("Failed encoding buffer");
+            return {"failed encoding buffer", e.report()};
+        }
+
+        out.write(outbuf.data(), outbuf.size());
+        if (utils::validate_stream_bad(out)) {
+            SQUEEZE_ERROR("output write error");
+            return {"output write error", e.report()};
+        }
+        outbuf.clear();
+    }
+
+    return success;
 }
 
 }

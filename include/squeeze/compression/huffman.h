@@ -243,10 +243,7 @@ public:
              std::input_iterator InIt, typename Sym = std::iter_value_t<InIt>,
              std::invocable<Sym> Sym2Idx = unsigned int (*)(Sym)>
     InIt encode_codes(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
-            Sym2Idx sym2idx = [](Sym sym) -> unsigned int
-            {
-                return static_cast<unsigned int>(static_cast<std::make_unsigned_t<Sym>>(sym));
-            })
+            Sym2Idx sym2idx = default_sym2idx<Sym>)
         requires std::convertible_to<std::invoke_result_t<Sym2Idx, Sym>, unsigned int>
     {
         for (; in_it != in_it_end; ++in_it) {
@@ -258,6 +255,23 @@ public:
         }
         return in_it;
     }
+
+    template<RandomAccessInputIterator CodeIt, RandomAccessInputIterator CodeLenIt,
+             std::input_iterator InIt, typename Sym = std::iter_value_t<InIt>,
+             std::invocable<Sym> Sym2Idx = unsigned int (*)(Sym)>
+    InIt encode_codes(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
+            unsigned int term_idx, Sym2Idx sym2idx = default_sym2idx<Sym>)
+    {
+        in_it = encode_codes(code_it, code_len_it, in_it, in_it_end, sym2idx);
+        bit_encoder.encode_bits(code_it[term_idx], code_len_it[term_idx]);
+        return in_it;
+    }
+
+    template<typename Sym>
+    inline static unsigned int default_sym2idx(Sym sym)
+    {
+        return static_cast<unsigned int>(static_cast<std::make_unsigned_t<Sym>>(sym));
+    };
 
 private:
     BitEncoder& bit_encoder;
@@ -276,23 +290,43 @@ public:
     template<typename Sym = char, std::output_iterator<Sym> OutIt,
         std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
     OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
-            Idx2Sym idx2sym = [](unsigned int idx) -> Sym
-            {
-                return static_cast<Sym>(static_cast<int>(idx));
-            })
+            Idx2Sym idx2sym = default_idx2sym<Sym>)
+        requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
+    {
+        return decode_codes<false>(root, out_it, out_it_end, HuffmanTreeNode::sentinel_symbol, idx2sym);
+    }
+    template<typename Sym = char, std::output_iterator<Sym> OutIt,
+        std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
+    OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
+            unsigned int term_idx, Idx2Sym idx2sym = default_idx2sym<Sym>)
+        requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
+    {
+        return decode_codes<true>(root, out_it, out_it_end, term_idx, idx2sym);
+    }
+
+    template<typename Sym>
+    inline static Sym default_idx2sym(unsigned int idx)
+    {
+        return static_cast<Sym>(static_cast<int>(idx));
+    }
+
+private:
+    template<bool expect_term, typename Sym = char, std::output_iterator<Sym> OutIt,
+        std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
+    OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
+            unsigned int term_idx, Idx2Sym idx2sym)
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {
         for (; out_it != out_it_end; ++out_it) {
             std::size_t nr_bits_left = 0;
             const unsigned int idx = root->find_symbol(bit_decoder.make_bit_reader_iterator(nr_bits_left));
-            if (nr_bits_left)
+            if (nr_bits_left || expect_term && idx == term_idx)
                 break;
             *out_it = idx2sym(idx);
         }
         return out_it;
     }
 
-private:
     BitDecoder& bit_decoder;
 };
 

@@ -292,10 +292,10 @@ public:
         using namespace ::squeeze::testing::tools;
         Random<int> prng(prng_seed);
         const MockContentsGeneratorParams params = {
-            .size_limit = static_cast<std::size_t>(prng(0x1000, 2 << 20)),
-            .min_nr_reps = prng(10, 30),
-            .max_nr_reps = prng(1000, 3000),
-            .noise_probability = 10,
+            .size_limit = 2 << 20,
+            .min_nr_reps = 1,
+            .max_nr_reps = (2 << 20) / content_seed.size() + 1,
+            .noise_probability = 32,
             .flags = MockContentsGeneratorParams::ApplyNoise
                    | MockContentsGeneratorParams::RandomizedRange
                    | MockContentsGeneratorParams::RandomizedRepCount,
@@ -368,7 +368,7 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
     auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
     auto huffman15_encoder = Huffman15<>::make_encoder(bit_encoder);
 
-    auto [in_it, ene] = huffman15_encoder.encode_data(data.begin(), data.end());
+    auto [in_it, ene] = huffman15_encoder.template encode_data<false>(data.begin(), data.end());
     ASSERT_TRUE(ene.successful()) << ene.report();
     ASSERT_EQ(in_it, data.end());
     ASSERT_EQ(bit_encoder.finalize(), 0);
@@ -382,7 +382,7 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeData)
     auto huffman15_decoder = Huffman15<>::make_decoder(bit_decoder);
 
     std::vector<char> rest_data(data.size());
-    auto [out_it, dee] = huffman15_decoder.decode_data(rest_data.begin(), rest_data.end());
+    auto [out_it, dee] = huffman15_decoder.template decode_data<false>(rest_data.begin(), rest_data.end());
     EXPECT_TRUE(dee.successful()) << dee.report();
     ASSERT_EQ(out_it, rest_data.end());
 
@@ -408,7 +408,7 @@ TEST_P(HuffmanDataBasedTest, EncodeDecode)
     EXPECT_TRUE(dee.successful()) << dee.report();
 
     for (std::size_t i = 0; i < data.size(); ++i)
-        ASSERT_EQ(data[i], rest_data[i]);
+        ASSERT_EQ(data[i], rest_data[i]) << "at index: " << i;
 }
 
 class GeneratedDataTestInputs {

@@ -17,7 +17,7 @@ auto decode_block(Out out, Out out_end, In in, In in_end, const CompressionParam
     switch (compression.method) {
         using enum compression::CompressionMethod;
     case Huffman:
-        return compression::decompress<Huffman>(out, out_end, in, in_end);
+        return compression::decompress<Huffman, true>(out, out_end, in, in_end);
     default:
         throw BaseException("invalid compression method or an unimplemented one");
     }
@@ -35,12 +35,12 @@ Error<> decode(std::istream& in, std::size_t size, std::ostream& out, const Comp
 
     const std::size_t outbuf_size = compression::get_block_size(compression);
     Buffer outbuf(outbuf_size);
-    misc::InputSubstream substream(in, size);
+    misc::InputSubstream insub(in, size);
 
     auto out_it = outbuf.begin();
     auto out_it_end = outbuf.end();
-    auto in_it = substream.begin();
-    auto in_it_end = substream.end();
+    auto in_it = insub.begin();
+    auto in_it_end = insub.end();
 
     while (in_it != in_it_end) {
         Error<> e;

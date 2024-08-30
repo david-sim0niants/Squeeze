@@ -9,8 +9,8 @@ namespace squeeze::testing::tools {
 
 struct MockContentsGeneratorParams {
     std::size_t size_limit;
-    int min_nr_reps;
-    int max_nr_reps;
+    unsigned long min_nr_reps;
+    unsigned long max_nr_reps;
     unsigned char noise_probability = 25;
     enum {
         NoneFlags = 0,

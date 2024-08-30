@@ -50,12 +50,12 @@ static MockDirectory generate_mockfs_entries(const Random<int>& prng, int max_br
 }
 
 static std::shared_ptr<MockRegularFile> generate_mock_regular_file(
-        const Random<int>& prng, const std::string_view seed,
+        const Random<int>& prng, const std::string_view content_seed,
         const MockContentsGeneratorParams& params)
 {
     std::shared_ptr<MockRegularFile> regular_file = std::make_shared<MockRegularFile>(
             generate_random_permissions(prng));
-    generate_mock_contents(params, prng, seed, regular_file->contents);
+    generate_mock_contents(params, prng, content_seed, regular_file->contents);
     return regular_file;
 }
 
@@ -64,7 +64,7 @@ static std::shared_ptr<MockSymlink> generate_mock_symlink(const Random<int>& prn
     return std::make_shared<MockSymlink>(generate_random_permissions(prng), std::move(target));
 }
 
-MockFileSystem generate_mockfs(const Random<int>& prng, const std::string_view seed)
+MockFileSystem generate_mockfs(const Random<int>& prng, const std::string_view content_seed)
 {
     constexpr int nr_regular_files = 20;
     constexpr int nr_symlinks = 20;
@@ -81,9 +81,9 @@ MockFileSystem generate_mockfs(const Random<int>& prng, const std::string_view s
 
     MockContentsGeneratorParams params = {
         .size_limit = 2 << 20,
-        .min_nr_reps = 20,
-        .max_nr_reps = 20000,
-        .noise_probability = 25,
+        .min_nr_reps = 1,
+        .max_nr_reps = (2 << 20) / content_seed.size() + 1,
+        .noise_probability = 32,
         .flags = MockContentsGeneratorParams::ApplyNoise
                | MockContentsGeneratorParams::RandomizedRange
                | MockContentsGeneratorParams::RandomizedRepCount,
@@ -95,7 +95,7 @@ MockFileSystem generate_mockfs(const Random<int>& prng, const std::string_view s
         std::string file_name = generate_random_regular_file_name(prng);
         auto& entries = directories[prng(0, directories.size() - 1)]->entries;
         regular_files.push_back(
-                entries.regular_files[file_name] = generate_mock_regular_file(prng, seed, params));
+                entries.regular_files[file_name] = generate_mock_regular_file(prng, content_seed, params));
     }
 
     int nr_symlinks_left = nr_symlinks;

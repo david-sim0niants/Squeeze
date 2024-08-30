@@ -232,11 +232,21 @@ TEST_P(SqueezeTest, WriteUpdateRead)
 static constexpr int prng_seed = 1234;
 static constexpr char file_content_seed[] = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec tristique dictum ex, vitae egestas elit aliquet ac. Pellentesque consectetur sapien quis purus euismod, vel efficitur nibh lobortis. In hac habitasse platea dictumst. Proin aliquam vulputate molestie. Morbi vehicula facilisis enim, id maximus tortor mollis at. Aenean vitae consequat turpis. Proin efficitur, dui ac commodo molestie, sapien lectus dignissim lectus, eget condimentum lacus lorem nec odio. Pellentesque convallis nulla eget malesuada consectetur. Fusce ullamcorper, massa non sagittis eleifend, arcu eros euismod orci, nec malesuada mauris mauris id risus. Vestibulum ullamcorper ac mi et fringilla. Proin sed lectus tincidunt, tristique enim in, interdum elit. Duis ac tincidunt diam, a vehicula leo. Ut luctus, ex eu ultrices vehicula, lorem enim dignissim tellus, ut congue nisi velit sit amet ante. Cras nec sagittis justo.\n";
 
-INSTANTIATE_TEST_SUITE_P(AnyCompression, SqueezeTest, ::testing::Values(
-            TestArgs {prng_seed, file_content_seed, {compression::CompressionMethod::None, 0}}
-            // TestArgs {prng_seed, file_content_seed, {compression::CompressionMethod::Huffman, 1}}
-        )
-    );
+#define SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(method, level) \
+    INSTANTIATE_TEST_SUITE_P(method##_##level, SqueezeTest, \
+            ::testing::Values(TestArgs {prng_seed, file_content_seed,\
+                {compression::CompressionMethod::method, level}}))
 
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(None,    0);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 1);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 2);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 3);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 4);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 5);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 6);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 7);
+SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST(Huffman, 8);
+
+#undef SQUEEZE_TESTING_INSTANTIATE_COMPRESSION_TEST
 
 }

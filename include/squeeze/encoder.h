@@ -44,7 +44,6 @@ public:
 private:
     Error<> schedule_stream_encode_step(std::future<EncodedBuffer>& future_output,
             std::istream& stream, const CompressionParams& compression);
-
     void try_another_thread();
     void threaded_task_run();
 
@@ -54,5 +53,8 @@ private:
 };
 
 Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression);
+
+Error<> encode(std::istream& in, std::size_t size, std::ostream& out,
+               const compression::CompressionParams& compression);
 
 }
