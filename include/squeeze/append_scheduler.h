@@ -61,10 +61,11 @@ public:
     void finalize_entry_append() noexcept;
 
     /* Run the scheduled tasks on the target output stream.
-     * Supposed to be called asynchronously while scheduling is done synchronously. */
+     * Supposed to be called asynchronously while scheduling being done synchronously. */
     inline void run(std::ostream& target)
     {
         scheduler.run(target);
+        scheduler.open();
     }
 
     /* Finalize the scheduler.
@@ -115,8 +116,8 @@ public:
     /* Schedule string append operation. The runner will just append it to the target. */
     void schedule_string_append(std::string&& str);
 
-    /* Finalize the schedule. No more block append operations can be scheduled afterwards. */
-    inline void close() noexcept
+    /* Finalize the scheduler. No more block append operations can be scheduled afterwards. */
+    inline void finalize() noexcept
     {
         scheduler.close();
     }

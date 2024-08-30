@@ -143,7 +143,7 @@ EntryAppendScheduler::EntryAppendScheduler(EntryHeader entry_header, Error<> *er
 
 EntryAppendScheduler::~EntryAppendScheduler()
 {
-    close();
+    finalize();
 }
 
 inline void EntryAppendScheduler::schedule_error_raise(Error<>&& error)
@@ -242,8 +242,8 @@ AppendScheduler::~AppendScheduler()
 
 void AppendScheduler::schedule_entry_append(EntryHeader&& entry_header, Error<> *error)
 {
+    SQUEEZE_TRACE();
     finalize_entry_append();
-    scheduler.open();
     Task task {entry_header, error};
     last_entry_append_scheduler = task.scheduler.get();
     // last_entry_append_scheduler is safe to use until finalize() or finalize_entry_append() are called
@@ -281,7 +281,7 @@ void AppendScheduler::schedule_string_append(std::string&& str)
 void AppendScheduler::finalize_entry_append() noexcept
 {
     if (last_entry_append_scheduler)
-        last_entry_append_scheduler->close();
+        last_entry_append_scheduler->finalize();
     last_entry_append_scheduler = nullptr;
 }
 
