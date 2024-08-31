@@ -6,10 +6,12 @@
 
 namespace squeeze::compression {
 
+/* Compress data using the given compression method and bit encoder.
+ * Return input iterator at the point when compression stopped and an error or success message. */
 template<CompressionMethod method, bool use_terminator,
         std::input_iterator InIt, std::output_iterator<char> OutIt, typename ...OutItEnd>
     requires (sizeof...(OutItEnd) <= 1)
-std::tuple<OutIt, Error<>> compress(misc::BitEncoder<char, CHAR_BIT, OutIt, OutItEnd...>& bit_encoder,
+std::tuple<InIt, Error<>> compress(misc::BitEncoder<char, CHAR_BIT, OutIt, OutItEnd...>& bit_encoder,
         InIt in_it, InIt in_it_end)
 {
     if constexpr (method == CompressionMethod::Huffman)
@@ -18,6 +20,8 @@ std::tuple<OutIt, Error<>> compress(misc::BitEncoder<char, CHAR_BIT, OutIt, OutI
         throw BaseException("invalid compression method or an unimplemented one");
 }
 
+/* Decompress data using the given compression method and bit decoder.
+ * Return output iterator at the point when decompression stopped and an error or success message. */
 template<CompressionMethod method, bool expect_terminator,
         std::output_iterator<char> OutIt, std::input_iterator InIt, typename ...InItEnd>
     requires (sizeof...(InItEnd) <= 1)
@@ -30,6 +34,8 @@ std::tuple<OutIt, Error<>> decompress(
         throw BaseException("invalid compression method or an unimplemented one");
 }
 
+/* Compress data using the given compression method.
+ * Return (InIt, OutIt, Error) triple at the point when compression stopped */
 template<CompressionMethod method, bool use_terminator,
          std::input_iterator InIt, std::output_iterator<char> OutIt, std::output_iterator<char>... OutItEnd>
     requires (sizeof...(OutItEnd) <= 1)
@@ -41,6 +47,8 @@ std::tuple<InIt, OutIt, Error<>> compress(InIt in_it, InIt in_it_end, OutIt out_
         throw BaseException("invalid compression method or an unimplemented one");
 }
 
+/* Decompress data using the given compression method.
+ * Return (InIt, OutIt, Error) triple at the point when decompression stopped */
 template<CompressionMethod method, bool expect_terminator,
          std::output_iterator<char> OutIt, std::input_iterator InIt, std::input_iterator... InItEnd>
     requires (sizeof...(InItEnd) <= 1)

@@ -5,26 +5,23 @@
 
 namespace squeeze::compression {
 
-template<typename T>
-concept AddableComparable = requires(T a, T b) { { a + b } -> std::same_as<T>; } and
-                            requires(T a, T b) { { a < b } -> std::convertible_to<bool>; };
+namespace detail {
+    template<typename T>
+    concept AddableComparable = requires(T a, T b) { { a + b } -> std::same_as<T>; } and
+                                requires(T a, T b) { { a < b } -> std::convertible_to<bool>; };
+}
 
-template<typename T>
-concept HuffmanCode = std::is_default_constructible_v<T>
-    and std::is_copy_constructible_v<T> and std::is_copy_assignable_v<T>
-    and requires(T t, int x)
-        {
-            { ++t } -> std::same_as<T>;
-            { t << x } -> std::same_as<T>;
-        };
-
+/* Concept defining what is expected from a Huffman policy type. */
 template<typename T>
 concept HuffmanPolicy = requires
     {
-        typename T::Freq; typename T::CodeLen;
-        requires AddableComparable<typename T::Freq>;
-        requires std::integral<typename T::CodeLen>;
+        // Require a frequency type with addable and comparable properties.
+        typename T::Freq;    requires detail::AddableComparable<typename T::Freq>;
+        // Require an integral code length type.
+        typename T::CodeLen; requires std::integral<typename T::CodeLen>;
+        // Require a code length limit of the code length type.
         { T::code_len_limit } -> std::same_as<const typename T::CodeLen&>;
+        // Require a static limit on the code length limit.
         requires T::code_len_limit <= sizeof(unsigned long long) * CHAR_BIT;
     };
 

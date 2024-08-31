@@ -139,7 +139,7 @@ TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLenCodeLens)
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
 
     DeflateHuffman<>::CodeLenCodeLen clcl[DeflateHuffman<>::code_len_alphabet_size] {};
-    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl);
+    DeflateHuffman<>::find_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl);
 
     ASSERT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(std::begin(clcl), std::end(clcl)));
 
@@ -175,7 +175,7 @@ TEST_P(HuffmanFreqBasedTest, EncodeDecodeCodeLens)
     ASSERT_TRUE(compression::Huffman<>::validate_code_lens(code_lens.begin(), code_lens.end()));
 
     DeflateHuffman<>::CodeLenCodeLen clcl[DeflateHuffman<>::code_len_alphabet_size] {};
-    DeflateHuffman<>::gen_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl);
+    DeflateHuffman<>::find_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl);
 
     ASSERT_TRUE(DeflateHuffman<>::validate_code_len_code_lens(std::begin(clcl), std::end(clcl)));
 
@@ -319,7 +319,7 @@ public:
     }
 };
 
-TEST_P(HuffmanDataBasedTest, EncodeDecodeCodes)
+TEST_P(HuffmanDataBasedTest, EncodeDecodeSymbols)
 {
     std::vector<char> data = GetParam()->get_data();
 
@@ -337,7 +337,7 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeCodes)
     auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
     auto huffman_encoder = Huffman<>::make_encoder(bit_encoder);
 
-    auto it = huffman_encoder.encode_codes(codes.data(), code_lens.data(), data.begin(), data.end());
+    auto it = huffman_encoder.encode_syms(codes.data(), code_lens.data(), data.begin(), data.end());
     ASSERT_EQ(it, data.end());
 
     ASSERT_EQ(bit_encoder.finalize(), 0);
@@ -354,7 +354,7 @@ TEST_P(HuffmanDataBasedTest, EncodeDecodeCodes)
     ASSERT_TRUE(tree.get_root()->validate_full_tree());
 
     std::vector<char> rest_data (data.size());
-    auto rest_it = huffman_decoder.decode_codes(tree.get_root(), rest_data.begin(), rest_data.end());
+    auto rest_it = huffman_decoder.decode_syms(tree.get_root(), rest_data.begin(), rest_data.end());
     ASSERT_EQ(rest_it, rest_data.end());
 
     for (std::size_t i = 0; i < data.size(); ++i)

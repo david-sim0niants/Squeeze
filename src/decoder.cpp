@@ -8,9 +8,6 @@
 
 namespace squeeze {
 
-template<std::input_iterator In>
-using BitDecoder = misc::BitDecoder<char, sizeof(char) * CHAR_BIT, In, In>;
-
 template<std::output_iterator<char> Out, std::input_iterator In>
 auto decode_block(Out out, Out out_end, In in, In in_end, const CompressionParams& compression)
 {
@@ -23,7 +20,7 @@ auto decode_block(Out out, Out out_end, In in, In in_end, const CompressionParam
     }
 }
 
-Error<> decode(std::istream& in, std::size_t size, std::ostream& out, const CompressionParams& compression)
+Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const CompressionParams& compression)
 {
     SQUEEZE_TRACE();
 

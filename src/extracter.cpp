@@ -92,7 +92,7 @@ Error<Extracter> Extracter::extract_stream(const EntryHeader& entry_header, std:
 {
     SQUEEZE_TRACE();
 
-    auto e = decode(source, entry_header.content_size, output, entry_header.compression);
+    auto e = decode(output, entry_header.content_size, source, entry_header.compression);
     if (e) {
         SQUEEZE_ERROR("Failed decoding entry");
         return {"failed decoding entry", e.report()};

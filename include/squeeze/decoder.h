@@ -11,7 +11,8 @@ namespace squeeze {
 
 using compression::CompressionParams;
 
-Error<> decode(std::istream& in, std::size_t size, std::ostream& out,
+/* Decode a char stream of a given size from another char stream using the compression info provided. */
+Error<> decode(std::ostream& out, std::size_t size, std::istream& in,
                const CompressionParams& compression);
 
 }

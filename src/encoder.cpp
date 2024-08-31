@@ -114,7 +114,7 @@ void EncoderPool::threaded_task_run()
 }
 
 template<bool use_terminator, std::input_iterator In, std::output_iterator<char> Out>
-auto encode_block(In in, In in_end, Out out, const CompressionParams& compression)
+static auto encode_block(In in, In in_end, Out out, const CompressionParams& compression)
 {
     switch (compression.method) {
         using enum compression::CompressionMethod;
@@ -133,6 +133,7 @@ Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& co
         return success;
     }
 
+    // use terminator mark only when the encoded buffer size is less than the block size,
     const bool use_term = in.size() < compression::get_block_size(compression);
 
     auto e = use_term ?

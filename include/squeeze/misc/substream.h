@@ -8,6 +8,9 @@ namespace squeeze::misc {
 template<typename Char>
 class BasicInputSubstreamIterator;
 
+/* Some sort of container that binds to the given input stream and provides a size-limited view of it.
+ * Reads from the substream will return EOF if read past the limit,
+ * even if the original stream has more data available. */
 template<typename Char>
 class BasicInputSubstream {
 public:
@@ -18,11 +21,15 @@ public:
     {
     }
 
+    /* Read one character. Return EOF in case of EOF. */
     int get();
 
+    /* Get the begin iterator. */
     Iterator begin();
+    /* Get the end iterator. */
     Iterator end();
 
+    /* Return if EOF. */
     inline bool eof() const
     {
         return cache_off == cache.size() && (0 == size || stream.eof());
@@ -37,6 +44,8 @@ private:
     static constexpr std::size_t cache_max_size = BUFSIZ;
 };
 
+/* Single-use iterator for traversing the substream. Acts like a std::istreambuf_iterator,
+ * except it becomes invalid when reaching the substream EOF, NOT the original stream EOF. */
 template<typename Char>
 class BasicInputSubstreamIterator {
 public:

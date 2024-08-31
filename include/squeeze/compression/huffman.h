@@ -16,6 +16,8 @@ namespace squeeze::compression {
 using squeeze::utils::RandomAccessInputIterator;
 using squeeze::utils::RandomAccessOutputIterator;
 
+/* Huffman coding interface defined by its policy rules implementing
+ * the essential Huffman coding methods. */
 template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>>
 class Huffman {
 public:
@@ -35,9 +37,10 @@ public:
 private:
     using Symset = std::vector<unsigned int>;
 
+    /* A pack type used in package-merge algorithm. */
     struct Pack {
-        Freq freq;
-        Symset symset;
+        Freq freq; /* Cumulative frequency of all symbols in the symset. */
+        Symset symset; /* The symbol set. */
 
         explicit Pack(Freq freq, Symset&& symset = {}) : freq(freq), symset(std::move(symset))
         {
@@ -58,12 +61,16 @@ private:
     };
 
 public:
+    /* Find code lengths for each frequency.
+     * This does not assume that frequencies are sorted and handles the sorting itself. */
     template<RandomAccessInputIterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static inline void sort_find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it)
     {
         package_merge<DontAssumeSorted>(freq_it, freq_it_end, code_len_it, code_len_limit);
     }
 
+    /* Find code lengths for each frequency with a custom code length limit.
+     * This does not assume that frequencies are sorted and handles the sorting itself. */
     template<RandomAccessInputIterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static inline void sort_find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it,
             CodeLen custom_limit)
@@ -71,12 +78,15 @@ public:
         package_merge<DontAssumeSorted>(freq_it, freq_it_end, code_len_it, custom_limit);
     }
 
+    /* Find code lengths for each frequency. This assumes that frequencies are sorted. */
     template<std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static inline void find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it)
     {
         package_merge<AssumeSorted>(freq_it, freq_it_end, code_len_it, code_len_limit);
     }
 
+    /* Find code lengths for each frequency with a custom code length limit.
+     * This assumes that frequencies are sorted. */
     template<std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static inline void find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it,
             CodeLen custom_limit)
@@ -84,6 +94,12 @@ public:
         package_merge<AssumeSorted>(freq_it, freq_it_end, code_len_it, custom_limit);
     }
 
+    /* Validate code lengths. Ignores zero lengths.
+     * Validation fails if any of the code lengths exceed the code length limit.
+     * If there's only one non-zero code length, validation passes.
+     * Otherwise it indirectly computes the sum of 2^(-code_length) for all non-zero code lengths.
+     * Validation only passes if the sum is 1, or, in other words, if there is a full binary tree
+     * with its leaves having the same depths as the non-zero code lengths. */
     template<std::input_iterator CodeLenIt>
     static bool validate_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_it_end)
     {
@@ -106,7 +122,8 @@ public:
         return nr_nz_code_lens <= 1 or sum_code == (1ULL << code_len_limit);
     }
 
-    template<std::input_iterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
+    /* Generate canonical Huffman codes based on the provided the code lengths. */
+    template<RandomAccessInputIterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
     static inline void gen_codes(CodeLenIt code_len_it, CodeLenIt code_len_it_end, CodeIt code_it)
     {
         if (code_len_it == code_len_it_end)
@@ -131,12 +148,14 @@ public:
         }
     }
 
+    /* Make an encoder using the given bit encoder. */
     template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename OutItEnd>
     inline static auto make_encoder(misc::BitEncoder<Char, char_size, OutIt, OutItEnd>& bit_encoder)
     {
         return Encoder<Char, char_size, OutIt, OutItEnd>(bit_encoder);
     }
 
+    /* Make an decoder using the given bit decoder. */
     template<typename Char, std::size_t char_size, std::input_iterator InIt, typename InItEnd>
     inline static auto make_decoder(misc::BitDecoder<Char, char_size, InIt, InItEnd>& bit_decoder)
     {
@@ -144,6 +163,8 @@ public:
     }
 
 private:
+    /* The package-merge algorithm used for finding length-limited Huffman code lengths
+     * for the given set of frequencies. */
     template<SortAssume sort_assume,
         std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static void package_merge(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it, CodeLen depth)
@@ -172,6 +193,7 @@ private:
         calc_length(packset, packset_per_level.size(), code_len_it);
     }
 
+    /* Makes initial packages containing only one symbol with its corresponding frequency. */
     template<SortAssume sort_assume, std::input_iterator FreqIt>
     static PackSet package_freqs(FreqIt freq_it, FreqIt freq_it_end)
     {
@@ -184,6 +206,7 @@ private:
         return packset;
     }
 
+    /* Combine every pair of packages into one. Ignore the last package if it got no pair. */
     static void package(PackSet& packset)
     {
         for (size_t i = 1; i < packset.size(); i += 2)
@@ -191,6 +214,7 @@ private:
         packset.erase(packset.begin() + (packset.size() / 2), packset.end());
     }
 
+    /* Merge a per-level sorted packset into the current sorted packset. */
     static void merge(PackSet& packset, const PackSet& packset_per_level)
     {
         packset.reserve(packset.size() + packset_per_level.size());
@@ -199,6 +223,7 @@ private:
                 compare_packs);
     }
 
+    /* Calculate length of each symbol. */
     template<RandomAccessOutputIterator<CodeLen> CodeLenIt>
     static void calc_length(const PackSet& packset, std::size_t nr_syms, CodeLenIt code_len_it)
     {
@@ -229,6 +254,7 @@ private:
     }
 };
 
+/* Huffman::Encoder class. Provides methods for encoding symbols. */
 template<HuffmanPolicy Policy>
 template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename OutItEnd>
 class Huffman<Policy>::Encoder {
@@ -239,10 +265,12 @@ public:
     {
     }
 
+    /* Encode symbols given the codes, code lengths and an optional
+     * symbol-to-index converter that defaults to the identity function. */
     template<RandomAccessInputIterator CodeIt, RandomAccessInputIterator CodeLenIt,
              std::input_iterator InIt, typename Sym = std::iter_value_t<InIt>,
              std::invocable<Sym> Sym2Idx = unsigned int (*)(Sym)>
-    InIt encode_codes(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
+    InIt encode_syms(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
             Sym2Idx sym2idx = default_sym2idx<Sym>)
         requires std::convertible_to<std::invoke_result_t<Sym2Idx, Sym>, unsigned int>
     {
@@ -256,13 +284,15 @@ public:
         return in_it;
     }
 
+    /* Encode symbols with a termination mark at the end, given the codes, code lengths, terminator
+     * index and an optional symbol-to-index converter that defaults to the identity function. */
     template<RandomAccessInputIterator CodeIt, RandomAccessInputIterator CodeLenIt,
              std::input_iterator InIt, typename Sym = std::iter_value_t<InIt>,
              std::invocable<Sym> Sym2Idx = unsigned int (*)(Sym)>
-    InIt encode_codes(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
+    InIt encode_syms(CodeIt code_it, CodeLenIt code_len_it, InIt in_it, InIt in_it_end,
             unsigned int term_idx, Sym2Idx sym2idx = default_sym2idx<Sym>)
     {
-        in_it = encode_codes(code_it, code_len_it, in_it, in_it_end, sym2idx);
+        in_it = encode_syms(code_it, code_len_it, in_it, in_it_end, sym2idx);
         bit_encoder.encode_bits(code_it[term_idx], code_len_it[term_idx]);
         return in_it;
     }
@@ -277,6 +307,7 @@ private:
     BitEncoder& bit_encoder;
 };
 
+/* Huffman::Decoder class. Provides methods for decoding symbols. */
 template<HuffmanPolicy Policy>
 template<typename Char, std::size_t char_size, std::input_iterator InIt, typename InItEnd>
 class Huffman<Policy>::Decoder {
@@ -287,21 +318,26 @@ public:
     {
     }
 
+    /* Decode symbols given the Huffman tree root and an optional index-to-symbol converter
+     * that defaults to the identity function. */
     template<typename Sym = char, std::output_iterator<Sym> OutIt,
         std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
-    OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
+    OutIt decode_syms(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
             Idx2Sym idx2sym = default_idx2sym<Sym>)
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {
-        return decode_codes<false>(root, out_it, out_it_end, HuffmanTreeNode::sentinel_symbol, idx2sym);
+        return decode_syms<false>(root, out_it, out_it_end, HuffmanTreeNode::sentinel_symbol, idx2sym);
     }
+
+    /* Decode symbols expecting a termination mark at the end, given the Huffman tree root, terminator
+     * index and an optional index-to-symbol converter that defaults to the identity function. */
     template<typename Sym = char, std::output_iterator<Sym> OutIt,
         std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
-    OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
+    OutIt decode_syms(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
             unsigned int term_idx, Idx2Sym idx2sym = default_idx2sym<Sym>)
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {
-        return decode_codes<true>(root, out_it, out_it_end, term_idx, idx2sym);
+        return decode_syms<true>(root, out_it, out_it_end, term_idx, idx2sym);
     }
 
     template<typename Sym>
@@ -313,7 +349,7 @@ public:
 private:
     template<bool expect_term, typename Sym = char, std::output_iterator<Sym> OutIt,
         std::invocable<unsigned int> Idx2Sym = Sym (*)(unsigned int)>
-    OutIt decode_codes(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
+    OutIt decode_syms(const HuffmanTreeNode *root, OutIt out_it, OutIt out_it_end,
             unsigned int term_idx, Idx2Sym idx2sym)
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {

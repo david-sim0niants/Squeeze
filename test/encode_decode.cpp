@@ -57,7 +57,7 @@ TEST_P(EncodeDecodeTest, EncodeDecode)
         << " | Compressed " << 100 * (1 - 1.0 / compression_ratio) << '%' << "\033[0m\n";
 
     std::stringstream restored_content;
-    EXPECT_TRUE(decode(compressed, compressed_size, restored_content, compression).successful());
+    EXPECT_TRUE(decode(restored_content, compressed_size, compressed, compression).successful());
 
     EXPECT_EQ(content.view().size(), restored_content.view().size());
     EXPECT_EQ(content.view(), restored_content.view());

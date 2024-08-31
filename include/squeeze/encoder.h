@@ -52,8 +52,11 @@ private:
     std::atomic_size_t nr_running_threads = 0;
 };
 
+/* Encode single buffer using the compression info provided. */
 Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression);
 
+/* Encode a char stream of a given size into another char stream using the compression info provided.
+ * Unlike the EncoderPool, doesn't use multithreading. */
 Error<> encode(std::istream& in, std::size_t size, std::ostream& out,
                const compression::CompressionParams& compression);
 
