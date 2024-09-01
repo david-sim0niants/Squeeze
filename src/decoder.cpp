@@ -48,16 +48,16 @@ Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const Comp
         }
 
         if (in_it == in_it_end) {
-            if (utils::validate_stream_bad(in)) [[unlikely]] {
+            if (utils::validate_stream_fail(in)) [[unlikely]] {
                 SQUEEZE_ERROR("Input read error");
-                return {"input read error", ErrorCode::from_current_errno().report()};
+                return "input read error";
             }
         }
 
         out.write(outbuf.data(), std::distance(outbuf.begin(), out_it));
-        if (utils::validate_stream_fail(out)) [[unlikely]] {
+        if (utils::validate_stream_fail_eof(out)) [[unlikely]] {
             SQUEEZE_ERROR("Output write error");
-            return {"output write error", ErrorCode::from_current_errno().report()};
+            return "output write error";
         }
         out_it = outbuf.begin();
     }

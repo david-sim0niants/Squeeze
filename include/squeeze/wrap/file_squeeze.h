@@ -16,7 +16,7 @@ public:
     {}
 
     /* Calls update() on the squeeze while also resetting its own state. */
-    void update();
+    bool update();
 
     inline auto& get_wrappee()
     {

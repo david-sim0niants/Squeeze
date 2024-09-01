@@ -82,8 +82,8 @@ Error<> EncoderPool::schedule_stream_encode_step(std::future<EncodedBuffer>& fut
 
     Buffer buffer(buffer_size);
     stream.read(reinterpret_cast<char *>(buffer.data()), buffer_size);
-    if (utils::validate_stream_bad(stream))
-        return {"output read error", ErrorCode::from_current_errno().report()};
+    if (utils::validate_stream_fail(stream)) [[unlikely]]
+        return "output read error";
 
     buffer.resize(stream.gcount());
 
@@ -165,22 +165,22 @@ Error<> encode(std::istream& in, std::size_t size, std::ostream& out,
         inbuf.resize(std::min(buffer_size, size));
         in.read(inbuf.data(), inbuf.size());
         size -= inbuf.size();
-        if (utils::validate_stream_bad(in)) [[unlikely]] {
+        if (utils::validate_stream_fail(in)) [[unlikely]] {
             SQUEEZE_ERROR("Input read error");
-            return {"input read error", ErrorCode::from_current_errno().report()};
+            return "input read error";
         }
         inbuf.resize(in.gcount());
 
         auto e = encode_buffer(inbuf, outbuf, compression);
-        if (e) {
+        if (e) [[unlikely]] {
             SQUEEZE_ERROR("Failed encoding buffer");
             return {"failed encoding buffer", e.report()};
         }
 
         out.write(outbuf.data(), outbuf.size());
-        if (utils::validate_stream_bad(out)) {
+        if (utils::validate_stream_fail(out)) [[unlikely]] {
             SQUEEZE_ERROR("output write error");
-            return {"output write error", e.report()};
+            return "output write error";
         }
         outbuf.clear();
     }

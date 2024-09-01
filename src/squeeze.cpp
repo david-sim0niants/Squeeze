@@ -1,6 +1,6 @@
 #include "squeeze/squeeze.h"
 
-#include <unordered_set>
+#include <unordered_map>
 
 #include "squeeze/logging.h"
 
@@ -9,25 +9,26 @@ namespace squeeze {
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Squeeze::"
 
-void Squeeze::update()
+bool Squeeze::update()
 {
     SQUEEZE_TRACE();
 
-    std::unordered_multiset<std::string_view> appendee_path_set;
-    appendee_path_set.reserve(future_appends.size());
+    std::unordered_multimap<std::string_view, FutureAppend *> appendee_path_map;
+    appendee_path_map.reserve(future_appends.size());
 
-    for (const auto& future_append : future_appends)
-        appendee_path_set.insert(future_append.entry_input.get_path());
+    for (auto& future_append : future_appends)
+        appendee_path_map.emplace(future_append.entry_input.get_path(), &future_append);
 
-    for (auto it = this->begin(); it != this->end() && !appendee_path_set.empty(); ++it) {
+    for (auto it = this->begin(); it != this->end() && !appendee_path_map.empty(); ++it) {
         auto& entry_header = it->second;
-        if (appendee_path_set.extract(entry_header.path).empty())
+        auto node = appendee_path_map.extract(entry_header.path);
+        if (node.empty())
             continue;
-        will_remove(it);
+        will_remove(it, node.mapped()->error);
         SQUEEZE_TRACE("Will update {}", it->second.path);
     }
 
-    this->write();
+    return this->write();
 }
 
 }

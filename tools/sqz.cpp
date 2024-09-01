@@ -36,7 +36,7 @@ public:
     };
 
     enum class Option {
-        Append, Remove, Extract, List, Recurse, NoRecurse, Compression, Help
+        Append, Remove, Extract, List, Recurse, NoRecurse, Compression, LogLevel, Help
     };
 
 public:
@@ -58,8 +58,8 @@ public:
         return exit_code;
     }
 
-    static constexpr char short_options[] = "ARXLhrC";
-    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse", "compression"};
+    static constexpr char short_options[] = "ARXLhrCl";
+    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse", "compression", "log-level"};
 
 private:
     int handle_arguments()
@@ -172,6 +172,19 @@ private:
             }
             if (not parse_compression_params(*arg, state.compression))
                 return EXIT_FAILURE;
+            break;
+        }
+        case Option::LogLevel:
+        {
+            auto arg = arg_parser->raw_next();
+            if (!arg) {
+                std::cerr << "Error: no log level specified.\n";
+                return EXIT_FAILURE;
+            }
+            LogLevel log_level;
+            if (not parse_log_level(*arg, log_level))
+                return EXIT_FAILURE;
+            set_log_level(log_level);
             break;
         }
         case Option::Help:
@@ -307,15 +320,18 @@ private:
         if (!(state.flags & Dirty))
             return EXIT_SUCCESS;
 
-        fsqz->update();
         int exit_code = EXIT_SUCCESS;
-        for (auto err : write_errors) {
-            if (err) {
-                exit_code = EXIT_FAILURE;
-                std::cerr << err.report() << '\n';
+        const bool succeeded = fsqz->update();
+
+        if (not succeeded)
+            for (auto err : write_errors) {
+                if (err) {
+                    exit_code = EXIT_FAILURE;
+                    std::cerr << err.report() << '\n';
+                }
             }
-        }
         write_errors.clear();
+
         std::filesystem::resize_file(sqz_fn, sqz_file.tellp());
 
         state.flags &= ~Dirty;
@@ -352,6 +368,8 @@ private:
             return Option::Recurse;
         case 'C':
             return Option::Compression;
+        case 'l':
+            return Option::LogLevel;
         case 'h':
             return Option::Help;
         default:
@@ -375,6 +393,8 @@ private:
             return Option::NoRecurse;
         if (option == "compression")
             return Option::Compression;
+        if (option == "log-level")
+            return Option::LogLevel;
         if (option == "help")
             return Option::Help;
         throw BaseException("unexpected long option");
@@ -402,6 +422,7 @@ private:
         for (std::size_t i = 0; i < str_methods.size(); ++i) {
             if (str.starts_with(str_methods[i])) {
                 new_params.method = methods[i];
+                new_params.level = compression::get_min_max_levels(new_params.method).first;
                 str = str.substr(str_methods[i].size());
                 compr_method_set = true;
                 break;
@@ -455,6 +476,33 @@ private:
         return true;
     }
 
+    static bool parse_log_level(std::string_view str, LogLevel& log_level)
+    {
+        std::array<char, 9> upper_str {};
+        for (int i = 0; i < std::min(9, (int)str.size()); ++i)
+            upper_str[i] = toupper(str[i]);
+
+        using enum squeeze::LogLevel;
+        static const std::unordered_map<std::string_view, squeeze::LogLevel> log_level_map =
+        {
+            { "TRACE",    Trace    }, { "T", Trace    }, { "0", Trace    },
+            { "DEBUG",    Debug    }, { "D", Debug    }, { "1", Debug    },
+            { "INFO",     Info     }, { "I", Info     }, { "2", Info     },
+            { "WARN",     Warn     }, { "W", Warn     }, { "3", Warn     },
+            { "ERROR",    Error    }, { "E", Error    }, { "4", Error    },
+            { "CRITICAL", Critical }, { "C", Critical }, { "5", Critical },
+            { "OFF",      Off      }, { "O", Off      }, { "6", Off      },
+        };
+
+        auto it = log_level_map.find(upper_str.data());
+        if (it == log_level_map.end()) {
+            std::cerr << "Error: invalid log level - " << str << std::endl;
+            return false;
+        }
+        log_level = it->second;
+        return true;
+    }
+
     static void usage()
     {
         std::cerr <<
@@ -471,6 +519,11 @@ Options:
     -C, --compression   Specify compression info in a form of 'method' or 'level' or 'method/level',
                         where method is one of the following: {none, huffman}; and level is an integer with
                         the following bounds for each method: {[0-0], [0-8]}
+    -l, --log-level     Set the log level which can be one of the following:
+                        [trace, debug, info, warn, error, critical, off] or:
+                        [0,     1,     2,    3,    4,     5,        6  ] or:
+                        [t,     d,     i,    w,    e,     c,        o  ]
+                        Log levels are case-insensitive
     -h, --help          Display usage information
 )"""";
     }

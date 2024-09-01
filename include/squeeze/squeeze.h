@@ -21,8 +21,9 @@ public:
      * It ensures that these existing entries are removed before being re-appended,
      * effectively updating the entries.
      * The method guarantees that the put pointer of the target stream
-     * will be at the new end of the stream */
-    void update();
+     * will be at the new end of the stream.
+     * Returns true if fully succeeded or false if some errors happened and may need to be checked. */
+    bool update();
 };
 
 }

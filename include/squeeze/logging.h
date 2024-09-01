@@ -1,7 +1,11 @@
 #pragma once
 
 #define SQUEEZE_LOG_FUNC_PREFIX ""
-#define SQUEEZE_LOG_PREFIX(format) "[{}{}(...)] " format, SQUEEZE_LOG_FUNC_PREFIX, __FUNCTION__
+#ifdef NDEBUG
+    #define SQUEEZE_LOG_PREFIX(format) format
+#else
+    #define SQUEEZE_LOG_PREFIX(format) "[{}{}(...)] " format, SQUEEZE_LOG_FUNC_PREFIX, __FUNCTION__
+#endif
 
 #define SQUEEZE_TRACE(...)      SQUEEZE_LOG(TRACE, __VA_ARGS__)
 #define SQUEEZE_DEBUG(...)      SQUEEZE_LOG(DEBUG, __VA_ARGS__)

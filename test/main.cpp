@@ -22,13 +22,13 @@ int main(int argc, char *argv[])
             using enum squeeze::LogLevel;
             static const std::unordered_map<std::string_view, squeeze::LogLevel> log_level_map =
             {
-                { "TRACE",    Trace    },  { "0", Trace    },
-                { "DEBUG",    Debug    },  { "1", Debug    },
-                { "INFO",     Info     },  { "2", Info     },
-                { "WARN",     Warn     },  { "3", Warn     },
-                { "ERROR",    Error    },  { "4", Error    },
-                { "CRITICAL", Critical },  { "5", Critical },
-                { "OFF",      Off      },  { "6", Off      },
+                { "TRACE",    Trace    }, { "T", Trace    }, { "0", Trace    },
+                { "DEBUG",    Debug    }, { "D", Debug    }, { "1", Debug    },
+                { "INFO",     Info     }, { "I", Info     }, { "2", Info     },
+                { "WARN",     Warn     }, { "W", Warn     }, { "3", Warn     },
+                { "ERROR",    Error    }, { "E", Error    }, { "4", Error    },
+                { "CRITICAL", Critical }, { "C", Critical }, { "5", Critical },
+                { "OFF",      Off      }, { "O", Off      }, { "6", Off      },
             };
 
             auto it = log_level_map.find(log_level_str);

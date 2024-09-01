@@ -118,7 +118,7 @@ static void encode_mockfs(Squeeze& squeeze, const tools::MockFileSystem& origina
         };
     original_mockfs.list_recursively<tools::MockRegularFile, tools::MockDirectory, tools::MockSymlink>(
             append_file, append_file, append_file);
-    squeeze.update();
+    EXPECT_TRUE(squeeze.update());
 
     for (const auto& err : write_errors)
         EXPECT_FALSE(err.failed()) << err.report();

@@ -3,6 +3,8 @@
 #include "squeeze/logging.h"
 #include "squeeze/utils/io.h"
 
+#include <cassert>
+
 namespace squeeze {
 
 struct Remover::FutureRemove {
@@ -44,7 +46,7 @@ Error<Remover> Remover::remove(const EntryIterator& it)
     return err;
 }
 
-void Remover::perform_removes()
+bool Remover::perform_removes()
 {
     SQUEEZE_TRACE("Removing {} entries", future_removes.size() - 1);
 
@@ -52,6 +54,8 @@ void Remover::perform_removes()
 
     target.seekp(0, std::ios_base::end);
     const uint64_t initial_endp = target.tellp();
+    SQUEEZE_DEBUG("initial_endp={}", initial_endp);
+
     uint64_t gap_len = 0; // gap length: the increasing size of the gap that gets pushed to the right
 
     // future remove operations are stored in a priority queue based on their positions
@@ -93,19 +97,24 @@ void Remover::perform_removes()
         // the length of the following non-gap data
         const uint64_t mov_len = std::min(next_pos, initial_endp) - mov_pos;
         // pos - gap_len is the destination of the following non-gap data to move to
-        utils::iosmove(target, pos - gap_len, mov_pos, mov_len); // do the move
+        Error<> e = utils::iosmove(target, pos - gap_len, mov_pos, mov_len); // do the move
 
-        if (utils::validate_stream_fail(target)) {
-            SQUEEZE_ERROR("Target output stream failed");
+        if (e) [[unlikely]] {
+            SQUEEZE_ERROR("Failed performing removes, starting from '{}'", path);
+            SQUEEZE_DEBUG("pos={}, gap_len={}, mov_pos={}, mov_len={}, len={}",
+                          pos, gap_len, mov_pos, mov_len, len);
+
             if (error)
-                *error = {"failed removing entry '" + path + '\'',
-                          Error<>("target output stream failed").report()};
+                *error = {"failed removing '" + path + '\'', e.report()};
+            return false;
         }
 
         gap_len += len; // increase the gap size
     }
+
     assert(future_removes.size() == 1 && "The last element in the priority queue of future removes must remain after performing all the remove operations.");
     target.seekp(initial_endp - gap_len); // point to the new end of the stream
+    return true;
 }
 
 }

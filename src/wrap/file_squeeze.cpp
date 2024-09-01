@@ -2,10 +2,10 @@
 
 namespace squeeze::wrap {
 
-void FileSqueeze::update()
+bool FileSqueeze::update()
 {
     clear_appendee_pathset();
-    squeeze.update();
+    return squeeze.update();
 }
 
 }

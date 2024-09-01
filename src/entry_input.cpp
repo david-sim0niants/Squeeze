@@ -52,7 +52,7 @@ Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& c
         SQUEEZE_TRACE("'{}' is a regular file", path);
         file = std::ifstream(path, std::ios_base::binary | std::ios_base::in);
         if (!*file)
-            return {"failed opening a file", ErrorCode::from_current_errno().report()};
+            return {"failed opening a file"};
         content = &*file;
         break;
     default:

@@ -35,7 +35,7 @@ public:
     /* Perform the registered removes.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream */
-    void perform_removes();
+    bool perform_removes();
 
 protected:
     std::iostream& target;

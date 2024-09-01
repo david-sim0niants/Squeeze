@@ -110,7 +110,7 @@ Error<Extracter> Extracter::extract_symlink(const EntryHeader& entry_header, std
     }
     target.resize(static_cast<std::size_t>(entry_header.content_size) - 1);
     source.read(target.data(), target.size());
-    if (utils::validate_stream_bad(source)) {
+    if (utils::validate_stream_fail(source)) [[unlikely]] {
         SQUEEZE_ERROR("Input read error");
         return "input read error";
     }

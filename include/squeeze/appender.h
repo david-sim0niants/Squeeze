@@ -66,7 +66,7 @@ public:
     /* Perform the registered appends.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream */
-    void perform_appends();
+    bool perform_appends();
 
     /* Append an entry immediately by creating an entry input with the supplied type and parameters. */
     template<typename T, typename ...Args>
@@ -81,23 +81,23 @@ public:
 
 protected:
     /* Runs the scheduler tasks */
-    inline void perform_scheduled_appends()
+    inline bool perform_scheduled_appends()
     {
-        scheduler.run(target);
+        return scheduler.run(target);
     }
 
     /* Schedules all registered appends. */
-    void schedule_appends();
+    bool schedule_appends();
     /* Schedules single registered append. */
-    Error<Appender> schedule_append(FutureAppend& future_append);
+    bool schedule_append(FutureAppend& future_append);
     /* Schedules a registered stream append. */
-    Error<Appender> schedule_append_stream(const CompressionParams& compression, std::istream& stream);
+    bool schedule_append_stream(const CompressionParams& compression, std::istream& stream);
     /* Schedules a registered string append. */
-    Error<Appender> schedule_append_string(const CompressionParams& compression, const std::string& str);
+    bool schedule_append_string(const CompressionParams& compression, const std::string& str);
     /* Schedules a registered stream's buffer appends. */
-    Error<Appender> schedule_buffer_appends(std::istream& stream);
+    bool schedule_buffer_appends(std::istream& stream);
     /* Schedules a registered stream's future buffer appends. */
-    Error<Appender> schedule_future_buffer_appends(const CompressionParams& compression, std::istream& stream);
+    bool schedule_future_buffer_appends(const CompressionParams& compression, std::istream& stream);
 
     inline EncoderPool& get_encoder_pool()
     {

@@ -13,18 +13,20 @@ template<typename T>
 Error<EntryHeader> encode_any(std::ostream& output, const T& obj)
 {
     output.write(reinterpret_cast<const char *>(&obj), sizeof(obj));
-    if (utils::validate_stream_fail(output))
-        return {"output write error", ErrorCode::from_current_errno().report()};
-    return success;
+    if (utils::validate_stream_fail_eof(output)) [[unlikely]]
+        return "output write error";
+    else
+        return success;
 }
 
 template<typename T>
 Error<EntryHeader> decode_any(std::istream& input, T& obj)
 {
     input.read(reinterpret_cast<char *>(&obj), sizeof(obj));
-    if (utils::validate_stream_fail(input))
-        return {"input read error", ErrorCode::from_current_errno().report()};
-    return success;
+    if (utils::validate_stream_fail_eof(input)) [[unlikely]]
+        return "input read error";
+    else
+        return success;
 }
 
 Error<EntryHeader> encode_path(std::ostream& output, const std::string& path)
@@ -39,9 +41,10 @@ Error<EntryHeader> encode_path(std::ostream& output, const std::string& path)
         return e;
     output.write(path.data(), path.size());
 
-    if (utils::validate_stream_fail(output))
-        return {"output write error", ErrorCode::from_current_errno().report()};
-    return success;
+    if (utils::validate_stream_fail_eof(output)) [[unlikely]]
+        return "output write error";
+    else
+        return success;
 }
 
 Error<EntryHeader> decode_path(std::istream& input, std::string& path)
@@ -53,9 +56,10 @@ Error<EntryHeader> decode_path(std::istream& input, std::string& path)
     path.resize(size);
     input.read(path.data(), path.size());
 
-    if (utils::validate_stream_fail(input))
-        return {"input read error", ErrorCode::from_current_errno().report()};
-    return success;
+    if (utils::validate_stream_fail_eof(input)) [[unlikely]]
+        return "input read error";
+    else
+        return success;
 }
 
 }
@@ -79,7 +83,7 @@ Error<EntryHeader> EntryHeader::encode(std::ostream& output, const EntryHeader& 
     case None:
     case Huffman:
         break;
-    default:
+    default: [[unlikely]]
         throw Exception<EntryHeader>("invalid compression method");
     }
 
@@ -99,7 +103,7 @@ Error<EntryHeader> EntryHeader::encode(std::ostream& output, const EntryHeader& 
         and (e = encode_any(output, entry_header.content_size)).successful()
         and (e = encode_any(output, entry_header.compression)).successful()
         and (e = encode_any(output, entry_header.attributes)).successful()
-        and (e = encode_path(output, entry_header.path)).successful()   )
+        and (e = encode_path(output, entry_header.path)).successful()   ) [[likely]]
         return success;
     else
         return e;
@@ -112,7 +116,7 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
         or (e = decode_any(input, entry_header.content_size)).failed()
         or (e = decode_any(input, entry_header.compression)).failed()
         or (e = decode_any(input, entry_header.attributes)).failed()
-        or (e = decode_path(input, entry_header.path)).failed()         )
+        or (e = decode_path(input, entry_header.path)).failed()         ) [[unlikely]]
         return e;
 
     switch (entry_header.compression.method) {
@@ -130,7 +134,7 @@ Error<EntryHeader> EntryHeader::decode(std::istream& input, EntryHeader& entry_h
     case EntryType::Directory:
     case EntryType::Symlink:
         break;
-    default:
+    default: [[unlikely]]
         return "invalid entry type";
     }
 

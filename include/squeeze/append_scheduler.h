@@ -26,7 +26,7 @@ public:
         Task(Task&&) = default;
         Task& operator=(Task&&) = default;
 
-        void operator()(std::ostream& target);
+        void operator()(std::ostream& target, bool& succeeded);
 
         std::unique_ptr<EntryAppendScheduler> scheduler;
     };
@@ -62,10 +62,12 @@ public:
 
     /* Run the scheduled tasks on the target output stream.
      * Supposed to be called asynchronously while scheduling being done synchronously. */
-    inline void run(std::ostream& target)
+    inline bool run(std::ostream& target)
     {
-        scheduler.run(target);
+        bool succeeded = true;
+        scheduler.run(target, succeeded);
         scheduler.open();
+        return succeeded;
     }
 
     /* Finalize the scheduler.
@@ -123,9 +125,11 @@ public:
     }
 
     /* Run the scheduled tasks on the target output stream. */
-    inline void run(std::ostream& target)
+    inline bool run(std::ostream& target)
     {
-        set_error(run_internal(target));
+        const Error<> e = run_internal(target);
+        set_error(e);
+        return e.successful();
     }
 
 private:

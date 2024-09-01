@@ -31,21 +31,24 @@ void Appender::will_append(EntryInput& entry_input, Error<Appender> *err)
     future_appends.emplace_back(entry_input, err);
 }
 
-void Appender::perform_appends()
+bool Appender::perform_appends()
 {
     SQUEEZE_TRACE();
 
     if (future_appends.empty()) {
         SQUEEZE_TRACE("No entry to append, exiting");
-        return;
+        return true;
     }
 
-    std::future<void> future_void = std::async(std::launch::async, [this]{perform_scheduled_appends();});
-    schedule_appends();
+    std::future<bool> fut_succeeded = std::async(std::launch::async,
+                                                 [this]{ return perform_scheduled_appends();});
+    bool succeeded = schedule_appends();
 
     SQUEEZE_TRACE("Waiting for scheduled append tasks to complete");
-    future_void.get();
+    succeeded = fut_succeeded.get() && succeeded;
+
     SQUEEZE_TRACE("Stream put pointer at: {}", static_cast<long long>(target.tellp()));
+    return succeeded;
 }
 
 Error<Appender> Appender::append(EntryInput& entry_input)
@@ -56,16 +59,16 @@ Error<Appender> Appender::append(EntryInput& entry_input)
     return err;
 }
 
-void Appender::schedule_appends()
+bool Appender::schedule_appends()
 {
+    bool succeeded = true;
     DEFER( scheduler.finalize() );
     for (auto& future_append : future_appends)
-        if (auto e = schedule_append(future_append))
-            if (future_append.error)
-                *future_append.error = {"failed appending entry", e.report()};
+        succeeded = schedule_append(future_append) && succeeded;
+    return succeeded;
 }
 
-Error<Appender> Appender::schedule_append(FutureAppend& future_append)
+bool Appender::schedule_append(FutureAppend& future_append)
 {
     SQUEEZE_TRACE();
 
@@ -76,7 +79,12 @@ Error<Appender> Appender::schedule_append(FutureAppend& future_append)
     DEFER( future_append.entry_input.deinit(); );
     if (e) {
         SQUEEZE_ERROR("Failed initializing entry input");
-        return {"failed initializing entry input", e.report()};
+        if (future_append.error)
+            *future_append.error = {
+                "failed scheduling entry append because failed initializing the entry input",
+                e.report()
+            };
+        return false;
     }
 
     SQUEEZE_DEBUG("entry_header={}", utils::stringify(entry_header));
@@ -93,38 +101,38 @@ Error<Appender> Appender::schedule_append(FutureAppend& future_append)
             {
                 return schedule_append_string(compression, str);
             },
-            [](std::monostate state) -> Error<Appender>
+            [](std::monostate state)
             {
-                return success;
+                return true;
             },
         }, content
     );
 }
 
-Error<Appender> Appender::schedule_append_stream(const CompressionParams& compression, std::istream& stream)
+bool Appender::schedule_append_stream(const CompressionParams& compression, std::istream& stream)
 {
     SQUEEZE_TRACE("Scheduling append ");
-    return false && compression.method == compression::CompressionMethod::None ?
+    return compression.method == compression::CompressionMethod::None ?
         schedule_buffer_appends(stream)
         :
         schedule_future_buffer_appends(compression, stream)
     ;
 }
 
-Error<Appender> Appender::schedule_append_string(const CompressionParams& compression, const std::string& str)
+bool Appender::schedule_append_string(const CompressionParams& compression, const std::string& str)
 {
     scheduler.schedule_string_append(std::string(str));
-    return success;
+    return true;
 }
 
-Error<Appender> Appender::schedule_buffer_appends(std::istream& stream)
+bool Appender::schedule_buffer_appends(std::istream& stream)
 {
     Buffer buffer(BUFSIZ);
     while (true) {
         stream.read(reinterpret_cast<char *>(buffer.data()), BUFSIZ);
-        if (utils::validate_stream_bad(stream)) {
-            scheduler.schedule_error_raise({"output read error", ErrorCode::from_current_errno().report()});
-            break;
+        if (utils::validate_stream_fail(stream)) [[unlikely]] {
+            scheduler.schedule_error_raise("output read error");
+            return false;
         }
         buffer.resize(stream.gcount());
 
@@ -136,10 +144,10 @@ Error<Appender> Appender::schedule_buffer_appends(std::istream& stream)
             break;
         }
     }
-    return success;
+    return true;
 }
 
-Error<Appender> Appender::schedule_future_buffer_appends(
+bool Appender::schedule_future_buffer_appends(
         const CompressionParams& compression, std::istream& stream)
 {
     auto e = get_encoder_pool().schedule_stream_encode(stream, compression,
@@ -150,9 +158,11 @@ Error<Appender> Appender::schedule_future_buffer_appends(
                 }
             }
         );
-    if (e.failed())
+    if (e) {
         scheduler.schedule_error_raise(std::move(e));
-    return success;
+        return false;
+    }
+    return true;
 }
 
 }

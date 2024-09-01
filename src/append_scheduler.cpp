@@ -4,6 +4,8 @@
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/overloaded.h"
 
+#include <cassert>
+
 namespace squeeze {
 
 /* Abstract block appender. */
@@ -27,9 +29,9 @@ public:
     {
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
         target.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
-        if (utils::validate_stream_bad(target)) {
+        if (utils::validate_stream_fail_eof(target)) [[unlikely]] {
             SQUEEZE_ERROR("Failed appending buffer");
-            return {"failed appending buffer", ErrorCode::from_current_errno().report()};
+            return "failed appending buffer";
         }
         return success;
     }
@@ -63,9 +65,9 @@ public:
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
 
         target.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
-        if (utils::validate_stream_bad(target)) {
+        if (utils::validate_stream_fail_eof(target)) [[unlikely]] {
             SQUEEZE_ERROR("Failed appending buffer");
-            return {"failed appending buffer", ErrorCode::from_current_errno().report()};
+            return "failed appending buffer";
         }
         return success;
     }
@@ -109,9 +111,9 @@ public:
         SQUEEZE_TRACE("Got a string: '{}'", str);
 
         target.write(str.data(), str.size() + 1);
-        if (utils::validate_stream_bad(target)) {
+        if (utils::validate_stream_fail_eof(target)) [[unlikely]] {
             SQUEEZE_ERROR("Failed appending string");
-            return {"failed appending string", ErrorCode::from_current_errno().report()};
+            return "failed appending string";
         }
 
         return success;
@@ -227,10 +229,10 @@ AppendScheduler::Task::Task(EntryHeader entry_header, Error<> *error) noexcept
 
 AppendScheduler::Task::~Task() = default;
 
-void AppendScheduler::Task::operator()(std::ostream& target)
+void AppendScheduler::Task::operator()(std::ostream& target, bool& succeeded)
 {
     SQUEEZE_TRACE();
-    scheduler->run(target);
+    succeeded = scheduler->run(target) && succeeded;
 }
 
 AppendScheduler::AppendScheduler() noexcept = default;
