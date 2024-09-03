@@ -9,49 +9,9 @@
 #include <vector>
 
 #include "squeeze/utils/iterator.h"
+#include "sequence.h"
 
 namespace squeeze::misc {
-
-namespace detail {
-
-/* Abstraction for handling two types of iterators - bounded iterator
- * with its corresponding end iterator and an unbounded iterator. */
-template<typename It, typename ItEnd>
-struct IteratorHandle;
-
-template<typename It> struct IteratorHandle<It, void> {
-    explicit IteratorHandle(It it) : it(it)
-    {
-    }
-
-    // unbounded iterator, always valid
-    inline bool is_valid() const
-    {
-        return true;
-    }
-
-    static constexpr bool bounded = false;
-
-    It it;
-};
-
-template<typename It> struct IteratorHandle<It, It> {
-    explicit IteratorHandle(It it, It it_end) : it(it), it_end(it_end)
-    {
-    }
-
-    // bounded iterator, valid as long as not equal to its end iterator
-    inline bool is_valid() const
-    {
-        return it != it_end;
-    }
-
-    static constexpr bool bounded = true;
-
-    It it, it_end;
-};
-
-}
 
 /* This is a class used for encoding bits. Internally handles all the necessary bit operations
  * to provide a bit-writing medium interface. Writes bits on an output sequence defined by the
@@ -64,30 +24,30 @@ class BitEncoder {
 public:
     using Iterator = OutIt;
 private:
-    using IteratorHandle = detail::IteratorHandle<OutIt, OutItEnd>;
+    using Seq = Sequence<OutIt, OutItEnd>;
 
 public:
-    explicit BitEncoder(OutIt out_it) requires (not IteratorHandle::bounded)
-        : it_handle(out_it)
+    explicit BitEncoder(OutIt out_it) requires (not Seq::bounded)
+        : seq(out_it)
     {
     }
 
-    explicit BitEncoder(OutIt out_it, OutIt out_it_end) requires (IteratorHandle::bounded)
-        : it_handle(out_it, out_it_end)
+    explicit BitEncoder(OutIt out_it, OutIt out_it_end) requires (Seq::bounded)
+        : seq(out_it, out_it_end)
     {
     }
 
     template<std::output_iterator<Char> PrevOutIt>
     explicit BitEncoder(const BitEncoder<Char, char_size, PrevOutIt>& prev, OutIt out_it)
-        requires (not IteratorHandle::bounded)
-        : mid_off(prev.mid_off), mid_chr(prev.mid_chr), it_handle(out_it)
+        requires (not Seq::bounded)
+        : mid_off(prev.mid_off), mid_chr(prev.mid_chr), seq(out_it)
     {
     }
 
     template<std::output_iterator<Char> PrevOutIt>
     explicit BitEncoder(const BitEncoder<Char, char_size, PrevOutIt, PrevOutIt>& prev,
-            OutIt out_it, OutIt out_it_end) requires (IteratorHandle::bounded)
-        : mid_off(prev.mid_off), mid_chr(prev.mid_off), it_handle(out_it, out_it_end)
+            OutIt out_it, OutIt out_it_end) requires (Seq::bounded)
+        : mid_off(prev.mid_off), mid_chr(prev.mid_off), seq(out_it, out_it_end)
     {
     }
 
@@ -112,8 +72,8 @@ public:
     /* Zero-pad remaining bits and flush them. */
     inline std::size_t finalize()
     {
-        if (it_handle.is_valid() and char_size != mid_off) {
-            *it_handle.it = mid_chr << mid_off; ++it_handle.it;
+        if (seq.is_valid() and char_size != mid_off) {
+            *seq.it = mid_chr << mid_off; ++seq.it;
             reset();
         }
         return char_size - mid_off;
@@ -129,7 +89,7 @@ public:
     /* Get the current iterator. */
     inline OutIt get_it() const
     {
-        return it_handle.it;
+        return seq.it;
     }
 
     /* Continue by using a different unbounded iterator. */
@@ -165,9 +125,9 @@ private:
 
         if (0 == mid_off) {
             mid_off = char_size;
-            if (not it_handle.is_valid())
+            if (not seq.is_valid())
                 return;
-            *it_handle.it = mid_chr; ++it_handle.it;
+            *seq.it = mid_chr; ++seq.it;
         }
     }
 
@@ -175,8 +135,8 @@ private:
     template<typename Bitset>
     inline void encode_main_bits(const Bitset& bits, std::size_t& nr_bits)
     {
-        for (; it_handle.is_valid() && nr_bits >= char_size; ++it_handle.it, nr_bits -= char_size)
-            *it_handle.it = static_cast<Char>((bits >> (nr_bits - char_size)).to_ullong()) & Char(-1);
+        for (; seq.is_valid() && nr_bits >= char_size; ++seq.it, nr_bits -= char_size)
+            *seq.it = static_cast<Char>((bits >> (nr_bits - char_size)).to_ullong()) & Char(-1);
     }
 
     /* Encode remainder bits left after previous two operations. These won't be flushed immediately
@@ -192,7 +152,7 @@ private:
 
     Char mid_chr {};
     std::size_t mid_off = char_size;
-    IteratorHandle it_handle;
+    Seq seq;
 };
 
 /* This is a class used for decoding bits. Internally handles all the necessary bit operations
@@ -207,31 +167,29 @@ public:
     using Iterator = InIt;
 private:
     using UChar = std::make_unsigned_t<Char>;
-    using IteratorHandle = detail::IteratorHandle<InIt, InItEnd>;
+    using Seq = Sequence<InIt, InItEnd>;
 
 public:
-    explicit BitDecoder(InIt in_it) requires (not IteratorHandle::bounded)
-        : it_handle(in_it)
+    explicit BitDecoder(InIt in_it) requires (not Seq::bounded) : seq(in_it)
     {
     }
 
-    explicit BitDecoder(InIt in_it, InIt in_it_end) requires (IteratorHandle::bounded)
-        : it_handle(in_it, in_it_end)
+    explicit BitDecoder(InIt in_it, InIt in_it_end) requires (Seq::bounded) : seq(in_it, in_it_end)
     {
     }
 
     template<std::input_iterator PrevInIt>
     explicit BitDecoder(const BitDecoder<Char, char_size, PrevInIt>& prev, InIt in_it)
-        requires (not IteratorHandle::bounded)
-        : mid_chr(prev.mid_chr), mid_pos(prev.mid_pos), it_handle(in_it)
+        requires (not Seq::bounded)
+        : mid_chr(prev.mid_chr), mid_pos(prev.mid_pos), seq(in_it)
     {
     }
 
     template<std::input_iterator PrevInIt>
     explicit BitDecoder(const BitDecoder<Char, char_size, PrevInIt, PrevInIt>& prev,
             InIt in_it, InIt in_it_end)
-        requires (IteratorHandle::bounded)
-        : mid_chr(prev.mid_chr), mid_pos(prev.mid_pos), it_handle(in_it, in_it_end)
+        requires (Seq::bounded)
+        : mid_chr(prev.mid_chr), mid_pos(prev.mid_pos), seq(in_it, in_it_end)
     {
     }
 
@@ -258,12 +216,12 @@ public:
     bool read_bit(std::size_t& nr_bits_unread)
     {
         if (0 == mid_pos) {
-            if (not it_handle.is_valid()) {
+            if (not seq.is_valid()) {
                 ++nr_bits_unread;
                 return false;
             }
 
-            mid_chr = *it_handle.it; ++it_handle.it;
+            mid_chr = *seq.it; ++seq.it;
             mid_pos = char_size;
         }
 
@@ -292,7 +250,7 @@ public:
     /* Get the current iterator. */
     inline InIt get_it() const
     {
-        return it_handle.it;
+        return seq.it;
     }
 
     /* Continue by using a different unbounded iterator. */
@@ -349,9 +307,9 @@ private:
     template<typename Bitset>
     inline void decode_main_bits(Bitset& bits, std::size_t& nr_bits)
     {
-        for (; it_handle.is_valid() && nr_bits >= char_size; ++it_handle.it, nr_bits -= char_size) {
+        for (; seq.is_valid() && nr_bits >= char_size; ++seq.it, nr_bits -= char_size) {
             bits <<= char_size;
-            bits |= Bitset(*it_handle.it);
+            bits |= Bitset(*seq.it);
         }
     }
 
@@ -363,10 +321,10 @@ private:
         assert(nr_bits < char_size);
         assert(nr_bits != 0);
 
-        if (not it_handle.is_valid())
+        if (not seq.is_valid())
             return;
 
-        mid_chr = *it_handle.it; ++it_handle.it;
+        mid_chr = *seq.it; ++seq.it;
 
         mid_pos = char_size - nr_bits;
         bits <<= nr_bits;
@@ -377,7 +335,7 @@ private:
 
     Char mid_chr {};
     std::size_t mid_pos = 0;
-    IteratorHandle it_handle;
+    Seq seq;
 };
 
 /* Make a bit encoder using unbounded output iterator. */
