@@ -7,13 +7,17 @@ namespace squeeze::compression {
 template<typename T>
 concept LZ77Policy = requires
     {
-        typename T::Literal; std::copyable<typename T::Literal>;
+        typename T::Literal;
+        std::copyable<typename T::Literal>;
+        requires std::is_default_constructible_v<typename T::Literal>;
         requires requires (typename T::Literal a, typename T::Literal b)
         {
             { a == b } -> std::convertible_to<bool>;
         };
+
         typename T::Len;  requires std::integral<typename T::Len>;
         typename T::Dist; requires std::integral<typename T::Dist>;
+
         T::min_len;
         std::integral<decltype(T::min_len)>;
         requires std::is_same_v<decltype(T::min_len), const decltype(T::min_len)>;

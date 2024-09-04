@@ -254,32 +254,22 @@ public:
 
     Token encode_once()
     {
-        KeySeq key_seq;
-        auto key_seq_it = window.peek(key_seq.begin(), key_seq.size());
-        if (key_seq_it == key_seq.begin())
+        // if (!std::holds_alternative<std::monostate>(cached_token)) [[unlikely]]
+        //     return std::exchange(cached_token, std::monostate());
+
+        Literal literal; std::size_t match_len = 0; std::size_t match_dist = 0;
+        find_best_match(literal, match_len, match_dist);
+        if (0 == match_len) {
             return std::monostate();
-        if (key_seq_it != key_seq.end()) {
+        } else if (1 == match_len && 0 == match_dist) {
             window.advance_once();
-            return key_seq.front();
+            return literal;
         }
 
-        std::forward_list<std::size_t>& pos_chain = hash_chains[key_seq];
-        auto [max_match_len, max_match_dist] = find_best_match(pos_chain);
-
-        if (0 == max_match_len) {
-            pos_chain.push_front(window.get_curr_peek_pos());
-            window.advance_once();
-            return key_seq.front();
-        }
-
-        std::size_t _tmp_max_len_to_update_pos_chain = 8;
-        if (max_match_len <= _tmp_max_len_to_update_pos_chain)
-            pos_chain.push_front(window.get_curr_peek_pos());
         // TODO: implement lazy matching
 
-        window.advance(max_match_len);
-
-        return encode_len_dist(max_match_len, max_match_dist);
+        window.advance(match_len);
+        return encode_len_dist(match_len, match_dist);
     }
 
     inline InIt& get_it() noexcept
@@ -293,9 +283,38 @@ public:
     }
 
 private:
-    std::pair<std::size_t, std::size_t> find_best_match(std::forward_list<std::size_t>& pos_chain)
+    void find_best_match(Literal& literal, std::size_t& len, std::size_t& dist)
     {
-        std::size_t max_match_len = 0, max_match_dist = 0;
+        KeySeq key_seq;
+        auto key_seq_it = window.peek(key_seq.begin(), key_seq.size());
+
+        if (key_seq_it == key_seq.begin()) {
+            len = 0; dist = 0;
+            return;
+        }
+
+        literal = key_seq.front();
+
+        if (key_seq_it != key_seq.end()) {
+            len = 1; dist = 0;
+            return;
+        }
+
+        std::forward_list<std::size_t>& pos_chain = hash_chains[key_seq];
+        auto [max_match_len, max_match_dist] = find_longest_match_from_chain(pos_chain);
+
+        std::size_t _tmp_max_len_to_update_pos_chain = 8;
+        if (max_match_len <= _tmp_max_len_to_update_pos_chain)
+            pos_chain.push_front(window.get_curr_peek_pos());
+
+        len = max_match_len;
+        dist = max_match_dist;
+    }
+
+    std::pair<std::size_t, std::size_t> find_longest_match_from_chain(
+            std::forward_list<std::size_t>& pos_chain)
+    {
+        std::size_t max_match_len = 1, max_match_dist = 0;
         auto pos_it = pos_chain.begin();
         for (; pos_it != pos_chain.end() && *pos_it >= window.get_offset(); ++pos_it) {
             const auto [match_len, match_dist] = window.find_match(*pos_it);
