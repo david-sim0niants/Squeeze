@@ -8,7 +8,7 @@ namespace squeeze::misc {
  * Unbounded sequences use only one iterator and are always considered valid.
  * Therefore, the is_valid() method is always true for unbounded sequences,
  * while for bounded sequences, it is true only if the current iterator is not equal to the end iterator. */
-template<typename It, typename ItEnd>
+template<typename It, typename ItEnd = void>
 struct Sequence;
 
 template<typename It> struct Sequence<It, void> {
