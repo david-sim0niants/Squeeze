@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "squeeze/compression/lz77.h"
+#include "squeeze/compression/config.h"
 #include "squeeze/utils/overloaded.h"
 
 #include "../test/test_tools/generate_mock_contents.h"
@@ -9,8 +10,8 @@ namespace squeeze::compression::testing {
 
 class LZ77TestInput {
 public:
-    LZ77TestInput(int prng_seed, std::string_view content_seed)
-        : prng_seed(prng_seed), content_seed(content_seed)
+    LZ77TestInput(LZ77<>::EncoderParams encoder_params, int prng_seed, std::string_view content_seed)
+        : encoder_params(encoder_params), prng_seed(prng_seed), content_seed(content_seed)
     {
     }
 
@@ -30,19 +31,30 @@ public:
         return std::vector(contents.view().begin(), contents.view().end());
     }
 
+    inline const auto& get_encoder_params() const noexcept
+    {
+        return encoder_params;
+    }
+
 private:
+    LZ77<>::EncoderParams encoder_params;
     int prng_seed;
     std::string_view content_seed;
 };
 
-class LZ77Test : public ::testing::TestWithParam<LZ77TestInput> {};
+class LZ77Test : public ::testing::TestWithParam<LZ77TestInput> {
+protected:
+    static constexpr std::size_t search_size = 1 << 15;
+    static constexpr std::size_t lookahead_size = 258;
+};
 
 TEST_P(LZ77Test, EncodeDecodeTokens)
 {
     std::vector<char> data = GetParam().gen_data();
-    auto encoder = LZ77<>::make_encoder(1 << 15, 258, data.begin(), data.end());
+    auto encoder = LZ77<>::make_encoder(GetParam().get_encoder_params(),
+                                        search_size, lookahead_size, data.begin(), data.end());
     std::vector<char> rest_data;
-    auto decoder = LZ77<>::make_decoder(1 << 15, 258, std::back_inserter(rest_data));
+    auto decoder = LZ77<>::make_decoder(search_size, lookahead_size, std::back_inserter(rest_data));
 
     while (true) {
         auto data_it = encoder.get_it();
@@ -61,22 +73,42 @@ TEST_P(LZ77Test, EncodeDecodeTokens)
     }
 
     ASSERT_EQ(data.size(), rest_data.size());
-    for (std::size_t i = 0; i < data.size(); ++i) {
+    for (std::size_t i = 0; i < data.size(); ++i)
         ASSERT_EQ(data[i], rest_data[i]);
-    }
 }
 
 static constexpr char content_seed[] = "Aliquam convallis ornare luctus. Mauris semper enim sit amet leo maximus, sit amet varius massa consectetur. Sed ut bibendum orci, vitae placerat massa. Mauris pulvinar, mi sit amet maximus eleifend, augue orci fringilla eros, ac posuere massa nisi id sem. Nam malesuada eleifend risus, ac aliquet augue finibus ac. Duis et turpis elit. Sed in vehicula dolor, vel commodo urna.";
 
-std::vector<LZ77TestInput> gen_test_inputs()
+std::vector<LZ77TestInput> gen_test_inputs(std::size_t level)
 {
+    if (level >= lz77_nr_levels)
+        throw BaseException("too high level for LZ77");
+
+    LZ77<>::EncoderParams encoder_params = {
+        .lazy_match_threshold = lz77_lazy_match_threshold_per_level[level],
+        .match_insert_threshold = lz77_match_insert_threshold_per_level[level],
+    };
+
     std::vector<LZ77TestInput> inputs;
     constexpr std::size_t nr_tests = 16;
     for (std::size_t i = 0; i < nr_tests; ++i)
-        inputs.emplace_back(1234 + i, content_seed);
+        inputs.emplace_back(encoder_params, 1234 + i, content_seed);
     return inputs;
 }
 
-INSTANTIATE_TEST_SUITE_P(Default, LZ77Test, ::testing::ValuesIn(gen_test_inputs()));
+#define SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(level) \
+    INSTANTIATE_TEST_SUITE_P(Level_##level, LZ77Test, ::testing::ValuesIn(gen_test_inputs(level)))
+
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(0);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(1);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(2);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(3);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(4);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(5);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(6);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(7);
+SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(8);
+
+#undef SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST
 
 }

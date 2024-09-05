@@ -4,9 +4,11 @@
 
 namespace squeeze::compression {
 
+/* Concept defining what is expected from an LZ77 policy type. */
 template<typename T>
 concept LZ77Policy = requires
     {
+        // Require a copyable, default-constructible Literal with equality operator
         typename T::Literal;
         std::copyable<typename T::Literal>;
         requires std::is_default_constructible_v<typename T::Literal>;
@@ -15,9 +17,11 @@ concept LZ77Policy = requires
             { a == b } -> std::convertible_to<bool>;
         };
 
+        // Require integral types of length (Len) and distance (Dist)
         typename T::Len;  requires std::integral<typename T::Len>;
         typename T::Dist; requires std::integral<typename T::Dist>;
 
+        // Require a constexpr minimum length of an integral type
         T::min_len;
         std::integral<decltype(T::min_len)>;
         requires std::is_same_v<decltype(T::min_len), const decltype(T::min_len)>;

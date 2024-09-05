@@ -54,4 +54,13 @@ constexpr std::size_t get_block_size(CompressionParams params)
     }
 }
 
+static constexpr std::size_t lz77_nr_levels = 9;
+constexpr std::array<std::size_t, lz77_nr_levels> lz77_lazy_match_threshold_per_level = {
+    0, 32, 64, 96, 128, 160, 192, 224, 256
+};
+
+constexpr std::array<std::size_t, lz77_nr_levels> lz77_match_insert_threshold_per_level {
+    1, 5, 6, 7, 8, 9, 10, 11, 12
+};
+
 }
