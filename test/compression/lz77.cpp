@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "squeeze/compression/lz77.h"
+#include "squeeze/compression/deflate_lz77.h"
 #include "squeeze/compression/config.h"
 #include "squeeze/utils/overloaded.h"
 
@@ -10,7 +11,7 @@ namespace squeeze::compression::testing {
 
 class LZ77TestInput {
 public:
-    LZ77TestInput(LZ77<>::EncoderParams encoder_params, int prng_seed, std::string_view content_seed)
+    LZ77TestInput(LZ77EncoderParams encoder_params, int prng_seed, std::string_view content_seed)
         : encoder_params(encoder_params), prng_seed(prng_seed), content_seed(content_seed)
     {
     }
@@ -37,7 +38,7 @@ public:
     }
 
 private:
-    LZ77<>::EncoderParams encoder_params;
+    LZ77EncoderParams encoder_params;
     int prng_seed;
     std::string_view content_seed;
 };
@@ -59,17 +60,43 @@ TEST_P(LZ77Test, EncodeDecodeTokens)
     while (true) {
         auto data_it = encoder.get_it();
         LZ77<>::Token token = encoder.encode_once();
-        if (std::holds_alternative<std::monostate>(token))
+        if (token.get_type() == LZ77<>::Token::None)
             break;
-        const std::size_t nr_literals_encoded = LZ77<>::get_nr_literals_within_token(token);
+        const std::size_t nr_syms_encoded = token.get_nr_syms_within();
 
         std::size_t rest_data_i = rest_data.size();
         auto e = decoder.decode_once(token);
-        ASSERT_TRUE(e.successful()) << e.report();
+        EXPECT_TRUE(e.successful()) << e.report();
         std::size_t rest_data_i_end = rest_data.size();
-        const std::size_t nr_literals_decoded = rest_data_i_end - rest_data_i;
+        const std::size_t nr_syms_decoded = rest_data_i_end - rest_data_i;
 
-        EXPECT_EQ(nr_literals_encoded, nr_literals_decoded);
+        EXPECT_EQ(nr_syms_encoded, nr_syms_decoded);
+    }
+
+    ASSERT_EQ(data.size(), rest_data.size());
+    for (std::size_t i = 0; i < data.size(); ++i)
+        ASSERT_EQ(data[i], rest_data[i]);
+}
+
+TEST_P(LZ77Test, EncodeDecodePackedTokens)
+{
+    std::vector<char> data = GetParam().gen_data();
+    auto encoder = DeflateLZ77::make_encoder(GetParam().get_encoder_params(), data.begin(), data.end());
+    std::vector<char> rest_data;
+    auto decoder = DeflateLZ77::make_decoder(std::back_inserter(rest_data));
+
+    std::vector<DeflateLZ77::PackedToken> buffer;
+    ASSERT_TRUE(encoder.encode(std::back_inserter(buffer)).is_none());
+    for (std::size_t i = 0; i < buffer.size(); ++i) {
+        DeflateLZ77::PackedToken p_token = buffer[i];
+        if (p_token.is_len_dist()) {
+            ASSERT_LT(++i, buffer.size());
+            DeflateLZ77::DistExtra dist_extra = buffer[i].get_dist_extra();
+            decoder.decode_once(p_token.get_len_sym(), p_token.get_len_extra(),
+                                p_token.get_dist_sym(), dist_extra);
+        } else {
+            decoder.decode_once(p_token.get_literal());
+        }
     }
 
     ASSERT_EQ(data.size(), rest_data.size());
@@ -84,7 +111,7 @@ std::vector<LZ77TestInput> gen_test_inputs(std::size_t level)
     if (level >= lz77_nr_levels)
         throw BaseException("too high level for LZ77");
 
-    LZ77<>::EncoderParams encoder_params = {
+    LZ77EncoderParams encoder_params = {
         .lazy_match_threshold = lz77_lazy_match_threshold_per_level[level],
         .match_insert_threshold = lz77_match_insert_threshold_per_level[level],
     };

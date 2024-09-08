@@ -9,6 +9,7 @@ namespace squeeze::compression {
 enum class CompressionMethod : uint8_t {
     None = 0,
     Huffman,
+    Deflate,
 };
 
 }
@@ -23,6 +24,8 @@ template<> inline std::string stringify(const compression::CompressionMethod& co
         return "none";
     case Huffman:
         return "huffman";
+    case Deflate:
+        return "deflate";
     default:
         return "[unknown]";
     }

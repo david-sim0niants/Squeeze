@@ -120,6 +120,8 @@ static auto encode_block(In in, In in_end, Out out, const CompressionParams& com
         using enum compression::CompressionMethod;
     case Huffman:
         return compression::compress<Huffman, use_terminator>(in, in_end, out);
+    case Deflate:
+        return compression::compress<Deflate, use_terminator>(in, in_end, out);
         break;
     default:
         throw BaseException("invalid compression method or an unimplemented one");

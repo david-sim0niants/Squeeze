@@ -3,6 +3,7 @@
 #include "params.h"
 #include "config.h"
 #include "huffman_15.h"
+#include "deflate.h"
 
 namespace squeeze::compression {
 
@@ -16,6 +17,8 @@ std::tuple<InIt, Error<>> compress(misc::BitEncoder<char, CHAR_BIT, OutIt, OutIt
 {
     if constexpr (method == CompressionMethod::Huffman)
         return huffman15_encode<use_terminator>(bit_encoder, in_it, in_it_end);
+    else if constexpr (method == CompressionMethod::Deflate)
+        return deflate<use_terminator>(bit_encoder, in_it, in_it_end);
     else
         throw BaseException("invalid compression method or an unimplemented one");
 }
@@ -30,6 +33,8 @@ std::tuple<OutIt, Error<>> decompress(
 {
     if constexpr (method == CompressionMethod::Huffman)
         return huffman15_decode<expect_terminator>(out_it, out_it_end, bit_decoder);
+    else if constexpr (method == CompressionMethod::Deflate)
+        return inflate(out_it, out_it_end, bit_decoder);
     else
         throw BaseException("invalid compression method or an unimplemented one");
 }
@@ -43,6 +48,8 @@ std::tuple<InIt, OutIt, Error<>> compress(InIt in_it, InIt in_it_end, OutIt out_
 {
     if constexpr (method == CompressionMethod::Huffman)
         return huffman15_encode<use_terminator>(in_it, in_it_end, out_it, out_it_end...);
+    else if constexpr (method == CompressionMethod::Deflate)
+        return deflate<use_terminator>(in_it, in_it_end, out_it, out_it_end...);
     else
         throw BaseException("invalid compression method or an unimplemented one");
 }
@@ -56,6 +63,8 @@ std::tuple<OutIt, InIt, Error<>> decompress(OutIt out_it, OutIt out_it_end, InIt
 {
     if constexpr (method == CompressionMethod::Huffman)
         return huffman15_decode<expect_terminator>(out_it, out_it_end, in_it, in_it_end...);
+    else if constexpr (method == CompressionMethod::Deflate)
+        return inflate(out_it, out_it_end, in_it, in_it_end...);
     else
         throw BaseException("invalid compression method or an unimplemented one");
 }

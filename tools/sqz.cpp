@@ -408,8 +408,8 @@ private:
         using namespace std::string_view_literals;
         using enum compression::CompressionMethod;
 
-        constexpr std::array str_methods = {"none"sv, "huffman"sv};
-        constexpr std::array methods = {None, Huffman};
+        constexpr std::array str_methods = {"none"sv, "huffman"sv, "deflate"sv};
+        constexpr std::array methods = {None, Huffman, Deflate};
 
         auto report_invalid_info = [str]()
         {

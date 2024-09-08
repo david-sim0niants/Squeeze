@@ -15,6 +15,8 @@ auto decode_block(Out out, Out out_end, In in, In in_end, const CompressionParam
         using enum compression::CompressionMethod;
     case Huffman:
         return compression::decompress<Huffman, true>(out, out_end, in, in_end);
+    case Deflate:
+        return compression::decompress<Deflate, true>(out, out_end, in, in_end);
     default:
         throw BaseException("invalid compression method or an unimplemented one");
     }

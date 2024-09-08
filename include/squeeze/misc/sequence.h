@@ -11,6 +11,29 @@ namespace squeeze::misc {
 template<typename It, typename ItEnd = void>
 struct Sequence;
 
+template<typename It>
+struct UnboundedSequenceEndIt {
+    inline bool operator==(It) const noexcept
+    {
+        return false;
+    }
+
+    inline bool operator!=(It) const noexcept
+    {
+        return true;
+    }
+
+    friend bool operator==(const It&, UnboundedSequenceEndIt<It>) noexcept
+    {
+        return false;
+    }
+
+    friend bool operator!=(const It&, UnboundedSequenceEndIt<It>) noexcept
+    {
+        return true;
+    }
+};
+
 template<typename It> struct Sequence<It, void> {
     explicit Sequence(It it) : it(it)
     {
@@ -31,6 +54,16 @@ template<typename It> struct Sequence<It, void> {
         return it;
     }
 
+    inline It begin() const noexcept
+    {
+        return it;
+    }
+
+    inline UnboundedSequenceEndIt<It> end()
+    {
+        return {};
+    }
+
     static constexpr bool bounded = false;
 
     It it;
@@ -46,9 +79,22 @@ template<typename It> struct Sequence<It, It> {
         return it != it_end;
     }
 
+    inline It begin() const noexcept
+    {
+        return it;
+    }
+
+    inline It end() const noexcept
+    {
+        return it_end;
+    }
+
     static constexpr bool bounded = true;
 
     It it, it_end;
 };
+
+template<typename It> Sequence(It) -> Sequence<It>;
+template<typename It> Sequence(It, It) -> Sequence<It, It>;
 
 }
