@@ -1,10 +1,10 @@
-#include "mock_entry_output.h"
+#include "test_tools/mock/entry_output.h"
 
 #include "squeeze/exception.h"
 
-namespace squeeze::testing::tools {
+namespace squeeze::test_tools::mock {
 
-Error<EntryOutput> MockEntryOutput::init(
+Error<EntryOutput> EntryOutput::init(
         const EntryHeader& entry_header, std::ostream *& stream)
 {
     switch (entry_header.attributes.type) {
@@ -13,7 +13,7 @@ Error<EntryOutput> MockEntryOutput::init(
         return "none type not supported";
     case RegularFile:
     {
-        auto regular_file = mockfs.make<MockRegularFile>(entry_header.path);
+        auto regular_file = fs.make<mock::RegularFile>(entry_header.path);
         this->file = regular_file;
         if (!regular_file)
             return "failed making a regular file in the mock filesystem";
@@ -22,7 +22,7 @@ Error<EntryOutput> MockEntryOutput::init(
     }
     case Directory:
     {
-        auto directory = mockfs.make<MockDirectory>(entry_header.path);
+        auto directory = fs.make<mock::Directory>(entry_header.path);
         this->file = directory;
         if (!directory)
             return "failed making a directory in the mock filesystem";
@@ -38,10 +38,10 @@ Error<EntryOutput> MockEntryOutput::init(
     return success;
 }
 
-Error<EntryOutput> MockEntryOutput::init_symlink(
+Error<EntryOutput> EntryOutput::init_symlink(
         const EntryHeader& entry_header, const std::string& target)
 {
-    auto symlink = mockfs.make<MockSymlink>(entry_header.path, std::string(target));
+    auto symlink = fs.make<Symlink>(entry_header.path, std::string(target));
     this->file = symlink;
     if (!symlink)
         return "failed making a symlink in the mock filesystem";
@@ -49,13 +49,13 @@ Error<EntryOutput> MockEntryOutput::init_symlink(
     return success;
 }
 
-Error<EntryOutput> MockEntryOutput::finalize()
+Error<EntryOutput> EntryOutput::finalize()
 {
     file->set_permissions(permissions);
     return success;
 }
 
-void MockEntryOutput::deinit() noexcept
+void EntryOutput::deinit() noexcept
 {
     file.reset();
 }

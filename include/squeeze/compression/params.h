@@ -13,12 +13,8 @@ struct CompressionParams {
 
 }
 
-namespace squeeze::utils {
-
-template<> inline std::string stringify(const compression::CompressionParams& compression)
+template<> inline std::string squeeze::utils::stringify(const compression::CompressionParams& compression)
 {
     return "{ method=" + stringify(compression.method) +
            ", level=" + stringify(compression.level) + " }";
-}
-
 }

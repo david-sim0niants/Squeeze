@@ -9,17 +9,19 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-set(TEST_TARGETS squeeze entry_header encode_decode compression/huffman compression/lz77)
+set(TEST_TARGETS squeeze entry_header encode_decode
+    compression/huffman compression/deflate_huffman compression/huffman_15 compression/lz77)
 set(TEST_SRC_FILES ${TEST_TARGETS})
 list(TRANSFORM TEST_SRC_FILES APPEND .cpp)
-list(APPEND TEST_SRC_FILES main.cpp)
+list(APPEND TEST_SRC_FILES main.cpp test_common/test_data.cpp test_common/test_on_data_input.cpp)
 
 set(TARGET_NAME test_all)
 add_executable(${TARGET_NAME} ${TEST_SRC_FILES})
-target_link_libraries(${TARGET_NAME} squeeze test_tools gtest)
+target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(${TARGET_NAME} squeeze test_tools gtest gmock)
 
-include(GoogleTest)
-gtest_discover_tests(${TARGET_NAME})
+# include(GoogleTest)
+# gtest_discover_tests(${TARGET_NAME})
 
 set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of GTest" FORCE)
 

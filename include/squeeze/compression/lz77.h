@@ -16,6 +16,7 @@
 #include "squeeze/exception.h"
 #include "squeeze/error.h"
 #include "squeeze/misc/sequence.h"
+#include "squeeze/utils/stringify.h"
 
 namespace squeeze::compression {
 
@@ -587,4 +588,10 @@ private:
     Token partial_token;
 };
 
+}
+
+template<> inline std::string squeeze::utils::stringify(const compression::LZ77EncoderParams& params)
+{
+    return "{ lazy_match_threshold=" + stringify(params.lazy_match_threshold) +
+           ", match_insert_threshold=" + stringify(params.match_insert_threshold) + " }";
 }

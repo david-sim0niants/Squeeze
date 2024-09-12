@@ -1,11 +1,11 @@
-#include "mockfs.h"
+#include "test_tools/mock/fs.h"
 
-namespace squeeze::testing::tools {
+namespace squeeze::test_tools::mock {
 
-std::shared_ptr<MockDirectory> MockDirectory::make_directories(std::string_view path)
+std::shared_ptr<Directory> Directory::make_directories(std::string_view path)
 {
-    std::shared_ptr<MockDirectory> curdir_shared = nullptr;
-    MockDirectory *curdir = this;
+    std::shared_ptr<Directory> curdir_shared = nullptr;
+    Directory *curdir = this;
     while (!path.empty()) {
         size_t i_sep = path.find(seperator);
         if (i_sep == std::string_view::npos)
@@ -13,7 +13,7 @@ std::shared_ptr<MockDirectory> MockDirectory::make_directories(std::string_view 
 
         auto& curdir_shared_ref = curdir->entries.directories[std::string(path.substr(0, i_sep + 1))];
         if (!curdir_shared_ref)
-            curdir_shared_ref = std::make_shared<MockDirectory>();
+            curdir_shared_ref = std::make_shared<Directory>();
 
         curdir_shared = curdir_shared_ref;
         curdir = curdir_shared.get();
@@ -22,15 +22,14 @@ std::shared_ptr<MockDirectory> MockDirectory::make_directories(std::string_view 
     return curdir_shared;
 }
 
-
-MockFileEntries flatten_mockfs(const MockFileSystem &mockfs)
+FileEntries flatten_fs(const FileSystem &mockfs)
 {
-    MockFileEntries flatten_entries;
+    FileEntries flatten_entries;
     auto handle_file = [&flatten_entries](const std::string& path, auto file)
     {
         flatten_entries.get<typename decltype(file)::element_type>()[path] = file;
     };
-    mockfs.list_recursively<MockRegularFile, MockDirectory, MockSymlink>(
+    mockfs.list_recursively<RegularFile, Directory, Symlink>(
             handle_file, handle_file, handle_file);
     return flatten_entries;
 }

@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <string_view>
+#include <cstring>
+#include <charconv>
 #include <unordered_map>
+#include <fstream>
 
 #include "squeeze/logging.h"
 

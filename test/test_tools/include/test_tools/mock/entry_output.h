@@ -1,13 +1,13 @@
 #pragma once
 
 #include "squeeze/entry_output.h"
-#include "mockfs.h"
+#include "fs.h"
 
-namespace squeeze::testing::tools {
+namespace squeeze::test_tools::mock {
 
-class MockEntryOutput final : public EntryOutput {
+class EntryOutput final : public squeeze::EntryOutput {
 public:
-    explicit MockEntryOutput(tools::MockFileSystem& mockfs) : mockfs(mockfs) {}
+    explicit EntryOutput(FileSystem& fs) : fs(fs) {}
 
     Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) override;
     Error<EntryOutput> init_symlink(const EntryHeader& entry_header, const std::string& target) override;
@@ -15,8 +15,8 @@ public:
     void deinit() noexcept override;
 
 private:
-    tools::MockFileSystem& mockfs;
-    std::shared_ptr<tools::MockAbstractFile> file = nullptr;
+    FileSystem& fs;
+    std::shared_ptr<AbstractFile> file = nullptr;
     EntryPermissions permissions {};
 };
 

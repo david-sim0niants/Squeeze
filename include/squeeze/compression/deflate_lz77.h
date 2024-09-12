@@ -48,7 +48,7 @@ public:
 
     inline static PackedLen pack_len(std::size_t len)
     {
-        assert(len <= 258 && "length too large");
+        assert(len <= lookahead_size && "length too large");
         assert(len >= min_len && "length too small");
         return static_cast<PackedLen>(len - min_len);
     }
@@ -60,7 +60,7 @@ public:
 
     inline static PackedDist pack_dist(std::size_t dist)
     {
-        assert(dist <= (1 << 15) && "too large distance");
+        assert(dist <= search_size && "too large distance");
         assert(dist > 0 && "zero-distance");
         return static_cast<PackedDist>(dist - 1);
     }
@@ -77,22 +77,31 @@ public:
         if (p_len <= 7)
             return std::make_pair(p_len, 0);
         else if (p_len == 255)
-            return std::make_pair(28, 0);
+            return std::make_pair(max_len_sym, 0);
         const int p = (std::bit_width(p_len) - 1) - 2;
         return std::make_pair(4 * p + (p_len >> p), p_len & PackedLen((1 << p) - 1));
     }
 
     /* Does some convoluted math to decode a length symbol and extra bits pair into a normal length. */
-    static std::size_t decode_len(LenSym len_sym, LenExtra len_extra)
+    static Error<DeflateLZ77> decode_len(LenSym len_sym, LenExtra len_extra, std::size_t& len)
     {
-        assert(len_sym <= 28 && "invalid length symbol");
-        if (len_sym <= 7)
-            return unpack_len(len_sym);
-        else if (len_sym == 28)
-            return unpack_len(255);
+        if (len_sym > max_len_sym) [[unlikely]]
+            return "invalid length symbol";
+
+        if (len_sym <= 7) {
+            len = unpack_len(len_sym);
+            return success;
+        } else if (len_sym == max_len_sym) {
+            len = unpack_len(255);
+            return success;
+        }
+
         const auto p = len_sym / 4 - 1;
-        assert(len_extra < (1 << p));
-        return unpack_len((static_cast<PackedLen>(len_sym % 4 + 4) << p) + len_extra);
+        if (len_extra >= (1 << p)) [[unlikely]]
+            return "invalid length extra bits";
+
+        len = unpack_len((static_cast<PackedLen>(len_sym % 4 + 4) << p) + len_extra);
+        return success;
     }
 
     /* Does some convoluted math to encode a normal distance into a distance symbol and extra bits pair. */
@@ -106,13 +115,22 @@ public:
     }
 
     /* Does some convoluted math to decode a distance symbol and extra bits pair into a normal distance. */
-    static std::size_t decode_dist(DistSym dist_sym, DistExtra dist_extra)
+    static Error<DeflateLZ77> decode_dist(DistSym dist_sym, DistExtra dist_extra, std::size_t& dist)
     {
-        if (dist_sym <= 3)
-            return unpack_dist(dist_sym);
+        if (dist_sym > max_dist_sym) [[unlikely]]
+            return "invalid distance symbol";
+
+        if (dist_sym <= 3) {
+            dist = unpack_dist(dist_sym);
+            return success;
+        }
+
         const auto p = dist_sym / 2 - 1;
-        assert(dist_extra < (1 << p));
-        return unpack_dist((static_cast<PackedDist>(dist_sym % 2 + 2) << p) + dist_extra);
+        if (dist_extra >= (1 << p)) [[unlikely]]
+            return "invalid distance extra bits";
+
+        dist = unpack_dist((static_cast<PackedDist>(dist_sym % 2 + 2) << p) + dist_extra);
+        return success;
     }
 
     /* Make an encoder from the provided input iterator(s). */
@@ -135,6 +153,11 @@ public:
     {
         return Decoder<OutIt, OutItEnd...>(out_it, out_it_end...);
     }
+
+    /* Max length symbol */
+    static constexpr LenSym max_len_sym = 28;
+    /* Max distance symbol */
+    static constexpr DistSym max_dist_sym = 29;
 
     /* Search window size. */
     static constexpr std::size_t search_size = 1 << 15;
@@ -169,7 +192,7 @@ public:
     constexpr PackedToken() = default;
 
     /* Construct a literal packed token. */
-    constexpr PackedToken(Literal literal) : data(literal)
+    constexpr PackedToken(Literal literal) : data(std::make_unsigned_t<Literal>(literal))
     {
     }
 
@@ -387,9 +410,16 @@ public:
     }
 
     /* Decode a len/dist pair from a length symbol and extra bits, distance symbol and its extra bits. */
-    inline void decode_once(LenSym len_sym, LenExtra len_extra, DistSym dist_sym, DistExtra dist_extra)
+    inline Error<Decoder>
+        decode_once(LenSym len_sym, LenExtra len_extra, DistSym dist_sym, DistExtra dist_extra)
     {
-        internal.decode_once(decode_len(len_sym, len_extra), decode_dist(dist_sym, dist_extra));
+        std::size_t len, dist;
+        Error<DeflateLZ77> e;
+        if ((e = decode_len(len_sym, len_extra, len)).failed() or
+            (e = decode_dist(dist_sym, dist_extra, dist)).failed())
+            return e;
+        else
+            return internal.decode_once(len, dist);
     }
 
     /* Check if the decoder has finished processing tokens. */

@@ -52,6 +52,8 @@ public:
                     node->right = create_node();
                     if (nullptr == node->right)
                         return "can't create a node anymore";
+                } else if (node->right->is_leaf()) {
+                    return "attempt to insert a code that is a prefix of another code";
                 }
                 node = node->right;
             } else {
@@ -59,14 +61,13 @@ public:
                     node->left = create_node();
                     if (nullptr == node->left)
                         return "can't create a node anymore";
+                } else if (node->left->is_leaf()) {
+                    return "attempt to insert a code that is a prefix of another code";
                 }
                 node = node->left;
             }
+
         }
-
-        if (not node->is_leaf())
-            return "attempt to insert a code that is a prefix of another code";
-
         node->symbol = symbol;
         return success;
     }
