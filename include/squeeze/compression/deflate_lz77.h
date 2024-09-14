@@ -216,10 +216,16 @@ public:
         return data == none_mark;
     }
 
-    /* Check if first token of len/dist pair. */
+    /* Check if a symbol token. */
+    constexpr inline bool is_literal() const noexcept
+    {
+        return !(data & len_dist_mark);
+    }
+
+    /* Check if first token of a len/dist pair. */
     constexpr inline bool is_len_dist() const noexcept
     {
-        return bool(data & len_dist_mark);
+        return !!(data & len_dist_mark);
     }
 
     /* Get length symbol. */
@@ -321,7 +327,10 @@ public:
         }
     }
 
-    /* Encode a sequence of packed tokens from internally encoded tokens. */
+    /* Encode a sequence of packed tokens from internally encoded tokens.
+     * If an extra token failed to be written (when the output iterator reached the end),
+     * it's returned from the function, otherwise a none token is returned, so error check
+     * can be done by checking if the returned token is a none token. */
     template<std::output_iterator<PackedToken> OutIt, typename... OutItEnd>
     PackedToken encode(OutIt out_it, OutItEnd... out_it_end)
     {

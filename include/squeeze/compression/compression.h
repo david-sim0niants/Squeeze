@@ -49,7 +49,7 @@ std::tuple<InIt, OutIt, Error<>> compress(InIt in_it, InIt in_it_end, OutIt out_
     if constexpr (method == CompressionMethod::Huffman)
         return huffman15_encode<use_terminator>(in_it, in_it_end, out_it, out_it_end...);
     else if constexpr (method == CompressionMethod::Deflate)
-        return deflate<use_terminator>(in_it, in_it_end, out_it, out_it_end...);
+        return deflate<use_terminator>({}, in_it, in_it_end, out_it, out_it_end...);
     else
         throw BaseException("invalid compression method or an unimplemented one");
 }

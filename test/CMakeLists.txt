@@ -10,7 +10,8 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 set(TEST_TARGETS squeeze entry_header encode_decode
-    compression/huffman compression/deflate_huffman compression/huffman_15 compression/lz77)
+    compression/huffman compression/deflate_huffman compression/huffman_15
+    compression/lz77 compression/deflate)
 set(TEST_SRC_FILES ${TEST_TARGETS})
 list(TRANSFORM TEST_SRC_FILES APPEND .cpp)
 list(APPEND TEST_SRC_FILES main.cpp test_common/test_data.cpp test_common/test_on_data_input.cpp)

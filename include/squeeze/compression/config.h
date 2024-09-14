@@ -4,6 +4,8 @@
 #include <utility>
 
 #include "params.h"
+#include "squeeze/compression/lz77_params.h"
+#include "squeeze/compression/deflate_params.h"
 #include "squeeze/exception.h"
 
 namespace squeeze::compression {
@@ -79,6 +81,25 @@ constexpr std::size_t get_block_size(CompressionParams params)
     default:
         throw BaseException("invalid compression method or an unimplemented one");
     }
+}
+
+constexpr LZ77EncoderParams get_lz77_encoder_params_for(std::size_t level)
+{
+    if (level >= lz77_nr_levels)
+        throw BaseException("too high level for LZ77");
+
+    return {
+        .lazy_match_threshold = lz77_lazy_match_threshold_per_level[level],
+        .match_insert_threshold = lz77_match_insert_threshold_per_level[level],
+    };
+}
+
+constexpr DeflateParams get_deflate_params_for_level(std::size_t level)
+{
+    if (level >= deflate_nr_levels)
+        throw BaseException("too high level for Deflate");
+
+    return { .lz77_encoder_params = get_lz77_encoder_params_for(level) };
 }
 
 }

@@ -82,27 +82,12 @@ TEST_P(LZ77Test, EncodeDecodePackedTokens)
     ASSERT_THAT(rest_data, Pointwise(Eq(), data));
 }
 
-namespace {
-
-LZ77EncoderParams gen_encoder_params_for(std::size_t level)
-{
-    if (level >= lz77_nr_levels)
-        throw BaseException("too high level for LZ77");
-
-    return {
-        .lazy_match_threshold = lz77_lazy_match_threshold_per_level[level],
-        .match_insert_threshold = lz77_match_insert_threshold_per_level[level],
-    };
-}
-
-const auto test_inputs = make_generated_test_on_data_inputs(16, 1234, 16);
-
-}
+static const auto test_inputs = make_generated_test_on_data_inputs(16, 1234, 16);
 
 #define SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(level) \
     INSTANTIATE_TEST_SUITE_P(Level_##level, LZ77Test, \
             ::testing::Combine(::testing::ValuesIn(test_inputs.collect()), \
-                               ::testing::Values(gen_encoder_params_for(level))))
+                               ::testing::Values(get_lz77_encoder_params_for(level))))
 
 SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(0);
 SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(1);

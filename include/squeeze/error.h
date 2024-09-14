@@ -32,7 +32,8 @@ template<> struct OptionalField_Or_NoField<void> {
 
 }
 
-constexpr struct Success {} success;
+enum class Success {success};
+using enum Success;
 
 template<typename MessageType = std::string>
 class BasicError {
