@@ -274,12 +274,10 @@ public:
             Sym2Idx sym2idx = default_sym2idx<Sym>)
         requires std::convertible_to<std::invoke_result_t<Sym2Idx, Sym>, unsigned int>
     {
-        for (; in_it != in_it_end; ++in_it) {
+        for (; in_it != in_it_end && bit_encoder.is_valid(); ++in_it) {
             const auto sym = *in_it;
             const unsigned int idx = sym2idx(sym);
-            const std::size_t nr_bits_left = bit_encoder.encode_bits(code_it[idx], code_len_it[idx]);
-            if (nr_bits_left)
-                break;
+            bit_encoder.encode_bits(code_it[idx], code_len_it[idx]);
         }
         return in_it;
     }
@@ -353,10 +351,9 @@ private:
             unsigned int term_idx, Idx2Sym idx2sym)
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {
-        for (; out_it != out_it_end; ++out_it) {
-            std::size_t nr_bits_left = 0;
-            const unsigned int idx = root->find_symbol(bit_decoder.make_bit_reader_iterator(nr_bits_left));
-            if (nr_bits_left || expect_term && idx == term_idx)
+        for (; out_it != out_it_end && bit_decoder.is_valid(); ++out_it) {
+            const unsigned int idx = root->find_symbol(bit_decoder.make_bit_reader_iterator());
+            if (expect_term && idx == term_idx)
                 break;
             *out_it = idx2sym(idx);
         }

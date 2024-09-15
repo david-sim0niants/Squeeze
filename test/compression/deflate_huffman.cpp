@@ -51,7 +51,7 @@ TEST_P(DeflateHuffmanTest, EncodesDecodesCodeLenCodeLens)
     auto bit_encoder = misc::make_bit_encoder(buffer);
     auto dh_encoder = DeflateHuffman<>::make_encoder(bit_encoder);
     auto clcl_end = clcl.begin() + clcl_size;
-    EXPECT_EQ(dh_encoder.encode_nr_code_len_codes(clcl_size), 0);
+    EXPECT_TRUE(dh_encoder.encode_nr_code_len_codes(clcl_size));
     EXPECT_EQ(dh_encoder.encode_code_len_code_lens(clcl.begin(), clcl_end), clcl_end);
     EXPECT_EQ(bit_encoder.finalize(), 0);
 
@@ -60,7 +60,7 @@ TEST_P(DeflateHuffmanTest, EncodesDecodesCodeLenCodeLens)
 
     auto bit_decoder = misc::make_bit_decoder(buffer);
     auto dh_decoder = DeflateHuffman<>::make_decoder(bit_decoder);
-    EXPECT_EQ(dh_decoder.decode_nr_code_len_codes(rest_clcl_size), 0);
+    EXPECT_TRUE(dh_decoder.decode_nr_code_len_codes(rest_clcl_size));
     auto rest_clcl_end = rest_clcl.begin() + rest_clcl_size;
     EXPECT_EQ(dh_decoder.decode_code_len_code_lens(rest_clcl.begin(), rest_clcl_end), rest_clcl_end);
 

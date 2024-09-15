@@ -27,8 +27,10 @@ public:
 
     using Literal = DeflateLZ77::Literal;
     using LitLenSym = uint16_t;
-    using LenSym = typename DeflateLZ77::LenSym;
-    using DistSym = typename DeflateLZ77::DistSym;
+    using LenSym = DeflateLZ77::LenSym;
+    using DistSym = DeflateLZ77::DistSym;
+    using LenExtra = DeflateLZ77::LenExtra;
+    using DistExtra = DeflateLZ77::DistExtra;
 
     using PackedToken = DeflateLZ77::PackedToken;
 
@@ -38,7 +40,6 @@ public:
     class Encoder;
 
     template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
-             std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
              std::input_iterator InIt = typename std::vector<Char>::iterator, typename ...InItEnd>
         requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(InItEnd) <= 1)
     class Decoder;
@@ -65,8 +66,7 @@ public:
 };
 
 template<DeflatePolicy Policy>
-template<typename Char, std::size_t char_size,
-         std::output_iterator<Char> OutIt, typename ...OutItEnd>
+template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename ...OutItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(OutItEnd) <= 1)
 class Deflate<Policy>::Encoder {
 public:
@@ -83,7 +83,38 @@ public:
         requires (sizeof...(InItEnd) <= 1)
     Error<Encoder> encode(const DeflateParams& params, InIt in_it, InItEnd... in_it_end)
     {
-        return huffman_encode<final_block>(lz77_encode(params.lz77_encoder_params, in_it, in_it_end...));
+        Error<Encoder> e = success;
+        if ((e = encode_header_bits<final_block>()).successful() &&
+            (e = encode_data(params, in_it, in_it_end...)).successful())
+            return e;
+        else
+            return success;
+    }
+
+    template<bool final_block>
+    inline Error<Encoder> encode_header_bits()
+    {
+        // non-compressed blocks are not supported (BTYPE=00)
+        // compression with static Huffman codes are not supported (BTYPE=01)
+        // supporting only a compression with dynamic Huffman codes (BTYPE=10)
+
+        bool s = true;
+        if constexpr (final_block)
+            s = bit_encoder.encode_bits(std::bitset<3>(0b110)); // BFINAL=1
+        else
+            s = bit_encoder.encode_bits(std::bitset<3>(0b010)); // BFINAL=0
+
+        if (s) [[likely]]
+            return success;
+        else
+            return "failed encoding header bits";
+    }
+
+    template<std::input_iterator InIt, typename... InItEnd>
+        requires (sizeof...(InItEnd) <= 1)
+    Error<Encoder> encode_data(const DeflateParams& params, InIt in_it, InItEnd... in_it_end)
+    {
+        return huffman_encode(lz77_encode(params.lz77_encoder_params, in_it, in_it_end...));
     }
 
 private:
@@ -98,7 +129,6 @@ private:
         return lz77_output;
     }
 
-    template<bool final_block>
     Error<Encoder> huffman_encode(const IntermediateData& data)
     {
         std::array<CodeLen, litlen_alphabet_size + dist_alphabet_size> code_lens_storage {};
@@ -106,11 +136,10 @@ private:
 
         std::span both_code_lens {code_lens_storage.data(), litlen_code_lens.size() + dist_code_lens.size()};
 
-        Error<Encoder> e = success;
-        if ((e = huffman_encode_code_lens(litlen_code_lens, dist_code_lens, both_code_lens)).failed())
+        Error<Encoder> e = huffman_encode_code_lens(litlen_code_lens, dist_code_lens, both_code_lens);
+        if (e) [[unlikely]]
             return {"failed encoding code lengths", e.report()};
-        if ((e = huffman_encode_syms<final_block>(data, litlen_code_lens, dist_code_lens)))
-            return {"failed encoding data", e.report()};
+        huffman_encode_syms(data, litlen_code_lens, dist_code_lens);
         return success;
     }
 
@@ -141,12 +170,13 @@ private:
         assert(nr_litlen_codes - literal_alphabet_size <= 31);
         assert(nr_dist_codes - 1 <= 31);
 
-        if (bit_encoder.encode_bits(std::bitset<5>(nr_litlen_codes - literal_alphabet_size)) ||
-            bit_encoder.encode_bits(std::bitset<5>(nr_dist_codes - 1))                       ||
-            DHuffman::make_encoder(bit_encoder).encode_nr_code_len_codes(nr_code_len_codes))
-            return "failed encoding the (HLIT, HDIST, HCLEN) triple of the number of code lengths";
-        else
+        if (bit_encoder.encode_bits(std::bitset<5>(nr_litlen_codes - literal_alphabet_size)) &&
+            bit_encoder.encode_bits(std::bitset<5>(nr_dist_codes - 1))                       &&
+            DHuffman::make_encoder(bit_encoder).encode_nr_code_len_codes(nr_code_len_codes)
+        )
             return success;
+        else
+            return "failed encoding the (HLIT, HDIST, HCLEN) triple of the number of code lengths";
     }
 
     Error<Encoder> huffman_encode_code_len_code_lens(std::span<CodeLenCodeLen> clcl)
@@ -172,8 +202,7 @@ private:
             return success;
     }
 
-    template<bool final_block>
-    Error<Encoder> huffman_encode_syms(const IntermediateData& data,
+    void huffman_encode_syms(const IntermediateData& data,
             std::span<CodeLen> litlen_code_lens, std::span<CodeLen> dist_code_lens)
     {
         std::array<Code, litlen_alphabet_size> litlen_codes_storage;
@@ -181,7 +210,7 @@ private:
         auto [litlen_codes, dist_codes] = gen_codes(litlen_code_lens, dist_code_lens,
                 litlen_codes_storage, dist_codes_storage);
 
-        for (auto it = data.begin(); it != data.end(); ++it) {
+        for (auto it = data.begin(); it != data.end() && bit_encoder.is_valid(); ++it) {
             PackedToken token = *it;
             if (token.is_literal()) {
                 LitLenSym sym = static_cast<std::make_unsigned_t<Literal>>(token.get_literal());
@@ -193,16 +222,23 @@ private:
 
                 PackedToken extra = *it;
 
+                LenExtra len_extra = token.get_len_extra();
                 LitLenSym len_sym = static_cast<std::make_unsigned_t<LenSym>>(token.get_len_sym());
-                DistSym dist_sym = static_cast<std::make_unsigned_t<DistSym>>(token.get_dist_sym());
+                DistSym dist_sym = token.get_dist_sym();
+                DistExtra dist_extra = token.get_dist_extra();
 
-                // TODO: missed the symbol to extra bits length conversion part, DO IT
+                std::size_t len_extra_bits = DeflateLZ77::get_sym_extra_bits_len(len_sym);
+                std::size_t dist_extra_bits = DeflateLZ77::get_dist_extra_bits_len(dist_sym);
 
+                bit_encoder.encode_bits(litlen_codes[len_sym], litlen_code_lens[len_sym]);
+                bit_encoder.encode_bits(std::bitset<5>(len_extra), len_extra_bits);
+                bit_encoder.encode_bits(dist_codes[dist_sym], dist_code_lens[dist_sym]);
+                bit_encoder.encode_bits(std::bitset<13>(dist_extra), dist_extra_bits);
             } else [[unlikely]] {
                 throw Exception<Encoder>("invalid token");
             }
         }
-        return "not ready";
+        bit_encoder.encode_bits(litlen_codes[term_sym], litlen_code_lens[term_sym]);
     }
 
     std::tuple<std::span<CodeLen>, std::span<CodeLen>> find_code_lens(
@@ -272,8 +308,8 @@ private:
 
                 ++litlen_freq[lit_len_sym];
                 ++dist_freq[dist_sym];
-                ++i;
 
+                ++i;
                 if (i == data.size()) [[unlikely]]
                     throw Exception<Encoder>("expected a distance extra bits token");
             } else [[unlikely]] {
@@ -286,10 +322,43 @@ private:
     BitEncoder& bit_encoder;
 };
 
+template<DeflatePolicy Policy>
+template<typename Char, std::size_t char_size, std::input_iterator InIt, typename... InItEnd>
+    requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(InItEnd) <= 1)
+class Deflate<Policy>::Decoder {
+public:
+    using BitDecoder = misc::BitDecoder<Char, char_size, InIt, InItEnd...>;
+
+    explicit Decoder(BitDecoder& bit_decoder) : bit_decoder(bit_decoder)
+    {
+    }
+
+    template<std::output_iterator<char> OutIt, typename... OutItEnd>
+    Error<Decoder, OutIt> decode(OutIt out_it, OutItEnd... out_it_end)
+    {
+        decode_header_bits();
+    }
+
+    std::pair<bool, Error<Decoder>> decode_header_bits()
+    {
+        std::bitset<3> header_bits {};
+        const bool s = bit_decoder.decode_bits(header_bits);
+        Error<Decoder> e = s ? success : Error<Decoder>("failed decoding header bits");
+        return std::make_pair(header_bits[2], e);
+    }
+
+    Error<Decoder> decode_data()
+    {
+    }
+
+private:
+    BitDecoder& bit_decoder;
+};
+
 template<bool final_block = false,
          typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
-         std::input_iterator InIt = typename std::vector<Char>::iterator,
+         std::input_iterator InIt = typename std::vector<char>::iterator,
          std::output_iterator<Char> OutIt = typename std::vector<Char>::iterator, typename ...OutItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(OutItEnd) <= 1)
 inline std::tuple<InIt, Error<>> deflate(misc::BitEncoder<char, CHAR_BIT, OutIt, OutItEnd...>& bit_encoder,
@@ -301,7 +370,7 @@ inline std::tuple<InIt, Error<>> deflate(misc::BitEncoder<char, CHAR_BIT, OutIt,
 
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
-         std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
+         std::output_iterator<char> OutIt = typename std::vector<char>::iterator,
          std::input_iterator InIt = typename std::vector<Char>::iterator, typename ...InItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(InItEnd) <= 1)
 std::tuple<OutIt, Error<>> inflate(OutIt out_it, OutIt out_it_end,
@@ -334,7 +403,7 @@ std::tuple<InIt, OutIt, Error<>> deflate(const DeflateParams& deflate_params,
 
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
-         std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
+         std::output_iterator<char> OutIt = typename std::vector<char>::iterator,
          std::input_iterator InIt = typename std::vector<Char>::iterator, typename ...InItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(InItEnd) <= 1)
 std::tuple<OutIt, InIt, Error<>> inflate(OutIt out_it, OutIt out_it_end, InIt in_it, InItEnd... in_it_end)

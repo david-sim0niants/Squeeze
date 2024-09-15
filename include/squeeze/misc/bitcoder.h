@@ -53,20 +53,20 @@ public:
 
     /* Encode the bitset. */
     template<std::size_t nr_bits>
-    inline std::size_t encode_bits(const std::bitset<nr_bits>& bits)
+    inline bool encode_bits(const std::bitset<nr_bits>& bits)
     {
         return encode_bits(bits, nr_bits);
     }
 
     /* Encode the bitset with a custom number of bits. */
     template<std::size_t max_nr_bits>
-    std::size_t encode_bits(const std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
+    bool encode_bits(const std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
     {
         encode_mid_bits(bits, nr_bits);
-        if constexpr (max_nr_bits + 1 >= 2 * char_size)
+        if constexpr (char_size < max_nr_bits)
             encode_main_bits(bits, nr_bits);
         encode_remainder_bits(bits, nr_bits);
-        return nr_bits;
+        return 0 == nr_bits;
     }
 
     /* Zero-pad remaining bits and flush them. */
@@ -90,6 +90,12 @@ public:
     inline OutIt get_it() const
     {
         return seq.it;
+    }
+
+    /* Check if there's space to write bits to. */
+    inline bool is_valid() const noexcept
+    {
+        return seq.is_valid();
     }
 
     /* Continue by using a different unbounded iterator. */
@@ -150,8 +156,13 @@ private:
         nr_bits = 0;
     }
 
+    /* Stores the not yet fully encoded character. */
     Char mid_chr {};
+    /* Stores the number of bits left to write to get a fully encoded character.
+     * Can also be thought of as a position of the unwritten bit stream within the mid char.
+     * It's the opposite of Decoder::mid_pos and its initial value is char_size. */
     std::size_t mid_off = char_size;
+    /* Output character sequence. */
     Seq seq;
 };
 
@@ -195,31 +206,29 @@ public:
 
     /* Decode the bitset. */
     template<std::size_t nr_bits>
-    std::size_t decode_bits(std::bitset<nr_bits>& bits)
+    bool decode_bits(std::bitset<nr_bits>& bits)
     {
         return decode_bits(bits, nr_bits);
     }
 
     /* Decode the bitset with a custom number of bits. */
     template<std::size_t max_nr_bits>
-    std::size_t decode_bits(std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
+    bool decode_bits(std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
     {
         decode_mid_bits(bits, nr_bits);
-        if constexpr (max_nr_bits + 1 >= 2 * char_size)
+        if constexpr (char_size < max_nr_bits)
             decode_main_bits(bits, nr_bits);
         if (0 != nr_bits)
             decode_remainder_bits(bits, nr_bits);
-        return nr_bits;
+        return 0 == nr_bits;
     }
 
     /* Read a single bit. */
-    bool read_bit(std::size_t& nr_bits_unread)
+    bool read_bit()
     {
         if (0 == mid_pos) {
-            if (not seq.is_valid()) {
-                ++nr_bits_unread;
+            if (not seq.is_valid())
                 return false;
-            }
 
             mid_chr = *seq.it; ++seq.it;
             mid_pos = char_size;
@@ -253,6 +262,12 @@ public:
         return seq.it;
     }
 
+    /* Check if there's space to read bits from. */
+    inline bool is_valid() const noexcept
+    {
+        return seq.is_valid() || 0 != mid_pos;
+    }
+
     /* Continue by using a different unbounded iterator. */
     template<std::input_iterator NextInIt>
     inline auto continue_by(NextInIt next_it) const
@@ -275,18 +290,17 @@ public:
     }
 
     /* Make a bit-reader iterator. */
-    auto make_bit_reader_iterator(std::size_t& nr_bits_unread)
+    auto make_bit_reader_iterator()
     {
         struct ReadBitFunctor {
             BitDecoder *self;
-            std::size_t *nr_bits_unread;
 
             inline bool operator()() const
             {
-                return self->read_bit(*nr_bits_unread);
+                return self->read_bit();
             }
         };
-        return utils::FunctionInputIterator(ReadBitFunctor{this, &nr_bits_unread});
+        return utils::FunctionInputIterator(ReadBitFunctor{this});
     }
 
 private:
@@ -333,8 +347,13 @@ private:
         nr_bits = 0;
     }
 
+    /* Stores the not yet fully decoded character. */
     Char mid_chr {};
+    /* Stores the number of bits left to read to get a fully decoded character.
+     * Can also be thought of as a position of the unread bit stream within the mid char.
+     * It's the opposite of BitEncoder::mid_off and its initial value is 0. */
     std::size_t mid_pos = 0;
+    /* Input character sequence. */
     Seq seq;
 };
 

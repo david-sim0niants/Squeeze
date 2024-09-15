@@ -89,8 +89,8 @@ public:
 
         auto dh_encoder = DHuffman::make_encoder(bit_encoder);
 
-        std::size_t nr_bits_left = dh_encoder.encode_nr_code_len_codes(clcl_size);
-        if (nr_bits_left) [[unlikely]]
+        bool s = dh_encoder.encode_nr_code_len_codes(clcl_size);
+        if (not s) [[unlikely]]
             return "failed encoding number of code length codes";
 
         auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
@@ -125,9 +125,9 @@ public:
 
         auto huffman_encoder = Huffman<Policy>::make_encoder(bit_encoder);
         if constexpr (use_term)
-            in_it = huffman_encoder.encode_syms(codes.begin(), code_lens.begin(), in_it, in_it_end, term_sym);
+            in_it = huffman_encoder.encode_syms(codes.data(), code_lens.data(), in_it, in_it_end, term_sym);
         else
-            in_it = huffman_encoder.encode_syms(codes.begin(), code_lens.begin(), in_it, in_it_end);
+            in_it = huffman_encoder.encode_syms(codes.data(), code_lens.data(), in_it, in_it_end);
         return {in_it, success};
     }
 
@@ -154,8 +154,8 @@ public:
         auto dh_decoder = DHuffman::make_decoder(bit_decoder);
 
         std::size_t clcl_size = 0;
-        std::size_t nr_bits_left = dh_decoder.decode_nr_code_len_codes(clcl_size);
-        if (nr_bits_left) [[unlikely]]
+        bool s = dh_decoder.decode_nr_code_len_codes(clcl_size);
+        if (not s) [[unlikely]]
             return "failed decoding number of code lengths codes";
 
         std::array<CodeLenCodeLen, DHuffman::code_len_alphabet_size> clcl {};
@@ -215,7 +215,7 @@ private:
  * Return input iterator at the point when encoding stopped and an error or success message. */
 template<bool use_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        std::input_iterator InIt = typename std::vector<Char>::iterator,
+        std::input_iterator InIt = typename std::vector<char>::iterator,
         std::output_iterator<Char> OutIt = typename std::vector<Char>::iterator,
         typename ...OutItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
@@ -248,7 +248,7 @@ inline std::tuple<OutIt, Error<>> huffman15_decode(
 /* Encode data using Huffman15. Return (InIt, OutIt, Error) triple at the point when encoding stopped. */
 template<bool use_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        std::input_iterator InIt = typename std::vector<Char>::iterator,
+        std::input_iterator InIt = typename std::vector<char>::iterator,
         std::output_iterator<Char> OutIt = typename std::vector<Char>::iterator,
         typename ...OutItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
@@ -273,7 +273,7 @@ std::tuple<InIt, OutIt, Error<>> huffman15_encode(
 /* Decode data using Huffman15. Return (OutIt, InIt, Error) triple at the point when decoding stopped. */
 template<bool expect_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
-        std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
+        std::output_iterator<char> OutIt = typename std::vector<char>::iterator,
         std::input_iterator InIt = typename std::vector<Char>::iterator,
         typename ...InItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&

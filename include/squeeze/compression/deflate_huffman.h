@@ -134,9 +134,9 @@ private:
     static void update_code_len_sym_freqs(CodeLen code_len, std::size_t nr_reps,
             CodeLenFreq& code_len_sym, CodeLenFreq& sym16, CodeLenFreq& sym17, CodeLenFreq& sym18)
     {
-        // the symbol '16' can encode 3-6 repetitions of the previous non-zero code length
-        // the symbol '17' can encode 3-10  repetitions of zero code lengths
-        // the symbol '18' can encode 11-138  repetitions of zero code lengths
+        // extra bits of symbol '16' can encode 3-6 repetitions of the previous non-zero code length
+        // extra bits of symbol '17' can encode 3-10  repetitions of zero code lengths
+        // extra bits of symbol '18' can encode 11-138  repetitions of zero code lengths
         // for repetitions less than 3, the code length is simply repeated
 
         if (0 == code_len) {
@@ -166,7 +166,7 @@ public:
     }
 
     /* Encode the number of code length codes. Encodes (n - 4) in a 4 bit integer code. */
-    inline std::size_t encode_nr_code_len_codes(std::size_t n)
+    inline bool encode_nr_code_len_codes(std::size_t n)
     {
         assert(n >= min_nr_code_len_codes);
         assert(n <= min_nr_code_len_codes + 15);
@@ -177,17 +177,16 @@ public:
     template<std::input_iterator CodeLenCodeLenIt>
     CodeLenCodeLenIt encode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
     {
-        for (; clcl_it != clcl_it_end &&
-               (0 == bit_encoder.encode_bits(std::bitset<3>(*clcl_it))); ++clcl_it);
+        for (; clcl_it != clcl_it_end && bit_encoder.encode_bits(std::bitset<3>(*clcl_it)); ++clcl_it);
         return clcl_it;
     }
 
     /* Encode a single code length with its repetitions. */
     template<RandomAccessInputIterator CodeLenCodeIt, RandomAccessInputIterator CodeLenCodeLenIt>
-    std::size_t encode_code_rep_len(CodeLenCodeIt clc_it, CodeLenCodeLenIt clcl_it,
+    bool encode_code_rep_len(CodeLenCodeIt clc_it, CodeLenCodeLenIt clcl_it,
             std::size_t nr_reps, CodeLen code_len)
     {
-        std::size_t nr_bits_left = 0;
+        bool s = true;
         const CodeLenCode clc = clc_it[code_len_indices[code_len]];
         const CodeLenCodeLen clcl = clcl_it[code_len_indices[code_len]];
 
@@ -197,47 +196,47 @@ public:
             const CodeLenCode clc17 = clc_it[code_len_indices[0x11]];
             const CodeLenCodeLen clcl17 = clcl_it[code_len_indices[0x11]];
 
-            while (nr_reps >= 138) {
-                nr_bits_left += bit_encoder.encode_bits(clc18, clcl18);
-                nr_bits_left += bit_encoder.encode_bits(std::bitset<7>(0x7F));
+            while (s && nr_reps >= 138) {
+                s = bit_encoder.encode_bits(clc18, clcl18) &&
+                    bit_encoder.encode_bits(std::bitset<7>(0x7F));
                 nr_reps -= 138;
             }
 
-            if (nr_reps >= 11) {
-                nr_bits_left += bit_encoder.encode_bits(clc18, clcl18);
-                nr_bits_left += bit_encoder.encode_bits(std::bitset<7>(nr_reps - 11));
+            if (s && nr_reps >= 11) {
+                s = bit_encoder.encode_bits(clc18, clcl18) &&
+                    bit_encoder.encode_bits(std::bitset<7>(nr_reps - 11));
             }
-            else if (nr_reps >= 3) {
-                nr_bits_left += bit_encoder.encode_bits(clc17, clcl17);
-                nr_bits_left += bit_encoder.encode_bits(std::bitset<3>(nr_reps - 3));
+            else if (s && nr_reps >= 3) {
+                s = bit_encoder.encode_bits(clc17, clcl17) &&
+                    bit_encoder.encode_bits(std::bitset<3>(nr_reps - 3));
             }
         } else {
             const CodeLenCode clc16 = clc_it[code_len_indices[0x10]];
             const CodeLenCodeLen clcl16 = clcl_it[code_len_indices[0x10]];
 
-            nr_bits_left += bit_encoder.encode_bits(clc, clcl);
+            bit_encoder.encode_bits(clc, clcl);
             --nr_reps;
-            while (nr_reps >= 6) {
-                nr_bits_left += bit_encoder.encode_bits(clc16, clcl16);
-                nr_bits_left += bit_encoder.encode_bits(std::bitset<2>(3));
+            while (s && nr_reps >= 6) {
+                s = bit_encoder.encode_bits(clc16, clcl16) &&
+                    bit_encoder.encode_bits(std::bitset<2>(3));
                 nr_reps -= 6;
             }
-            if (nr_reps >= 3) {
-                nr_bits_left += bit_encoder.encode_bits(clc16, clcl16);
-                nr_bits_left += bit_encoder.encode_bits(std::bitset<2>(nr_reps - 3));
+            if (s && nr_reps >= 3) {
+                s = bit_encoder.encode_bits(clc16, clcl16) &&
+                    bit_encoder.encode_bits(std::bitset<2>(nr_reps - 3));
             }
         }
 
         switch (nr_reps) {
         case 2:
-            nr_bits_left += bit_encoder.encode_bits(clc, clcl);
+            s = bit_encoder.encode_bits(clc, clcl);
         case 1:
-            nr_bits_left += bit_encoder.encode_bits(clc, clcl);
+            s = bit_encoder.encode_bits(clc, clcl);
         default:
             break;
         }
 
-        return nr_bits_left;
+        return s;
     }
 
     /* Encode code length symbols. */
@@ -252,7 +251,7 @@ public:
         while (true) {
             CodeLen curr_len = *cl_it; ++cl_it;
             auto [nr_reps, next_len] = count_code_len_freq(curr_len, cl_it, cl_it_end);
-            if (encode_code_rep_len(clc_it, clcl_it, nr_reps, curr_len) || curr_len == next_len)
+            if (not encode_code_rep_len(clc_it, clcl_it, nr_reps, curr_len) or curr_len == next_len)
                 break;
         }
 
@@ -276,12 +275,12 @@ public:
     }
 
     /* Decode the number of code length codes. Returns (decoded 4 bit integer + 4). */
-    inline std::size_t decode_nr_code_len_codes(std::size_t& n)
+    inline bool decode_nr_code_len_codes(std::size_t& n)
     {
         std::bitset<4> bits;
-        const std::size_t nr_bits_left = bit_decoder.decode_bits(bits);
+        bool s = bit_decoder.decode_bits(bits);
         n = bits.to_ullong() + min_nr_code_len_codes;
-        return nr_bits_left;
+        return s;
     }
 
     /* Decode code lengths for the code length alphabet. */
@@ -289,17 +288,17 @@ public:
     CodeLenCodeLenIt decode_code_len_code_lens(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end)
     {
         std::bitset<3> bits;
-        for (; clcl_it != clcl_it_end && (0 == bit_decoder.decode_bits(bits)); ++clcl_it)
+        for (; clcl_it != clcl_it_end && bit_decoder.decode_bits(bits); ++clcl_it)
             *clcl_it = bits.to_ulong();
         return clcl_it;
     }
 
     /* Decode a single code length with its repetitions. */
-    std::size_t decode_code_len_sym(const HuffmanTreeNode *node, std::size_t& nr_reps, CodeLen& code_len)
+    bool decode_code_len_sym(const HuffmanTreeNode *node, std::size_t& nr_reps, CodeLen& code_len)
     {
-        std::size_t nr_bits_left = 0;
+        bool s = true;
         const unsigned int symbol_index = node->find_symbol(
-                bit_decoder.make_bit_reader_iterator(nr_bits_left));
+                bit_decoder.make_bit_reader_iterator());
         if (symbol_index >= code_len_alphabet_size)
             throw Exception<Decoder>("invalid symbol index in a Huffman tree node");
 
@@ -308,14 +307,14 @@ public:
         case 0x10:
         {
             std::bitset<2> extra_bits;
-            nr_bits_left += bit_decoder.decode_bits(extra_bits);
+            s = bit_decoder.decode_bits(extra_bits);
             nr_reps = extra_bits.to_ullong() + 3;
             break;
         }
         case 0x11:
         {
             std::bitset<3> extra_bits;
-            nr_bits_left += bit_decoder.decode_bits(extra_bits);
+            s = bit_decoder.decode_bits(extra_bits);
             code_len = 0;
             nr_reps = extra_bits.to_ullong() + 3;
             break;
@@ -323,7 +322,7 @@ public:
         case 0x12:
         {
             std::bitset<7> extra_bits;
-            nr_bits_left += bit_decoder.decode_bits(extra_bits);
+            s = bit_decoder.decode_bits(extra_bits);
             code_len = 0;
             nr_reps = extra_bits.to_ullong() + 11;
             break;
@@ -334,16 +333,15 @@ public:
             break;
         }
 
-        return nr_bits_left;
+        return s;
     }
 
     /* Decode code length symbols. */
     template<std::output_iterator<CodeLen> CodeLenIt>
     CodeLenIt decode_code_len_syms(const HuffmanTreeNode *tree_root, CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
-        std::size_t nr_bits_left = 0;
         std::size_t nr_reps = 0; CodeLen code_len = 0;
-        while (cl_it != cl_it_end && (0 == decode_code_len_sym(tree_root, nr_reps, code_len)))
+        while (cl_it != cl_it_end && decode_code_len_sym(tree_root, nr_reps, code_len))
             for (; nr_reps != 0 && cl_it != cl_it_end; --nr_reps, ++cl_it)
                 *cl_it = code_len;
         return cl_it;

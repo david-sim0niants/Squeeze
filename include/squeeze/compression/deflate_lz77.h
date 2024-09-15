@@ -133,6 +133,26 @@ public:
         return success;
     }
 
+    inline static constexpr std::size_t get_sym_extra_bits_len(LenSym len_sym)
+    {
+        if (len_sym > max_len_sym) [[unlikely]]
+            throw Exception<DeflateLZ77>("invalid length symbol");
+        else if (len_sym <= 7 || len_sym == max_len_sym)
+            return 0;
+        else
+            return len_sym / 4 - 1;
+    }
+
+    inline static constexpr std::size_t get_dist_extra_bits_len(DistSym dist_sym)
+    {
+        if (dist_sym > max_dist_sym) [[unlikely]]
+            throw Exception<DeflateLZ77>("invalid distance symbol");
+        else if (dist_sym <= 1)
+            return 0;
+        else
+            return dist_sym / 2 - 1;
+    }
+
     /* Make an encoder from the provided input iterator(s). */
     template<std::input_iterator InIt, typename... InItEnd>
     inline static auto make_encoder(InIt in_it, InItEnd... in_it_end)
