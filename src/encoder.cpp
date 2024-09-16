@@ -113,21 +113,6 @@ void EncoderPool::threaded_task_run()
     scheduler.run<misc::TaskRunPolicy::NoWait>();
 }
 
-template<bool use_terminator, std::input_iterator In, std::output_iterator<char> Out>
-static auto encode_block(In in, In in_end, Out out, const CompressionParams& compression)
-{
-    switch (compression.method) {
-        using enum compression::CompressionMethod;
-    case Huffman:
-        return compression::compress<Huffman, use_terminator>(in, in_end, out);
-    case Deflate:
-        return compression::compress<Deflate, use_terminator>(in, in_end, out);
-        break;
-    default:
-        throw BaseException("invalid compression method or an unimplemented one");
-    }
-}
-
 Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression)
 {
     if (compression.method == compression::CompressionMethod::None) {
@@ -135,16 +120,12 @@ Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& co
         return success;
     }
 
-    // use terminator mark only when the encoded buffer size is less than the block size,
-    const bool use_term = in.size() < compression::get_block_size(compression);
+    using namespace compression;
+    using enum compression::CompressionFlags;
 
-    auto e = use_term ?
-        std::get<2>(encode_block<true> (in.begin(), in.end(), std::back_inserter(out), compression))
-        :
-        std::get<2>(encode_block<false>(in.begin(), in.end(), std::back_inserter(out), compression))
-    ;
-
-    return e ? Error<>{"failed encoding buffer", e.report()} : success;
+    const bool final_block = in.size() < compression::get_block_size(compression);
+    const CompressionFlags flags = utils::switch_flag(FinalBlock, final_block);
+    return std::get<2>(compress(in.begin(), in.end(), compression, flags, std::back_inserter(out))).error;
 }
 
 Error<> encode(std::istream& in, std::size_t size, std::ostream& out,

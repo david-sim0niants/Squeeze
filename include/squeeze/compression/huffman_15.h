@@ -197,7 +197,7 @@ public:
         HuffmanTree tree;
         auto ee = tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());
         if (ee)
-            return {out_it, "failed building a Huffman tree"};
+            return {out_it, {"failed building a Huffman tree", ee.report()}};
 
         auto huffman_decoder = Huffman<Policy>::make_decoder(bit_decoder);
         if constexpr (expect_term)

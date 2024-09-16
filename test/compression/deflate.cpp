@@ -21,6 +21,7 @@ TEST_P(DeflateTest, EncodeDecode)
 {
     std::vector<char> data {std::get<0>(GetParam())->get_data()};
     DeflateParams deflate_params = std::get<1>(GetParam());
+    deflate_params.header_bits = DeflateHeaderBits::FinalBlock | DeflateHeaderBits::DynamicHuffman;
     std::vector<char> buffer;
 
     auto [in_it, out_it, e] = deflate(deflate_params, data.begin(), data.end(), std::back_inserter(buffer));
@@ -32,7 +33,8 @@ TEST_P(DeflateTest, EncodeDecode)
 
     std::vector<char> rest_data (data.size());
     {
-        auto [out_it, in_it, e] = inflate(rest_data.begin(), rest_data.end(), buffer.begin(), buffer.end());
+        auto [out_it, in_it, header_bits, e] =
+            inflate(rest_data.begin(), rest_data.end(), buffer.begin(), buffer.end());
         EXPECT_EQ(out_it, rest_data.end());
         EXPECT_EQ(in_it, buffer.end());
         EXPECT_TRUE(e.successful()) << e.report();

@@ -8,31 +8,19 @@
 
 namespace squeeze {
 
-template<std::output_iterator<char> Out, std::input_iterator In>
-auto decode_block(Out out, Out out_end, In in, In in_end, const CompressionParams& compression)
-{
-    switch (compression.method) {
-        using enum compression::CompressionMethod;
-    case Huffman:
-        return compression::decompress<Huffman, true>(out, out_end, in, in_end);
-    case Deflate:
-        return compression::decompress<Deflate, true>(out, out_end, in, in_end);
-    default:
-        throw BaseException("invalid compression method or an unimplemented one");
-    }
-}
-
 Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const CompressionParams& compression)
 {
+    using namespace compression;
+    using CompressionFlags::ExpectFinalBlock;
     SQUEEZE_TRACE();
 
-    if (compression.method == compression::CompressionMethod::None) {
+    if (compression.method == CompressionMethod::None) {
         SQUEEZE_TRACE("Compression method is none, plain copying...");
         auto e = utils::ioscopy(in, in.tellg(), out, out.tellp(), size);
         return e ? Error<>{"failed copying stream", e.report()} : success;
     }
 
-    const std::size_t outbuf_size = compression::get_block_size(compression);
+    const std::size_t outbuf_size = get_block_size(compression);
     Buffer outbuf(outbuf_size);
     misc::InputSubstream insub(in, size);
 
@@ -42,11 +30,12 @@ Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const Comp
     auto in_it_end = insub.end();
 
     while (in_it != in_it_end) {
-        Error<> e;
-        std::tie(out_it, in_it, e) = decode_block(out_it, out_it_end, in_it, in_it_end, compression);
-        if (e) [[unlikely]] {
+        DecompressionResult result;
+        std::tie(out_it, in_it, result) =
+            decompress(out_it, out_it_end, compression, ExpectFinalBlock, in_it, in_it_end);
+        if (result.error) [[unlikely]] {
             SQUEEZE_ERROR("Failed decoding buffer");
-            return {"failed decoding buffer", e.report()};
+            return {"failed decoding buffer", result.error.report()};
         }
 
         if (in_it == in_it_end) {

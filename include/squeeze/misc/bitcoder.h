@@ -87,7 +87,13 @@ public:
     }
 
     /* Get the current iterator. */
-    inline OutIt get_it() const
+    inline OutIt& get_it()
+    {
+        return seq.it;
+    }
+
+    /* Get the current iterator. */
+    inline const OutIt& get_it() const
     {
         return seq.it;
     }
@@ -257,7 +263,13 @@ public:
     }
 
     /* Get the current iterator. */
-    inline InIt get_it() const
+    inline InIt& get_it()
+    {
+        return seq.it;
+    }
+
+    /* Get the current iterator. */
+    inline const InIt& get_it() const
     {
         return seq.it;
     }
