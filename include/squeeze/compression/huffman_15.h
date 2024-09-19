@@ -75,34 +75,10 @@ public:
     {
     }
 
-    /* Encode code lengths. */
     template<std::forward_iterator CodeLenIt>
-    Error<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    inline Error<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
-        std::array<CodeLenCodeLen, DHuffman::code_len_alphabet_size> clcl {};
-        DHuffman::find_code_len_code_lens(cl_it, cl_it_end, clcl.begin());
-        std::array<CodeLenCode, DHuffman::code_len_alphabet_size> clc {};
-        DHuffman::gen_code_len_codes(clcl.begin(), clcl.end(), clc.begin());
-
-        std::size_t clcl_size = clcl.size();
-        for (; clcl_size > DHuffman::min_nr_code_len_codes && clcl[clcl_size - 1] == 0; --clcl_size);
-
-        auto dh_encoder = DHuffman::make_encoder(bit_encoder);
-
-        bool s = dh_encoder.encode_nr_code_len_codes(clcl_size);
-        if (not s) [[unlikely]]
-            return "failed encoding number of code length codes";
-
-        auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
-        clcl_it = dh_encoder.encode_code_len_code_lens(clcl.begin(), clcl.begin() + clcl_size);
-        if (clcl_it != clcl_it_end) [[unlikely]]
-            return "failed encoding code lengths for the code length alphabet";
-
-        cl_it = dh_encoder.encode_code_len_syms(clc.begin(), clcl.begin(), cl_it, cl_it_end);
-        if (cl_it != cl_it_end) [[unlikely]]
-            return "failed encoding code lengths";
-
-        return success;
+        return DHuffman::make_encoder(bit_encoder).encode_code_lens(cl_it,  cl_it_end);
     }
 
     /* Encode data. Generates and encodes the code lengths and the main data. */
@@ -147,37 +123,10 @@ public:
     {
     }
 
-    /* Decode code lengths. */
     template<std::output_iterator<CodeLen> CodeLenIt>
-    Error<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    inline Error<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
-        auto dh_decoder = DHuffman::make_decoder(bit_decoder);
-
-        std::size_t clcl_size = 0;
-        bool s = dh_decoder.decode_nr_code_len_codes(clcl_size);
-        if (not s) [[unlikely]]
-            return "failed decoding number of code lengths codes";
-
-        std::array<CodeLenCodeLen, DHuffman::code_len_alphabet_size> clcl {};
-        auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
-
-        clcl_it = dh_decoder.decode_code_len_code_lens(clcl_it, clcl_it_end);
-        if (clcl_it != clcl_it_end) [[unlikely]]
-            return "failed decoding code lengths for the code length alphabet";
-        else if (not DHuffman::validate_code_len_code_lens(clcl.begin(), clcl_it_end)) [[unlikely]]
-            return "invalid code lengths for the code length alphabet decoded";
-
-        std::array<CodeLenCode, DHuffman::code_len_alphabet_size> clc {};
-        DHuffman::gen_code_len_codes(clcl.begin(), clcl.begin() + clcl_size, clc.begin());
-        HuffmanTree tree;
-        tree.build_from_codes(clc.begin(),  clc.begin() + clcl_size,
-                             clcl.begin(), clcl.begin() + clcl_size);
-
-        cl_it = dh_decoder.decode_code_len_syms(tree.get_root(), cl_it, cl_it_end);
-        if (cl_it != cl_it_end) [[unlikely]]
-            return "failed decoding code lengths";
-        else
-            return success;
+        return DHuffman::make_decoder(bit_decoder).decode_code_lens(cl_it, cl_it_end);
     }
 
     /* Decode data. Decodes the code lengths and the main data. */
@@ -263,7 +212,7 @@ std::tuple<InIt, OutIt, Error<>> huffman15_encode(
     std::tie(in_it, e) = huffman15_encode<use_term>(bit_encoder, in_it, in_it_end);
     out_it = bit_encoder.get_it();
     if (e)
-        return std::make_tuple(in_it, out_it, e);
+        return std::make_tuple(in_it, out_it, std::move(e));
 
     bit_encoder.finalize();
     out_it = bit_encoder.get_it();
@@ -286,7 +235,7 @@ std::tuple<OutIt, InIt, Error<>> huffman15_decode(
     Error<> e;
     std::tie(out_it, e) = huffman15_decode<expect_term>(out_it, out_it_end, bit_decoder);
     in_it = bit_decoder.get_it();
-    return std::make_tuple(out_it, in_it, e);
+    return std::make_tuple(out_it, in_it, std::move(e));
 }
 
 }

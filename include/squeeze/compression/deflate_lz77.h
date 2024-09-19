@@ -34,9 +34,9 @@ public:
     /* Up to 13 bits of distance extra bits */
     using DistExtra = uint16_t;
 
-    /* Represents a range of lengths [3-258] */
+    /* Represents the range of lengths [3-258] */
     using PackedLen = uint8_t;
-    /* Represents a range of distances [1-32768] */
+    /* Represents the range of distances [1-32768] */
     using PackedDist = uint16_t;
 
     class PackedToken;
@@ -126,14 +126,14 @@ public:
         }
 
         const auto p = dist_sym / 2 - 1;
-        if (dist_extra >= (1 << p)) [[unlikely]]
+        if (dist_extra >= (DistExtra(1) << p)) [[unlikely]]
             return "invalid distance extra bits";
 
         dist = unpack_dist((static_cast<PackedDist>(dist_sym % 2 + 2) << p) + dist_extra);
         return success;
     }
 
-    inline static constexpr std::size_t get_sym_extra_bits_len(LenSym len_sym)
+    inline static constexpr std::size_t get_nr_len_extra_bits(LenSym len_sym)
     {
         if (len_sym > max_len_sym) [[unlikely]]
             throw Exception<DeflateLZ77>("invalid length symbol");
@@ -143,7 +143,7 @@ public:
             return len_sym / 4 - 1;
     }
 
-    inline static constexpr std::size_t get_dist_extra_bits_len(DistSym dist_sym)
+    inline static constexpr std::size_t get_nr_dist_extra_bits(DistSym dist_sym)
     {
         if (dist_sym > max_dist_sym) [[unlikely]]
             throw Exception<DeflateLZ77>("invalid distance symbol");
@@ -257,7 +257,7 @@ public:
     /* Get length extra bits. */
     constexpr inline LenExtra get_len_extra() const noexcept
     {
-        return static_cast<LenExtra>((data >> 10) & sym_mask);
+        return static_cast<LenExtra>((data >> 10) & len_extra_mask);
     }
 
     /* Get distance symbol. */

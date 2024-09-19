@@ -1,6 +1,9 @@
 #pragma once
 
+#include <array>
+
 #include "huffman.h"
+#include "squeeze/error.h"
 
 namespace squeeze::compression {
 
@@ -258,6 +261,35 @@ public:
         return cl_it;
     }
 
+    /* Encode code lengths. */
+    template<std::forward_iterator CodeLenIt>
+    Error<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    {
+        std::array<CodeLenCodeLen, code_len_alphabet_size> clcl {};
+        find_code_len_code_lens(cl_it, cl_it_end, clcl.begin());
+
+        std::array<CodeLenCode, code_len_alphabet_size> clc {};
+        gen_code_len_codes(clcl.begin(), clcl.end(), clc.begin());
+
+        std::size_t clcl_size = clcl.size();
+        for (; clcl_size > min_nr_code_len_codes && clcl[clcl_size - 1] == 0; --clcl_size);
+
+        bool s = encode_nr_code_len_codes(clcl_size);
+        if (not s) [[unlikely]]
+            return "failed encoding number of code length codes";
+
+        auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
+        clcl_it = encode_code_len_code_lens(clcl.begin(), clcl.begin() + clcl_size);
+        if (clcl_it != clcl_it_end) [[unlikely]]
+            return "failed encoding code lengths for the code length alphabet";
+
+        cl_it = encode_code_len_syms(clc.begin(), clcl.begin(), cl_it, cl_it_end);
+        if (cl_it != cl_it_end) [[unlikely]]
+            return "failed encoding code lengths";
+
+        return success;
+    }
+
 private:
     BitEncoder& bit_encoder;
 };
@@ -298,8 +330,10 @@ public:
     {
         bool s = true;
         const unsigned int symbol_index = node->find_symbol(
-                bit_decoder.make_bit_reader_iterator());
-        if (symbol_index >= code_len_alphabet_size)
+                bit_decoder.make_bit_reader_iterator(s));
+        if (not s)
+            return s;
+        else if (symbol_index >= code_len_alphabet_size)
             throw Exception<Decoder>("invalid symbol index in a Huffman tree node");
 
         CodeLen code_len_sym = code_len_alphabet[symbol_index];
@@ -345,6 +379,37 @@ public:
             for (; nr_reps != 0 && cl_it != cl_it_end; --nr_reps, ++cl_it)
                 *cl_it = code_len;
         return cl_it;
+    }
+
+    /* Decode code lengths. */
+    template<std::output_iterator<CodeLen> CodeLenIt>
+    Error<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    {
+        std::size_t clcl_size = 0;
+        bool s = decode_nr_code_len_codes(clcl_size);
+        if (not s) [[unlikely]]
+            return "failed decoding number of code lengths codes";
+
+        std::array<CodeLenCodeLen, code_len_alphabet_size> clcl {};
+        auto clcl_it = clcl.begin(); auto clcl_it_end = clcl_it + clcl_size;
+
+        clcl_it = decode_code_len_code_lens(clcl_it, clcl_it_end);
+        if (clcl_it != clcl_it_end) [[unlikely]]
+            return "failed decoding code lengths for the code length alphabet";
+        else if (not validate_code_len_code_lens(clcl.begin(), clcl_it_end)) [[unlikely]]
+            return "invalid code lengths for the code length alphabet decoded";
+
+        std::array<CodeLenCode, code_len_alphabet_size> clc {};
+        gen_code_len_codes(clcl.begin(), clcl.begin() + clcl_size, clc.begin());
+        HuffmanTree tree;
+        tree.build_from_codes(clc.begin(),  clc.begin() + clcl_size,
+                             clcl.begin(), clcl.begin() + clcl_size);
+
+        cl_it = decode_code_len_syms(tree.get_root(), cl_it, cl_it_end);
+        if (cl_it != cl_it_end) [[unlikely]]
+            return "failed decoding code lengths";
+        else
+            return success;
     }
 
 private:

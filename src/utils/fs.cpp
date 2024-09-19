@@ -31,9 +31,10 @@ std::variant<std::ofstream, ErrorCode> make_regular_file_out(std::string_view pa
     if (ec)
         return ec;
 
-    std::ofstream file(path, std::ios_base::binary | std::ios_base::out);
+    std::ofstream file(path, std::ios_base::binary | std::ios_base::out | std::ios_base::app);
     if (!file)
         return ErrorCode::from_current_errno();
+    file.seekp(0, std::ios::beg);
     return file;
 }
 

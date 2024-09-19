@@ -138,7 +138,7 @@ public:
     Token encode_once()
     {
         if (cached_token.get_type() != Token::None) [[unlikely]]
-            return std::exchange(cached_token, Token()); // cache token from previous calculations
+            return std::exchange(cached_token, Token()); // return the cached token from previous calculations
 
         auto [sym, match_len, match_dist] = find_best_match();
         if (0 == match_len) {
@@ -159,7 +159,7 @@ public:
         auto [next_sym, next_match_len, next_match_dist] = find_best_match();
 
         if (next_match_len >= match_len) {
-            // lazy match actually produced a longer match, keeping in the cache token
+            // lazy match did actually produce a longer match, caching it to return in the next step
             cached_token = {next_match_len, next_match_dist};
             window.advance(next_match_len);
             return sym;
@@ -173,7 +173,7 @@ public:
     /* Check if the encoder has finished encoding with the current sequence. */
     inline bool is_finished() const noexcept
     {
-        return window.is_empty();
+        return cached_token.is_none() && window.is_empty();
     }
 
     /* Get current iterator. */
@@ -298,7 +298,7 @@ public:
         if (dist > window.size()) [[unlikely]]
             return "invalid distance that points further behind data";
         if (len > lookahead_size) [[unlikely]]
-            return "too large length";
+            return "length too large";
         decode_len_dist_raw(len, dist);
         return success;
     }
@@ -320,7 +320,7 @@ public:
     }
 
     /* Check if the decoder has finished processing tokens. If there's an unprocessed
-     * partial token, the decoder will request more output space to continue to decoding. */
+     * partial token, the decoder will request more output space to continue decoding. */
     inline bool is_finished() const noexcept
     {
         return not partial_token.is_none();
@@ -385,7 +385,7 @@ private:
 
     inline void decode_len_dist_raw(std::size_t len, std::size_t dist)
     {
-        for (; len > 0 && seq.is_valid(); --len) {
+        for (; len > 0 && seq.is_valid(); --len, ++seq.it) {
             const Sym sym = window[window.size() - dist];
             *seq.it = sym;
             window.push_back(sym);

@@ -36,13 +36,13 @@ constexpr std::array<std::size_t, lz77_nr_levels> lz77_match_insert_threshold_pe
 
 static constexpr std::size_t deflate_nr_levels = lz77_nr_levels;
 constexpr std::array<std::size_t, deflate_nr_levels> deflate_block_sizes_per_level = {
-        64 << 10,
-        64 << 10,
-        64 << 10,
-        64 << 10,
-        64 << 10,
-        64 << 10,
-        64 << 10,
+        8 << 10,
+        16 << 10,
+        16 << 10,
+        24 << 10,
+        24 << 10,
+        32 << 10,
+        32 << 10,
         64 << 10,
         64 << 10,
 };

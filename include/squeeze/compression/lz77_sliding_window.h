@@ -5,6 +5,7 @@
 #include <cassert>
 #include <deque>
 #include <tuple>
+#include <algorithm>
 
 #include "squeeze/misc/sequence.h"
 

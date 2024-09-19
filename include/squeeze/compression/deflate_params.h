@@ -51,6 +51,6 @@ template<> inline std::string squeeze::utils::stringify(const compression::Defla
 
 template<> inline std::string squeeze::utils::stringify(const compression::DeflateParams& params)
 {
-    return "{header_bits=" + stringify(params.header_bits) +
+    return "{ header_bits=" + stringify(params.header_bits) +
         ", lz77_encoder_params=" + utils::stringify(params.lz77_encoder_params) + " }";
 }

@@ -69,6 +69,20 @@ public:
         return 0 == nr_bits;
     }
 
+    /* Encode the bits represented in an integral form. */
+    template<std::integral T>
+    inline bool encode_bits(T bits, std::size_t nr_bits)
+    {
+        return encode_bits(std::bitset<sizeof(T) * CHAR_BIT>(bits), nr_bits);
+    }
+
+    /* Encode the bits represented in an integral form. */
+    template<std::size_t nr_bits, std::integral T>
+    inline bool encode_bits(T bits)
+    {
+        return encode_bits(std::bitset<nr_bits>(bits));
+    }
+
     /* Zero-pad remaining bits and flush them. */
     inline std::size_t finalize()
     {
@@ -229,17 +243,39 @@ public:
         return 0 == nr_bits;
     }
 
+    /* Decode the bits represented in an integral form. */
+    template<std::integral T>
+    bool decode_bits(T& bits, std::size_t nr_bits)
+    {
+        std::bitset<sizeof(T) * CHAR_BIT> bitset {};
+        bool s = decode_bits(bitset, nr_bits);
+        bits = static_cast<T>(bitset.to_ullong());
+        return s;
+    }
+
+    /* Decode the bits represented in an integral form. */
+    template<std::size_t nr_bits, std::integral T>
+    bool decode_bits(T& bits)
+    {
+        std::bitset<nr_bits> bitset {};
+        bool s = decode_bits(bitset, nr_bits);
+        bits = static_cast<T>(bitset.to_ullong());
+        return s;
+    }
+
     /* Read a single bit. */
-    bool read_bit()
+    bool read_bit(bool& succeeded)
     {
         if (0 == mid_pos) {
-            if (not seq.is_valid())
+            succeeded = seq.is_valid();
+            if (not succeeded)
                 return false;
 
             mid_chr = *seq.it; ++seq.it;
             mid_pos = char_size;
         }
 
+        succeeded = true;
         --mid_pos;
         const bool bit = !!(mid_chr >> mid_pos);
         mid_chr &= (Char(1) << mid_pos) - 1;
@@ -302,17 +338,23 @@ public:
     }
 
     /* Make a bit-reader iterator. */
-    auto make_bit_reader_iterator()
+    auto make_bit_reader_iterator(bool& succeded)
     {
         struct ReadBitFunctor {
-            BitDecoder *self;
+            ReadBitFunctor(BitDecoder& self, bool& succeeded)
+                : self(&self), succeeded(&succeeded)
+            {
+            }
 
             inline bool operator()() const
             {
-                return self->read_bit();
+                return self->read_bit(*succeeded);
             }
+
+            BitDecoder *self;
+            bool *succeeded;
         };
-        return utils::FunctionInputIterator(ReadBitFunctor{this});
+        return utils::FunctionInputIterator(ReadBitFunctor(*this, succeded));
     }
 
 private:
@@ -325,7 +367,7 @@ private:
         mid_pos -= nr_mid_bits;
         bits <<= nr_mid_bits;
         bits |= Bitset(static_cast<UChar>(mid_chr) >> mid_pos);
-        mid_chr &= (Char(1) << mid_pos) - 1;
+        mid_chr &= (UChar(1) << mid_pos) - 1;
         nr_bits -= nr_mid_bits;
     }
 
@@ -335,7 +377,7 @@ private:
     {
         for (; seq.is_valid() && nr_bits >= char_size; ++seq.it, nr_bits -= char_size) {
             bits <<= char_size;
-            bits |= Bitset(*seq.it);
+            bits |= Bitset(static_cast<UChar>(*seq.it));
         }
     }
 

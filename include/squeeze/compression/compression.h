@@ -196,7 +196,7 @@ private:
         std::tie(out_it, header_bits, result.error) = inflate(out_it, out_it_end, bit_decoder);
         const bool final_block = utils::test_flag(header_bits, DeflateHeaderBits::FinalBlock);
         result.flags = utils::switch_flag(DecompressionResult::FinalBlock, final_block);
-        return std::make_tuple(out_it, result);
+        return std::make_tuple(out_it, std::exchange(result, DecompressionResult()));
     }
 
     BitDecoder& bit_decoder;

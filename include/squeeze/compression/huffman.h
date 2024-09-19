@@ -351,9 +351,10 @@ private:
             unsigned int term_idx, Idx2Sym idx2sym)
         requires std::convertible_to<std::invoke_result_t<Idx2Sym, unsigned int>, Sym>
     {
-        for (; out_it != out_it_end && bit_decoder.is_valid(); ++out_it) {
-            const unsigned int idx = root->find_symbol(bit_decoder.make_bit_reader_iterator());
-            if (expect_term && idx == term_idx)
+        for (; out_it != out_it_end; ++out_it) {
+            bool succeeded = true;
+            const unsigned int idx = root->find_symbol(bit_decoder.make_bit_reader_iterator(succeeded));
+            if (not succeeded || expect_term && idx == term_idx)
                 break;
             *out_it = idx2sym(idx);
         }
