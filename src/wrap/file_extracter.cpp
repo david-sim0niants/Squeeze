@@ -2,38 +2,41 @@
 
 namespace squeeze::wrap {
 
-Error<Reader> FileExtracter::extract(std::string_view path) const
+using Stat = FileExtracter::Stat;
+
+Stat FileExtracter::extract(std::string_view path) const
 {
     auto it = reader.find(path);
     return it == reader.end() ? "non-existing path - " + std::string(path) : reader.extract(it);
 }
 
 bool FileExtracter::extract_recursively(const std::string_view path,
-        const std::function<Error<Reader> *()>& get_err_ptr)
+        const std::function<Stat *()>& get_stat_ptr)
 {
     bool at_least_one_path_extracted = false;
     for (auto it = reader.begin(); it != reader.end(); ++it) {
         if (!utils::path_within_dir(it->second.path, path))
             continue;
         at_least_one_path_extracted = true;
-        auto *err = get_err_ptr();
-        if (err)
-            *err = reader.extract(it);
+        Stat *stat = get_stat_ptr();
+        if (stat)
+            *stat = reader.extract(it);
         else
             reader.extract(it);
     }
 
-    if (not at_least_one_path_extracted)
-        if (auto *err = get_err_ptr())
-            *err = "non-existent path - " + std::string(path);
+    Stat *stat = nullptr;
+    if (not at_least_one_path_extracted and (stat = get_stat_ptr()))
+        *stat = "non-existent path - " + std::string(path);
+
     return at_least_one_path_extracted;
 }
 
-void FileExtracter::extract_all(const std::function<Error<Reader> *()>& get_err_ptr)
+void FileExtracter::extract_all(const std::function<Stat *()>& get_stat_ptr)
 {
     for (auto it = reader.begin(); it != reader.end(); ++it)
-        if (auto *err = get_err_ptr())
-            *err = reader.extract(it);
+        if (auto *stat = get_stat_ptr())
+            *stat = reader.extract(it);
 }
 
 }

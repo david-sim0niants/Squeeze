@@ -4,12 +4,12 @@
 #include <sstream>
 
 #include "squeeze/squeeze.h"
+#include "squeeze/printing.h"
 
 #include "test_tools/generators/mockfs_gen.h"
 #include "test_tools/mock/entry_input.h"
 #include "test_tools/mock/entry_output.h"
 #include "test_common/test_data.h"
-#include "test_common/print_to.h"
 
 namespace squeeze::testing {
 
@@ -23,15 +23,14 @@ static void observe_mockfs(const mock::FileSystem& mockfs, std::ostream& os)
     auto observer =
         [&os](std::string& path, auto file)
         {
-            os << utils::stringify(file->get_attributes()) << "    " << path << std::endl;
-            return 0;
+            print_to(os, file->get_attributes(), "    ", path, '\n');
+            return false;
         };
     auto symlink_observer =
         [&os](std::string& path, std::shared_ptr<mock::Symlink> symlink)
         {
-            os << utils::stringify(symlink->get_attributes())
-               << "    " << path << " -> " << symlink->target << '\n';
-            return 0;
+            print_to(os, symlink->get_attributes(), "    ", path, " -> ", symlink->target, '\n');
+            return false;
         };
 
     mockfs.list_recursively<
@@ -110,21 +109,19 @@ template<> void test_mock_files<mock::Symlink>(
 static void encode_mockfs(Squeeze& squeeze, const mock::FileSystem& original_mockfs,
         const CompressionParams& compression)
 {
-    std::deque<Error<Writer>> write_errors;
-    auto append_file =
-        [&squeeze, &write_errors, &compression]
-        (const std::string& path, auto file)
+    std::deque<Writer::Stat> write_stats;
+    auto append_file = [&squeeze, &write_stats, &compression] (const std::string& path, auto file)
         {
-            write_errors.emplace_back();
-            squeeze.will_append<mock::EntryInput>(write_errors.back(),
-                    std::string(path), compression, file);
+            write_stats.emplace_back();
+            squeeze.will_append<mock::EntryInput>(write_stats.back(), std::string(path), compression, file);
         };
+
     original_mockfs.list_recursively<mock::RegularFile, mock::Directory, mock::Symlink>(
             append_file, append_file, append_file);
     EXPECT_TRUE(squeeze.update());
 
-    for (const auto& err : write_errors)
-        EXPECT_FALSE(err.failed()) << err.report();
+    for (const auto& stat : write_stats)
+        EXPECT_FALSE(stat.failed()) << stat.report();
 }
 
 static void decode_mockfs(Squeeze& squeeze, mock::FileSystem& restored_mockfs)
@@ -143,9 +140,8 @@ struct TestInput {
 
 void PrintTo(const TestInput& test_input, std::ostream *os)
 {
-    *os << "Squeeze test input: {prng_seed=" << test_input.prng_seed << ", compression=";
-    PrintTo(test_input.compression, os);
-    *os << '}';
+    print_to(*os, "Squeeze test input: {prng_seed=", test_input.prng_seed,
+                                     ", compression=", test_input.compression, '}');
 }
 
 class SqueezeTest : public ::testing::TestWithParam<TestInput> {

@@ -3,7 +3,7 @@
 #include <array>
 
 #include "huffman.h"
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 
 namespace squeeze::compression {
 
@@ -263,7 +263,7 @@ public:
 
     /* Encode code lengths. */
     template<std::forward_iterator CodeLenIt>
-    Error<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    StatStr encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         std::array<CodeLenCodeLen, code_len_alphabet_size> clcl {};
         find_code_len_code_lens(cl_it, cl_it_end, clcl.begin());
@@ -383,7 +383,7 @@ public:
 
     /* Decode code lengths. */
     template<std::output_iterator<CodeLen> CodeLenIt>
-    Error<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    StatStr decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         std::size_t clcl_size = 0;
         bool s = decode_nr_code_len_codes(clcl_size);

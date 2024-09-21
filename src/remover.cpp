@@ -10,11 +10,12 @@ namespace squeeze {
 struct Remover::FutureRemove {
     mutable std::string path;
     uint64_t pos, len;
-    Error<Remover> *error;
+    Stat *status;
 
-    FutureRemove(std::string&& path, uint64_t pos, uint64_t len, Error<Remover> *error)
-        : path(std::move(path)), pos(pos), len(len), error(error)
-    {}
+    FutureRemove(std::string&& path, uint64_t pos, uint64_t len, Stat *status)
+        : path(std::move(path)), pos(pos), len(len), status(status)
+    {
+    }
 };
 
 inline bool Remover::FutureRemoveCompare::operator()(const FutureRemove& a, const FutureRemove& b)
@@ -32,18 +33,18 @@ Remover::Remover(std::iostream& target) : target(target)
 
 Remover::~Remover() = default;
 
-void Remover::will_remove(const EntryIterator& it, Error<Remover> *err)
+void Remover::will_remove(const EntryIterator& it, Stat *stat)
 {
     SQUEEZE_TRACE("Will remove {}", it->second.path);
-    future_removes.emplace(std::string(it->second.path), it->first, it->second.get_encoded_full_size(), err);
+    future_removes.emplace(std::string(it->second.path), it->first, it->second.get_encoded_full_size(), stat);
 }
 
-Error<Remover> Remover::remove(const EntryIterator& it)
+Remover::Stat Remover::remove(const EntryIterator& it)
 {
-    Error<Remover> err;
-    will_remove(it, &err);
+    Stat stat;
+    will_remove(it, &stat);
     perform_removes();
-    return err;
+    return stat;
 }
 
 bool Remover::perform_removes()
@@ -65,7 +66,7 @@ bool Remover::perform_removes()
         future_removes.top().path.swap(path);
         uint64_t pos = future_removes.top().pos;
         uint64_t len = future_removes.top().len;
-        Error<Remover> *error = future_removes.top().error;
+        Stat *stat = future_removes.top().status;
 
         SQUEEZE_TRACE("Removing {}", path);
 
@@ -97,15 +98,15 @@ bool Remover::perform_removes()
         // the length of the following non-gap data
         const uint64_t mov_len = std::min(next_pos, initial_endp) - mov_pos;
         // pos - gap_len is the destination of the following non-gap data to move to
-        Error<> e = utils::iosmove(target, pos - gap_len, mov_pos, mov_len); // do the move
+        Stat s = utils::iosmove(target, pos - gap_len, mov_pos, mov_len); // do the move
 
-        if (e) [[unlikely]] {
-            SQUEEZE_ERROR("Failed performing removes, starting from '{}'", path);
+        if (s.failed()) [[unlikely]] {
+            SQUEEZE_ERROR("Failed performing removes starting from '{}'", path);
             SQUEEZE_DEBUG("pos={}, gap_len={}, mov_pos={}, mov_len={}, len={}",
                           pos, gap_len, mov_pos, mov_len, len);
 
-            if (error)
-                *error = {"failed removing '" + path + '\'', e.report()};
+            if (stat)
+                *stat = {"failed removing '" + path + '\'', s};
             return false;
         }
 

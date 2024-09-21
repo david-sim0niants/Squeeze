@@ -12,26 +12,28 @@ namespace squeeze {
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Extracter::"
 
-Error<Extracter> Extracter::extract(const EntryIterator& it)
+using Stat = Extracter::Stat;
+
+Stat Extracter::extract(const EntryIterator& it)
 {
     FileEntryOutput entry_output;
     return extract(it, entry_output);
 }
 
-Error<Extracter> Extracter::extract(const EntryIterator& it, std::ostream& output)
+Stat Extracter::extract(const EntryIterator& it, std::ostream& output)
 {
     CustomStreamEntryOutput entry_output(output);
     return extract(it, entry_output);
 }
 
-Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_output)
+Stat Extracter::extract(const EntryIterator& it, EntryOutput& entry_output)
 {
     SQUEEZE_TRACE("Extracting {}", it->second.path);
 
     auto& [pos, entry_header] = *it;
     source.seekg(pos + entry_header.get_encoded_header_size());
 
-    SQUEEZE_DEBUG("Entry header: {}", utils::stringify(entry_header));
+    SQUEEZE_DEBUG("Entry header: {}", stringify(entry_header));
 
     switch (entry_header.attributes.type) {
         using enum EntryType;
@@ -40,67 +42,67 @@ Error<Extracter> Extracter::extract(const EntryIterator& it, EntryOutput& entry_
     case Directory:
     {
         std::ostream *output;
-        auto e = entry_output.init(entry_header, output);
+        Stat s = entry_output.init(EntryHeader(entry_header), output);
         DEFER( entry_output.deinit() );
-        if (e) {
+        if (s.failed()) {
             SQUEEZE_ERROR("Failed initializing entry output");
-            return {"failed initializing entry output", e.report()};
+            return {"failed initializing entry output", s};
         }
         if (output) {
-            Error<Extracter> e = extract_stream(entry_header, *output);
-            if (e) {
+            Stat s = extract_stream(entry_header, *output);
+            if (s.failed()) {
                 SQUEEZE_ERROR("Failed extracting stream");
-                return {"failed extracting stream", e.report()};
+                return {"failed extracting stream", s};
             }
         }
-        e = entry_output.finalize();
-        if (e) {
+        s = entry_output.finalize();
+        if (s.failed()) {
             SQUEEZE_ERROR("Failed finalizing entry output");
-            return {"failed finalizing entry output", e.report()};
+            return {"failed finalizing entry output", s};
         }
         break;
     }
     case Symlink:
     {
         std::string target;
-        auto e = extract_symlink(entry_header, target);
-        if (e) {
+        Stat stat = extract_symlink(entry_header, target);
+        if (stat.failed()) {
             SQUEEZE_ERROR("Failed extracting symlink");
-            return {"failed extracting symlink", e.report()};
+            return {"failed extracting symlink", stat};
         }
 
-        e = entry_output.init_symlink(entry_header, target);
+        stat = entry_output.init_symlink(EntryHeader(entry_header), target);
         DEFER( entry_output.deinit() );
-        if (e) {
+        if (stat.failed()) {
             SQUEEZE_ERROR("Failed extracting symlink");
-            return {"failed extracting symlink", e.report()};
+            return {"failed extracting symlink", stat};
         }
-        e = entry_output.finalize();
-        if (e) {
+        stat = entry_output.finalize();
+        if (stat.failed()) {
             SQUEEZE_ERROR("Failed finalizing entry output");
-            return {"failed finalizing entry output", e.report()};
+            return {"failed finalizing entry output", stat};
         }
         break;
     }
     default:
-        return Error<Extracter>("invalid entry type");
+        return Stat("invalid entry type");
     }
     return success;
 }
 
-Error<Extracter> Extracter::extract_stream(const EntryHeader& entry_header, std::ostream& output)
+Stat Extracter::extract_stream(const EntryHeader& entry_header, std::ostream& output)
 {
     SQUEEZE_TRACE();
 
-    auto e = decode(output, entry_header.content_size, source, entry_header.compression);
-    if (e) {
+    auto s = decode(output, entry_header.content_size, source, entry_header.compression);
+    if (s.failed()) {
         SQUEEZE_ERROR("Failed decoding entry");
-        return {"failed decoding entry", e.report()};
+        return {"failed decoding entry", s};
     }
     return success;
 }
 
-Error<Extracter> Extracter::extract_symlink(const EntryHeader& entry_header, std::string& target)
+Stat Extracter::extract_symlink(const EntryHeader& entry_header, std::string& target)
 {
     SQUEEZE_TRACE();
 

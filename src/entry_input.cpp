@@ -9,6 +9,8 @@
 
 namespace squeeze {
 
+using Stat = EntryInput::Stat;
+
 void EntryInput::init_entry_header(EntryHeader& entry_header)
 {
     entry_header.major_minor_version = {version.major, version.minor};
@@ -24,13 +26,13 @@ void BasicEntryInput::init_entry_header(EntryHeader& entry_header)
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::FileEntryInput::"
 
-Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
+Stat FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
     SQUEEZE_TRACE("Opening {}", path);
 
-    auto e = init_entry_header(entry_header);
-    if (e)
-        return e;
+    auto s = init_entry_header(entry_header);
+    if (s.failed())
+        return s;
 
     switch (entry_header.attributes.type) {
         using enum EntryType;
@@ -44,7 +46,7 @@ Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& c
         std::error_code ec;
         auto symlink_target = std::filesystem::read_symlink(entry_header.path, ec);
         if (ec)
-            return {"failed reading symlink", ErrorCode(ec).report()};
+            return {"failed reading symlink", Status(ec)};
         content = symlink_target.string();
         break;
     }
@@ -52,7 +54,7 @@ Error<EntryInput> FileEntryInput::init(EntryHeader& entry_header, ContentType& c
         SQUEEZE_TRACE("'{}' is a regular file", path);
         file = std::ifstream(path, std::ios_base::binary | std::ios_base::in);
         if (!*file)
-            return {"failed opening a file"};
+            return "failed opening a file";
         content = &*file;
         break;
     default:
@@ -68,15 +70,15 @@ void FileEntryInput::deinit() noexcept
     file.reset();
 }
 
-Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
+Stat FileEntryInput::init_entry_header(EntryHeader& entry_header)
 {
     BasicEntryInput::init_entry_header(entry_header);
 
-    ErrorCode ec;
-    std::filesystem::file_status st = std::filesystem::symlink_status(entry_header.path, ec.get());
+    StatCode sc;
+    std::filesystem::file_status st = std::filesystem::symlink_status(entry_header.path, sc.get());
 
-    if (ec)
-        return {"failed getting file status of '" + entry_header.path + '\'', ec.report()};
+    if (sc.failed())
+        return {stringify("failed getting file status of '", entry_header.path, '\''), sc};
 
     switch (st.type()) {
         using enum std::filesystem::file_type;
@@ -107,7 +109,7 @@ Error<EntryInput> FileEntryInput::init_entry_header(EntryHeader& entry_header)
     }
 }
 
-Error<EntryInput> CustomContentEntryInput::init(EntryHeader& entry_header, ContentType& content)
+Stat CustomContentEntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
     init_entry_header(entry_header);
     content = this->content;

@@ -13,27 +13,27 @@ namespace squeeze::wrap {
  * specifically designed for handling files. */
 class FileAppender {
 public:
+    using Stat = Appender::Stat;
+
     explicit FileAppender(Appender& appender) : appender(appender)
     {}
 
     /* Append a file with given path and ensure the same path is not appended more than once. */
-    inline bool will_append(std::string&& path,
-            const CompressionParams& compression,
-            Error<Appender> *err = nullptr)
+    inline bool will_append(std::string&& path, const CompressionParams& compression,
+            Stat *stat = nullptr)
     {
-        return will_append(std::filesystem::path(std::move(path)), compression, err);
+        return will_append(std::filesystem::path(std::move(path)), compression, stat);
     }
 
     /* Append a file with given path and ensure the same path is not appended more than once. */
     bool will_append(const std::filesystem::path& path,
-            const CompressionParams& compression,
-            Error<Appender> *err = nullptr);
+            const CompressionParams& compression, Stat *stat = nullptr);
 
     /* Append recursively all files within the path.
-     * get_err_ptr() is supposed to provide a pointer to the subsequent error. */
+     * get_stat_ptr() is supposed to provide a pointer to the subsequent status. */
     bool will_append_recursively(const std::string_view path,
             const CompressionParams& compression,
-            const std::function<Error<Appender> *()>& get_err_ptr = [](){ return nullptr; });
+            const std::function<Stat *()>& get_stat_ptr = [](){ return nullptr; });
 
     /* Calls perform_appends() on the appender while also resetting its own state. */
     void perform_appends();
@@ -50,7 +50,7 @@ protected:
     }
 
 private:
-    bool check_append_precondit(const std::filesystem::path& path, Error<Appender> *err,
+    bool check_append_precondit(const std::filesystem::path& path, Stat *stat,
             std::string& better_path);
 
     Appender& appender;

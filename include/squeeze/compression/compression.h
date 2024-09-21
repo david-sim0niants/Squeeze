@@ -19,11 +19,11 @@ SQUEEZE_DEFINE_ENUM_LOGIC_BITWISE_OPERATORS(CompressionFlags);
 struct CompressionResult {
     CompressionResult() = default;
 
-    CompressionResult(Error<>&& error) : error(std::move(error))
+    CompressionResult(StatStr&& status) : status(std::move(status))
     {
     }
 
-    Error<> error = success;
+    StatStr status;
 };
 
 /* Stores an overall result of decompression. */
@@ -39,16 +39,16 @@ struct DecompressionResult {
     {
     }
 
-    explicit DecompressionResult(Error<>&& error) : error(std::move(error))
+    explicit DecompressionResult(StatStr&& status) : status(std::move(status))
     {
     }
 
-    DecompressionResult(int flags, Error<>&& error) : flags(flags), error(std::move(error))
+    DecompressionResult(int flags, StatStr&& status) : flags(flags), status(std::move(status))
     {
     }
 
     int flags = 0;
-    Error<> error = success;
+    StatStr status = success;
 };
 
 /* The compressor interface. */
@@ -104,7 +104,7 @@ private:
     std::tuple<InIt, CompressionResult> compress_huffman(InIt in_it, InIt in_it_end, bool final_block)
     {
         CompressionResult result;
-        std::tie(in_it, result.error) = final_block ?
+        std::tie(in_it, result.status) = final_block ?
             huffman15_encode<true>(bit_encoder, in_it, in_it_end)
             :
             huffman15_encode<false>(bit_encoder, in_it, in_it_end)
@@ -179,7 +179,7 @@ private:
             bool expect_final_block)
     {
         DecompressionResult result;
-        std::tie(out_it, result.error) = expect_final_block ?
+        std::tie(out_it, result.status) = expect_final_block ?
             huffman15_decode<true>(out_it, out_it_end, bit_decoder)
             :
             huffman15_decode<false>(out_it, out_it_end, bit_decoder)
@@ -193,7 +193,7 @@ private:
     {
         DecompressionResult result;
         DeflateHeaderBits header_bits {};
-        std::tie(out_it, header_bits, result.error) = inflate(out_it, out_it_end, bit_decoder);
+        std::tie(out_it, header_bits, result.status) = inflate(out_it, out_it_end, bit_decoder);
         const bool final_block = utils::test_flag(header_bits, DeflateHeaderBits::FinalBlock);
         result.flags = utils::switch_flag(DecompressionResult::FinalBlock, final_block);
         return std::make_tuple(out_it, std::exchange(result, DecompressionResult()));

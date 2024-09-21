@@ -2,7 +2,7 @@
 
 #include "method.h"
 
-#include "squeeze/utils/stringify.h"
+#include "squeeze/printing.h"
 
 namespace squeeze::compression {
 
@@ -13,8 +13,7 @@ struct CompressionParams {
 
 }
 
-template<> inline std::string squeeze::utils::stringify(const compression::CompressionParams& compression)
+template<> inline void squeeze::print_to(std::ostream& os, const compression::CompressionParams& compression)
 {
-    return "{ method=" + stringify(compression.method) +
-           ", level=" + stringify(compression.level) + " }";
+    print_to(os, "{ method=", compression.method, ", level=", compression.level, " }");
 }

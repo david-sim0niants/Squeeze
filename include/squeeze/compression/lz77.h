@@ -16,7 +16,7 @@
 #include "lz77_sliding_window.h"
 
 #include "squeeze/exception.h"
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 #include "squeeze/misc/sequence.h"
 
 namespace squeeze::compression {
@@ -293,7 +293,7 @@ public:
     }
 
     /* Decode length and distance codes. */
-    Error<Decoder> decode_once(std::size_t len, std::size_t dist)
+    StatStr decode_once(std::size_t len, std::size_t dist)
     {
         if (dist > window.size()) [[unlikely]]
             return "invalid distance that points further behind data";
@@ -304,7 +304,7 @@ public:
     }
 
     /* Decode a token. */
-    Error<Decoder> decode_once(const Token& token)
+    StatStr decode_once(const Token& token)
     {
         switch (token.get_type()) {
         case Token::None:

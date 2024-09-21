@@ -2,13 +2,12 @@
 
 #include <iostream>
 
-#include "squeeze/common.h"
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 
 namespace squeeze::utils {
 
-Error<> iosmove(std::iostream& ios, std::streampos dst, std::streampos src, std::streamsize len);
-Error<> ioscopy(std::istream& src_stream, std::streampos src_pos,
+StatStr iosmove(std::iostream& ios, std::streampos dst, std::streampos src, std::streamsize len);
+StatStr ioscopy(std::istream& src_stream, std::streampos src_pos,
              std::ostream& dst_stream, std::streampos dst_pos,
              std::streamsize cpy_len);
 

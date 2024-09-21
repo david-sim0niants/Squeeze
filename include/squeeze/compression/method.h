@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "squeeze/utils/stringify.h"
+#include "squeeze/printing.h"
 
 namespace squeeze::compression {
 
@@ -14,21 +14,18 @@ enum class CompressionMethod : uint8_t {
 
 }
 
-namespace squeeze::utils {
-
-template<> inline std::string stringify(const compression::CompressionMethod& compression_method)
+template<> inline void squeeze::print_to(std::ostream& os,
+        const compression::CompressionMethod& compression_method)
 {
     switch (compression_method) {
         using enum compression::CompressionMethod;
     case None:
-        return "none";
+        return print_to(os, "none");
     case Huffman:
-        return "huffman";
+        return print_to(os, "huffman");
     case Deflate:
-        return "deflate";
+        return print_to(os, "deflate");
     default:
-        return "[unknown]";
+        return print_to(os, "[unknown]");
     }
-}
-
 }

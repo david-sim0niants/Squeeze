@@ -14,7 +14,7 @@ public:
         : BasicEntryInput(std::move(path), compression), file(file)
     {}
 
-    Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
+    Stat init(EntryHeader& entry_header, ContentType& content) override;
     void deinit() noexcept override;
 
     void init_entry_header(EntryHeader& entry_header);

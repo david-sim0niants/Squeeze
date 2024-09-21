@@ -11,7 +11,7 @@ namespace fs = std::filesystem;
 
 static std::error_code create_directories(const fs::path& path);
 
-std::variant<std::fstream, ErrorCode> make_regular_file(std::string_view path_str)
+std::variant<std::fstream, StatCode> make_regular_file(std::string_view path_str)
 {
     fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
@@ -20,11 +20,11 @@ std::variant<std::fstream, ErrorCode> make_regular_file(std::string_view path_st
 
     std::fstream file(path, std::ios_base::binary | std::ios_base::in | std::ios_base::out);
     if (!file)
-        return ErrorCode::from_current_errno();
+        return std::make_error_code(std::errc::io_error);
     return file;
 }
 
-std::variant<std::ofstream, ErrorCode> make_regular_file_out(std::string_view path_str)
+std::variant<std::ofstream, StatCode> make_regular_file_out(std::string_view path_str)
 {
     fs::path path(path_str);
     std::error_code ec = utils::create_directories(path.parent_path());
@@ -33,12 +33,12 @@ std::variant<std::ofstream, ErrorCode> make_regular_file_out(std::string_view pa
 
     std::ofstream file(path, std::ios_base::binary | std::ios_base::out | std::ios_base::app);
     if (!file)
-        return ErrorCode::from_current_errno();
+        return std::make_error_code(std::errc::io_error);
     file.seekp(0, std::ios::beg);
     return file;
 }
 
-ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms)
+StatCode make_directory(std::string_view path_str, EntryPermissions entry_perms)
 {
     fs::path path(path_str);
     std::error_code ec = utils::create_directories(path);
@@ -47,7 +47,7 @@ ErrorCode make_directory(std::string_view path_str, EntryPermissions entry_perms
     return set_permissions(path, entry_perms);
 }
 
-ErrorCode make_symlink(std::string_view path_str, std::string_view link_to,
+StatCode make_symlink(std::string_view path_str, std::string_view link_to,
         EntryPermissions entry_perms)
 {
     fs::path path(path_str);
@@ -76,7 +76,7 @@ static std::error_code create_directories(const fs::path& path)
     return ec;
 }
 
-ErrorCode set_permissions(const fs::path &path, EntryPermissions entry_perms)
+StatCode set_permissions(const fs::path &path, EntryPermissions entry_perms)
 {
     std::error_code ec;
     fs::perms perms;

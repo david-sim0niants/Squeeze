@@ -5,7 +5,7 @@
 
 #include "huffman.h"
 #include "deflate_huffman.h"
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 
 namespace squeeze::compression {
 
@@ -69,6 +69,7 @@ template<HuffmanPolicy Policy, HuffmanPolicy CodeLenPolicy>
 template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename OutItEnd>
 class Huffman15<Policy, CodeLenPolicy>::Encoder {
 public:
+    using Stat = StatStr;
     using BitEncoder = misc::BitEncoder<Char, char_size, OutIt, OutItEnd>;
 
     explicit Encoder(BitEncoder& bit_encoder) : bit_encoder(bit_encoder)
@@ -76,14 +77,14 @@ public:
     }
 
     template<std::forward_iterator CodeLenIt>
-    inline Error<Encoder> encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    inline Stat encode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         return DHuffman::make_encoder(bit_encoder).encode_code_lens(cl_it,  cl_it_end);
     }
 
     /* Encode data. Generates and encodes the code lengths and the main data. */
     template<bool use_term, std::forward_iterator InIt>
-    std::tuple<InIt, Error<Encoder>> encode_data(InIt in_it, InIt in_it_end)
+    std::tuple<InIt, Stat> encode_data(InIt in_it, InIt in_it_end)
         requires std::convertible_to<std::iter_value_t<InIt>, char>
     {
         std::array<Freq, alphabet_size> freqs {};
@@ -95,9 +96,9 @@ public:
         std::array<Code, alphabet_size> codes {};
         Huffman<Policy>::gen_codes(code_lens.begin(), code_lens.end(), codes.data());
 
-        auto e = encode_code_lens(code_lens.begin(), code_lens.end());
-        if (e) [[unlikely]]
-            return {in_it, {"failed encoding code lengths", e.report()}};
+        Stat s = encode_code_lens(code_lens.begin(), code_lens.end());
+        if (s.failed()) [[unlikely]]
+            return std::make_tuple(in_it, Stat{"failed encoding code lengths", s});
 
         auto huffman_encoder = Huffman<Policy>::make_encoder(bit_encoder);
         if constexpr (use_term)
@@ -117,6 +118,7 @@ template<HuffmanPolicy Policy, HuffmanPolicy CodeLenPolicy>
 template<typename Char, std::size_t char_size, std::input_iterator InIt, typename InItEnd>
 class Huffman15<Policy, CodeLenPolicy>::Decoder {
 public:
+    using Stat = StatStr;
     using BitDecoder = misc::BitDecoder<Char, char_size, InIt, InItEnd>;
 
     explicit Decoder(BitDecoder& bit_decoder) : bit_decoder(bit_decoder)
@@ -124,19 +126,19 @@ public:
     }
 
     template<std::output_iterator<CodeLen> CodeLenIt>
-    inline Error<Decoder> decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
+    inline Stat decode_code_lens(CodeLenIt cl_it, CodeLenIt cl_it_end)
     {
         return DHuffman::make_decoder(bit_decoder).decode_code_lens(cl_it, cl_it_end);
     }
 
     /* Decode data. Decodes the code lengths and the main data. */
     template<bool expect_term, std::output_iterator<char> OutIt>
-    std::tuple<OutIt, Error<Decoder>> decode_data(OutIt out_it, OutIt out_it_end)
+    std::tuple<OutIt, Stat> decode_data(OutIt out_it, OutIt out_it_end)
     {
         std::array<CodeLen, alphabet_size> code_lens {};
-        auto e = decode_code_lens(code_lens.begin(), code_lens.end());
-        if (e)
-            return {out_it, {"failed decoding code lengths", e.report()}};
+        Stat s = decode_code_lens(code_lens.begin(), code_lens.end());
+        if (s.failed())
+            return {out_it, Stat{"failed decoding code lengths", s}};
         else if (not Huffman<Policy>::validate_code_lens(code_lens.begin(), code_lens.end()))
             return {out_it, "invalid code lengths decoded"};
 
@@ -144,9 +146,9 @@ public:
         Huffman<Policy>::gen_codes(code_lens.begin(), code_lens.end(), codes.data());
 
         HuffmanTree tree;
-        auto ee = tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());
-        if (ee)
-            return {out_it, {"failed building a Huffman tree", ee.report()}};
+        StatStr st = tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());
+        if (st.failed())
+            return {out_it, Stat{"failed building a Huffman tree", st}};
 
         auto huffman_decoder = Huffman<Policy>::make_decoder(bit_decoder);
         if constexpr (expect_term)
@@ -170,7 +172,7 @@ template<bool use_term = true, typename Char = char, std::size_t char_size = siz
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
               (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
               sizeof...(OutItEnd) <= 1)
-inline std::tuple<InIt, Error<>> huffman15_encode(
+inline std::tuple<InIt, StatStr> huffman15_encode(
         misc::BitEncoder<Char, char_size, OutIt, OutItEnd...>& bit_encoder, InIt in_it, InIt in_it_end)
 {
     return Huffman15<Policy, CodeLenPolicy>::make_encoder(bit_encoder).
@@ -187,7 +189,7 @@ template<bool expect_term = true, typename Char = char, std::size_t char_size = 
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
               (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
               sizeof...(InItEnd) <= 1)
-inline std::tuple<OutIt, Error<>> huffman15_decode(
+inline std::tuple<OutIt, StatStr> huffman15_decode(
         OutIt out_it, OutIt out_it_end, misc::BitDecoder<Char, char_size, InIt, InItEnd...>& bit_decoder)
 {
     return Huffman15<Policy, CodeLenPolicy>::make_decoder(bit_decoder).
@@ -203,16 +205,16 @@ template<bool use_term = true, typename Char = char, std::size_t char_size = siz
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
               (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
               sizeof...(OutItEnd) <= 1)
-std::tuple<InIt, OutIt, Error<>> huffman15_encode(
+std::tuple<InIt, OutIt, StatStr> huffman15_encode(
         InIt in_it, InIt in_it_end, OutIt out_it, OutItEnd... out_it_end)
 {
     auto bit_encoder = misc::make_bit_encoder<Char, char_size>(out_it, out_it_end...);
 
-    Error<> e;
-    std::tie(in_it, e) = huffman15_encode<use_term>(bit_encoder, in_it, in_it_end);
+    StatStr s = success;
+    std::tie(in_it, s) = huffman15_encode<use_term>(bit_encoder, in_it, in_it_end);
     out_it = bit_encoder.get_it();
-    if (e)
-        return std::make_tuple(in_it, out_it, std::move(e));
+    if (s.failed())
+        return std::make_tuple(in_it, out_it, std::move(s));
 
     bit_encoder.finalize();
     out_it = bit_encoder.get_it();
@@ -228,14 +230,14 @@ template<bool expect_term = true, typename Char = char, std::size_t char_size = 
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) &&
               (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7) &&
               sizeof...(InItEnd) <= 1)
-std::tuple<OutIt, InIt, Error<>> huffman15_decode(
+std::tuple<OutIt, InIt, StatStr> huffman15_decode(
         OutIt out_it, OutIt out_it_end, InIt in_it, InItEnd... in_it_end)
 {
     auto bit_decoder = misc::make_bit_decoder<Char, char_size>(in_it, in_it_end...);
-    Error<> e;
-    std::tie(out_it, e) = huffman15_decode<expect_term>(out_it, out_it_end, bit_decoder);
+    StatStr s = success;
+    std::tie(out_it, s) = huffman15_decode<expect_term>(out_it, out_it_end, bit_decoder);
     in_it = bit_decoder.get_it();
-    return std::make_tuple(out_it, in_it, std::move(e));
+    return std::make_tuple(out_it, in_it, std::move(s));
 }
 
 }

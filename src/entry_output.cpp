@@ -2,13 +2,16 @@
 #include "squeeze/logging.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/fs.h"
+#include "squeeze/utils/overloaded.h"
 
 namespace squeeze {
 
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::FileEntryOutput::"
 
-Error<EntryOutput> FileEntryOutput::init(const EntryHeader& entry_header, std::ostream *& stream)
+using Stat = EntryOutput::Stat;
+
+Stat FileEntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
 {
     switch (entry_header.attributes.type) {
     case EntryType::None:
@@ -17,23 +20,26 @@ Error<EntryOutput> FileEntryOutput::init(const EntryHeader& entry_header, std::o
         {
             SQUEEZE_TRACE("'{}' is a regular file", entry_header.path);
             this->final_entry_header = entry_header;
-            auto result = utils::make_regular_file_out(entry_header.path);
-            if (auto *f = std::get_if<std::ofstream>(&result)) {
-                file = std::move(*f);
-                stream = &*file;
-                return success;
-            } else {
-                return {"failed making a regular file '" + entry_header.path + '\'',
-                        get<ErrorCode>(result).report()};
-            }
+            return std::visit(utils::Overloaded {
+                    [this, &stream](std::ofstream&& f) -> Stat
+                    {
+                        file = std::move(f);
+                        stream = &*file;
+                        return success;
+                    },
+                    [this, &entry_header](StatCode&& stat) -> Stat
+                    {
+                        return {"failed making a regular file '" + entry_header.path + '\'', stat};
+                    }
+                }, utils::make_regular_file_out(entry_header.path));
         }
     case EntryType::Directory:
         {
             SQUEEZE_TRACE("'{}' is a directory", entry_header.path);
             stream = nullptr;
-            auto e = utils::make_directory(entry_header.path, entry_header.attributes.permissions);
-            if (e.failed())
-                return {"failed making directory '" + entry_header.path + '\'', e.report()};
+            StatCode sc = utils::make_directory(entry_header.path, entry_header.attributes.permissions);
+            if (sc.failed())
+                return {"failed making directory '" + entry_header.path + '\'', sc};
             else
                 return success;
         }
@@ -44,27 +50,27 @@ Error<EntryOutput> FileEntryOutput::init(const EntryHeader& entry_header, std::o
     }
 }
 
-Error<EntryOutput> FileEntryOutput::init_symlink(
-        const EntryHeader &entry_header, const std::string &target)
+Stat FileEntryOutput::init_symlink(EntryHeader&& entry_header, const std::string &target)
 {
     SQUEEZE_TRACE("'{}' is a symlink", entry_header.path);
-    ErrorCode ec = utils::make_symlink(entry_header.path, target, entry_header.attributes.permissions);
-    if (ec)
-        return {"failed creating symlink '" + entry_header.path + " -> " + target + '\'', ec.report()};
+    StatCode sc = utils::make_symlink(entry_header.path, target, entry_header.attributes.permissions);
+    if (sc.failed())
+        return {"failed creating symlink '" + entry_header.path + " -> " + target + '\'', sc};
     else
         return success;
 }
 
-Error<EntryOutput> FileEntryOutput::finalize()
+Stat FileEntryOutput::finalize()
 {
     SQUEEZE_TRACE();
     if (not final_entry_header)
         return success;
 
-    auto e = utils::set_permissions(final_entry_header->path, final_entry_header->attributes.permissions);
-    if (e) {
+    StatCode sc = utils::set_permissions(final_entry_header->path,
+                                         final_entry_header->attributes.permissions);
+    if (sc.failed()) {
         SQUEEZE_ERROR("Failed setting file permissions");
-        return {"failed setting file permissions", e.report()};
+        return {"failed setting file permissions", sc};
     }
     return success;
 }
@@ -74,16 +80,13 @@ void FileEntryOutput::deinit() noexcept
     file.reset();
 }
 
-
-Error<EntryOutput> CustomStreamEntryOutput::init(
-        const EntryHeader &entry_header, std::ostream *&stream)
+Stat CustomStreamEntryOutput::init(EntryHeader&& entry_header, std::ostream *&stream)
 {
     stream = &this->stream;
     return success;
 }
 
-Error<EntryOutput> CustomStreamEntryOutput::init_symlink(
-        const EntryHeader &entry_header, const std::string& target)
+Stat CustomStreamEntryOutput::init_symlink(EntryHeader&& entry_header, const std::string& target)
 {
     stream.write(target.data(), target.size());
     return success;

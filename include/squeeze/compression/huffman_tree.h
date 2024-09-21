@@ -3,7 +3,7 @@
 #include <cassert>
 #include <deque>
 
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 #include "squeeze/exception.h"
 
 namespace squeeze::compression {
@@ -42,8 +42,7 @@ public:
     }
 
     template<typename Code, typename CodeLen, typename CreateNode>
-    Error<HuffmanTreeNode> insert(Code code, CodeLen code_len,
-            unsigned int symbol, CreateNode create_node)
+    StatStr insert(Code code, CodeLen code_len, unsigned int symbol, CreateNode create_node)
     {
         HuffmanTreeNode *node = this;
         while (code_len--) {
@@ -109,7 +108,7 @@ public:
     }
 
     template<std::input_iterator CodeIt, std::input_iterator CodeLenIt>
-    Error<HuffmanTree> build_from_codes(CodeIt code_it, CodeIt code_it_end,
+    StatStr build_from_codes(CodeIt code_it, CodeIt code_it_end,
             CodeLenIt code_len_it, CodeLenIt code_len_it_end)
     {
         if (code_it == code_it_end)
@@ -131,9 +130,9 @@ public:
             if (code_len == 0)
                 continue;
 
-            auto e = root->insert(code, code_len, symbol, node_creater);
-            if (e)
-                return {"failed inserting a code into a Huffman tree", e.report()};
+            StatStr s = root->insert(code, code_len, symbol, node_creater);
+            if (s.failed())
+                return {"failed inserting a code into a Huffman tree", s};
         }
 
         if (root->is_leaf()) {

@@ -13,22 +13,24 @@ namespace squeeze {
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::Appender::"
 
+using Stat = Appender::Stat;
+
 Appender::Appender(std::ostream& target) : target(target)
 {
 }
 
 Appender::~Appender() = default;
 
-void Appender::will_append(std::unique_ptr<EntryInput>&& entry_input, Error<Appender> *err)
+void Appender::will_append(std::unique_ptr<EntryInput>&& entry_input, Stat *stat)
 {
     owned_entry_inputs.push_back(std::move(entry_input));
-    will_append(*owned_entry_inputs.back(), err);
+    will_append(*owned_entry_inputs.back(), stat);
 }
 
-void Appender::will_append(EntryInput& entry_input, Error<Appender> *err)
+void Appender::will_append(EntryInput& entry_input, Stat *stat)
 {
     SQUEEZE_TRACE("Will append {}", entry_input.get_path());
-    future_appends.emplace_back(entry_input, err);
+    future_appends.emplace_back(entry_input, stat);
 }
 
 bool Appender::perform_appends()
@@ -51,12 +53,12 @@ bool Appender::perform_appends()
     return succeeded;
 }
 
-Error<Appender> Appender::append(EntryInput& entry_input)
+Stat Appender::append(EntryInput& entry_input)
 {
-    Error<Appender> err;
-    will_append(entry_input, &err);
+    Stat stat;
+    will_append(entry_input, &stat);
     perform_appends();
-    return err;
+    return stat;
 }
 
 bool Appender::schedule_appends()
@@ -75,22 +77,20 @@ bool Appender::schedule_append(FutureAppend& future_append)
     EntryHeader entry_header;
     EntryInput::ContentType content;
 
-    auto e = future_append.entry_input.init(entry_header, content);
+    Stat s = future_append.entry_input.init(entry_header, content);
     DEFER( future_append.entry_input.deinit(); );
-    if (e) {
+    if (s.failed()) {
         SQUEEZE_ERROR("Failed initializing entry input");
-        if (future_append.error)
-            *future_append.error = {
-                "failed scheduling entry append because failed initializing the entry input",
-                e.report()
-            };
+        if (future_append.status)
+            *future_append.status =
+                {"failed scheduling entry append because failed initializing the entry input", s};
         return false;
     }
 
-    SQUEEZE_DEBUG("entry_header={}", utils::stringify(entry_header));
+    SQUEEZE_DEBUG("entry_header={}", stringify(entry_header));
 
     CompressionParams compression = entry_header.compression;
-    scheduler.schedule_entry_append(std::move(entry_header), future_append.error);
+    scheduler.schedule_entry_append(std::move(entry_header), future_append.status);
 
     return std::visit(utils::Overloaded {
             [this, &compression](std::istream *stream)
@@ -150,7 +150,7 @@ bool Appender::schedule_buffer_appends(std::istream& stream)
 bool Appender::schedule_future_buffer_appends(
         const CompressionParams& compression, std::istream& stream)
 {
-    auto e = get_encoder_pool().schedule_stream_encode(stream, compression,
+    auto s = get_encoder_pool().schedule_stream_encode(stream, compression,
             utils::FunctionOutputIterator {
                 [this](std::future<EncodedBuffer>&& future_buffer)
                 {
@@ -158,8 +158,8 @@ bool Appender::schedule_future_buffer_appends(
                 }
             }
         );
-    if (e) {
-        scheduler.schedule_error_raise(std::move(e));
+    if (s.failed()) {
+        scheduler.schedule_error_raise(std::move(s));
         return false;
     }
     return true;

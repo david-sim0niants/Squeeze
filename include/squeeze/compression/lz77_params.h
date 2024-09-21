@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "squeeze/utils/stringify.h"
+#include "squeeze/printing.h"
 
 namespace squeeze::compression {
 
@@ -14,8 +14,8 @@ struct LZ77EncoderParams {
 
 }
 
-template<> inline std::string squeeze::utils::stringify(const compression::LZ77EncoderParams& params)
+template<> inline void squeeze::print_to(std::ostream& os, const compression::LZ77EncoderParams& params)
 {
-    return "{ lazy_match_threshold=" + stringify(params.lazy_match_threshold) +
-           ", match_insert_threshold=" + stringify(params.match_insert_threshold) + " }";
+    return print_to(os, "{ lazy_match_threshold=", params.lazy_match_threshold,
+                        ", match_insert_threshold=", params.match_insert_threshold, " }");
 }

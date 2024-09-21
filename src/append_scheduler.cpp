@@ -8,10 +8,13 @@
 
 namespace squeeze {
 
+using Stat = AppendScheduler::Stat;
+using FutureBuffer = AppendScheduler::FutureBuffer;
+
 /* Abstract block appender. */
 class BlockAppender {
 public:
-    virtual Error<> run(std::ostream& target) = 0;
+    virtual Stat run(std::ostream& target) = 0;
     virtual ~BlockAppender() = default;
 };
 
@@ -25,7 +28,7 @@ public:
     {
     }
 
-    Error<> run(std::ostream& target)
+    Stat run(std::ostream& target)
     {
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
         target.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
@@ -43,8 +46,6 @@ private:
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::FutureBufferAppender::"
 
-using FutureBuffer = std::future<std::pair<Buffer, Error<>>>;
-
 /* Future buffer appender task. */
 class FutureBufferAppender final : public BlockAppender {
 public:
@@ -53,13 +54,13 @@ public:
     {
     }
 
-    Error<> run(std::ostream& target)
+    Stat run(std::ostream& target)
     {
         SQUEEZE_TRACE("Waiting for future to complete.");
-        const auto& [buffer, e] = future_buffer.get();
-        if (e) {
+        auto [buffer, s] = future_buffer.get();
+        if (s.failed()) {
             SQUEEZE_ERROR("Buffer encoding failed");
-            return {"buffer encoding failed", e.report()};
+            return {"buffer encoding failed", s};
         }
 
         SQUEEZE_TRACE("Got a buffer with size={}", buffer.size());
@@ -82,18 +83,18 @@ private:
 /* Error raiser task. */
 class ErrorRaiser final : public BlockAppender {
 public:
-    ErrorRaiser(Error<>&& error) : error(std::move(error))
+    ErrorRaiser(Stat&& error) : error(std::move(error))
     {
     }
 
-    Error<> run(std::ostream& target)
+    Stat run(std::ostream& target)
     {
-        SQUEEZE_ERROR("Got an error: {}", error.report());
+        SQUEEZE_ERROR("Got an error: {}", stringify(error));
         return std::move(error);
     }
 
 private:
-    Error<> error;
+    Stat error;
 };
 
 #undef SQUEEZE_LOG_FUNC_PREFIX
@@ -106,7 +107,7 @@ public:
     {
     }
 
-    Error<> run(std::ostream& target)
+    Stat run(std::ostream& target)
     {
         SQUEEZE_TRACE("Got a string: '{}'", str);
 
@@ -133,13 +134,13 @@ EntryAppendScheduler::Task::Task(std::unique_ptr<BlockAppender>&& block_appender
 
 EntryAppendScheduler::Task::~Task() = default;
 
-inline Error<EntryAppendScheduler::Task> EntryAppendScheduler::Task::operator()(std::ostream& target)
+inline Stat EntryAppendScheduler::Task::operator()(std::ostream& target)
 {
     return block_appender->run(target);
 }
 
-EntryAppendScheduler::EntryAppendScheduler(EntryHeader entry_header, Error<> *error)
-    : entry_header(entry_header), error(error)
+EntryAppendScheduler::EntryAppendScheduler(EntryHeader entry_header, Stat *error)
+    : entry_header(entry_header), status(error)
 {
 }
 
@@ -148,7 +149,7 @@ EntryAppendScheduler::~EntryAppendScheduler()
     finalize();
 }
 
-inline void EntryAppendScheduler::schedule_error_raise(Error<>&& error)
+inline void EntryAppendScheduler::schedule_error_raise(Stat&& error)
 {
     scheduler.schedule(std::make_unique<ErrorRaiser>(std::move(error)));
 }
@@ -168,39 +169,40 @@ inline void EntryAppendScheduler::schedule_string_append(std::string&& str)
     scheduler.schedule(std::make_unique<StringAppender>(std::move(str)));
 }
 
-void EntryAppendScheduler::set_error(const Error<>& e)
+bool EntryAppendScheduler::set_status(Stat&& s)
 {
-    if (!error)
-        return;
-    if (e)
-        *error = {"failed appending entry '" + entry_header.path + '\'', e.report()};
+    if (!status)
+        return s.successful();
+    if (s)
+        *status = success;
     else
-        *error = success;
+        *status = {"failed appending entry '" + entry_header.path + '\'', s};
+    return status->successful();
 }
 
-Error<> EntryAppendScheduler::run_internal(std::ostream& target)
+Stat EntryAppendScheduler::run_internal(std::ostream& target)
 {
     SQUEEZE_TRACE("Appending {}", entry_header.path);
 
     const std::streampos initial_pos = target.tellp();
     SQUEEZE_DEBUG("initial_pos = {}", static_cast<long long>(initial_pos));
 
-    SQUEEZE_TRACE("Encoding entry_header = {}", utils::stringify(entry_header));
-    auto ehe = EntryHeader::encode(target, entry_header);
-    if (ehe) {
+    SQUEEZE_TRACE("Encoding entry_header = {}", stringify(entry_header));
+    StatStr ehs = EntryHeader::encode(target, entry_header);
+    if (ehs.failed()) [[unlikely]] {
         target.seekp(initial_pos);
         SQUEEZE_ERROR("Failed encoding the entry header");
-        return {"failed encoding the entry header", ehe.report()};
+        return {"failed encoding the entry header", ehs};
     }
 
     const std::streampos content_pos = target.tellp();
 
     SQUEEZE_TRACE("Running scheduled tasks");
-    auto e = scheduler.run_till_error(target);
-    if (e) {
+    Stat s = scheduler.run_till_error(target);
+    if (s.failed()) [[unlikely]] {
         target.seekp(initial_pos);
         SQUEEZE_ERROR("Failed appending content");
-        return {"failed appending content", e.report()};
+        return {"failed appending content", s};
     }
 
     const std::streampos final_pos = target.tellp();
@@ -210,11 +212,11 @@ Error<> EntryAppendScheduler::run_internal(std::ostream& target)
 
     entry_header.content_size = final_pos - content_pos;
     SQUEEZE_DEBUG("Encoding entry_header.content_size={}", entry_header.content_size);
-    e = EntryHeader::encode_content_size(target, entry_header.content_size);
-    if (e) {
+    ehs = EntryHeader::encode_content_size(target, entry_header.content_size);
+    if (s.failed()) {
         target.seekp(initial_pos);
         SQUEEZE_ERROR("Failed encoding content size");
-        return {"failed encoding content size", e.report()};
+        return {"failed encoding content size", std::move(ehs)};
     }
 
     target.seekp(final_pos);
@@ -222,7 +224,7 @@ Error<> EntryAppendScheduler::run_internal(std::ostream& target)
     return success;
 }
 
-AppendScheduler::Task::Task(EntryHeader entry_header, Error<> *error) noexcept
+AppendScheduler::Task::Task(EntryHeader entry_header, Stat *error) noexcept
     : scheduler(std::make_unique<EntryAppendScheduler>(entry_header, error))
 {
 }
@@ -242,7 +244,7 @@ AppendScheduler::~AppendScheduler()
     finalize();
 }
 
-void AppendScheduler::schedule_entry_append(EntryHeader&& entry_header, Error<> *error)
+void AppendScheduler::schedule_entry_append(EntryHeader&& entry_header, Stat *error)
 {
     SQUEEZE_TRACE();
     finalize_entry_append();
@@ -252,7 +254,7 @@ void AppendScheduler::schedule_entry_append(EntryHeader&& entry_header, Error<> 
     scheduler.schedule(std::move(task));
 }
 
-void AppendScheduler::schedule_error_raise(Error<>&& error)
+void AppendScheduler::schedule_error_raise(Stat&& error)
 {
     SQUEEZE_TRACE();
     assert(last_entry_append_scheduler != nullptr);

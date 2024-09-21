@@ -12,20 +12,22 @@ namespace squeeze {
  * */
 class Extracter {
 public:
+    using Stat = StatStr;
+
     /* Construct the interface by passing a reference to the ostream source to read from. */
     explicit Extracter(std::istream& source) : source(source)
     {}
 
     /* Extract an entry from the given iterator to a file. */
-    Error<Extracter> extract(const EntryIterator& it);
+    Stat extract(const EntryIterator& it);
     /* Extract an entry from the given iterator to the given custom output stream. */
-    Error<Extracter> extract(const EntryIterator& it, std::ostream& output);
+    Stat extract(const EntryIterator& it, std::ostream& output);
     /* Extract an entry from the given iterator to the given entry output. */
-    Error<Extracter> extract(const EntryIterator& it, EntryOutput& entry_output);
+    Stat extract(const EntryIterator& it, EntryOutput& entry_output);
 
 protected:
-    Error<Extracter> extract_stream(const EntryHeader& entry_header, std::ostream& output);
-    Error<Extracter> extract_symlink(const EntryHeader& entry_header, std::string& target);
+    Stat extract_stream(const EntryHeader& entry_header, std::ostream& output);
+    Stat extract_symlink(const EntryHeader& entry_header, std::string& target);
 
     std::istream& source;
 };

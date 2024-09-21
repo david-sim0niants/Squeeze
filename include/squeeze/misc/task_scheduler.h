@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <functional>
 
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 #include "thread_safe_queue.h"
 
 namespace squeeze::misc {
@@ -62,19 +62,18 @@ public:
         return task_q.get_size();
     }
 
-    /* Run until hitting an error. This method is valid to use if calling a Task object
-     * returns an error (convertible to Error<Task>).
+    /* Run until hitting an error. This method is valid to use if calling a Task object returns a status.
      * This method is mainly supposed to be called within a different thread parallel to scheduling threads. */
-    template<TaskRunPolicy policy = TaskRunPolicy::Wait>
-    Error<Task> run_till_error(auto&&... args)
-        requires std::is_convertible_v<std::invoke_result_t<Task, decltype(args)...>, Error<Task>>
+    template<TaskRunPolicy policy = TaskRunPolicy::Wait, typename... Args>
+    auto run_till_error(Args&&... args)
     {
+        using Stat = std::invoke_result_t<Task, Args&&...>;
         while (auto task = get_task<policy>()) {
-            Error<Task> e = (*task)(std::forward<decltype(args)>(args)...);
-            if (e.failed())
-                return std::move(e);
+            Stat s = (*task)(std::forward<decltype(args)>(args)...);
+            if (s.failed())
+                return Stat(std::move(s));
         }
-        return success;
+        return Stat(success);
     }
 
     /* Plain task runner.

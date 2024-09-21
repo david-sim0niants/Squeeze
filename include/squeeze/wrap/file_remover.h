@@ -11,21 +11,23 @@ namespace squeeze::wrap {
  * specifically designed for handling files. */
 class FileRemover {
 public:
+    using Stat = Remover::Stat;
+
     explicit FileRemover(Squeeze& squeeze) : squeeze(squeeze)
-    {}
+    {
+    }
 
     /* Find an entry by its path and remove it. */
-    bool will_remove(const std::string_view path, Error<Writer> *err = nullptr);
+    bool will_remove(std::string_view path, Stat *stat = nullptr);
 
     /* Remove recursively all entries within the path.
-     * get_err_ptr() is supposed to provide a pointer to the subsequent error. */
-    bool will_remove_recursively(const std::string_view path,
-            const std::function<Error<Writer> *()>& get_err_ptr = [](){ return nullptr; });
+     * get_stat_ptr() is supposed to provide a pointer to the subsequent status. */
+    bool will_remove_recursively(std::string_view path,
+            const std::function<Stat *()>& get_stat_ptr = [](){ return nullptr; });
 
     /* Remove all entries.
-     * get_err_ptr() is supposed to provide a pointer to the subsequent error. */
-    void will_remove_all(
-            const std::function<Error<Writer> *()>& get_err_ptr = [](){ return nullptr; });
+     * get_stat_ptr() is supposed to provide a pointer to the subsequent status. */
+    void will_remove_all(const std::function<Stat *()>& get_stat_ptr = [](){ return nullptr; });
 
     inline auto& get_wrappee()
     {

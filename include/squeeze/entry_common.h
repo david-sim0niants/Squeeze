@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "utils/stringify.h"
+#include "printing.h"
 #include "utils/enum.h"
 
 namespace squeeze {
@@ -37,6 +37,6 @@ struct EntryAttributes {
     EntryPermissions permissions : 9;
 };
 
-template<> std::string utils::stringify(const EntryAttributes& attributes);
+template<> void print_to(std::ostream& os, const EntryAttributes& attributes);
 
 }

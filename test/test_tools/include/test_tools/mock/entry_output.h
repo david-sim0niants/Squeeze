@@ -9,9 +9,9 @@ class EntryOutput final : public squeeze::EntryOutput {
 public:
     explicit EntryOutput(FileSystem& fs) : fs(fs) {}
 
-    Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) override;
-    Error<EntryOutput> init_symlink(const EntryHeader& entry_header, const std::string& target) override;
-    Error<EntryOutput> finalize() override;
+    Stat init(EntryHeader&& entry_header, std::ostream *& stream) override;
+    Stat init_symlink(EntryHeader&& entry_header, const std::string& target) override;
+    Stat finalize() override;
     void deinit() noexcept override;
 
 private:

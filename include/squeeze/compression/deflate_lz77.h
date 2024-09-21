@@ -83,7 +83,7 @@ public:
     }
 
     /* Does some convoluted math to decode a length symbol and extra bits pair into a normal length. */
-    static Error<DeflateLZ77> decode_len(LenSym len_sym, LenExtra len_extra, std::size_t& len)
+    static StatStr decode_len(LenSym len_sym, LenExtra len_extra, std::size_t& len)
     {
         if (len_sym > max_len_sym) [[unlikely]]
             return "invalid length symbol";
@@ -115,7 +115,7 @@ public:
     }
 
     /* Does some convoluted math to decode a distance symbol and extra bits pair into a normal distance. */
-    static Error<DeflateLZ77> decode_dist(DistSym dist_sym, DistExtra dist_extra, std::size_t& dist)
+    static StatStr decode_dist(DistSym dist_sym, DistExtra dist_extra, std::size_t& dist)
     {
         if (dist_sym > max_dist_sym) [[unlikely]]
             return "invalid distance symbol";
@@ -439,16 +439,15 @@ public:
     }
 
     /* Decode a len/dist pair from a length symbol and extra bits, distance symbol and its extra bits. */
-    inline Error<Decoder>
-        decode_once(LenSym len_sym, LenExtra len_extra, DistSym dist_sym, DistExtra dist_extra)
+    inline StatStr decode_once(LenSym len_sym, LenExtra len_extra, DistSym dist_sym, DistExtra dist_extra)
     {
         std::size_t len, dist;
-        Error<DeflateLZ77> e;
-        if ((e = decode_len(len_sym, len_extra, len)).failed() or
-            (e = decode_dist(dist_sym, dist_extra, dist)).failed())
-            return e;
-        else
+        StatStr s = success;
+        if ((s = decode_len(len_sym, len_extra, len)) &&
+            (s = decode_dist(dist_sym, dist_extra, dist)))
             return internal.decode_once(len, dist);
+        else
+            return s;
     }
 
     /* Check if the decoder has finished processing tokens. */

@@ -23,8 +23,8 @@ struct EncoderPool::Task {
     {
         try {
             Buffer output;
-            auto e = encode_buffer(input, output, compression);
-            output_promise.set_value(std::make_pair(output, e));
+            Stat stat = encode_buffer(input, output, compression);
+            output_promise.set_value(std::make_pair(std::move(output), std::move(stat)));
         } catch (...) {
             output_promise.set_exception(std::current_exception());
         }
@@ -73,7 +73,7 @@ std::future<EncodedBuffer> EncoderPool::
     return future_output;
 }
 
-Error<> EncoderPool::schedule_stream_encode_step(std::future<EncodedBuffer>& future_output,
+EncoderStat EncoderPool::schedule_stream_encode_step(std::future<EncodedBuffer>& future_output,
         std::istream& stream, const CompressionParams& compression)
 {
     SQUEEZE_TRACE();
@@ -113,7 +113,7 @@ void EncoderPool::threaded_task_run()
     scheduler.run<misc::TaskRunPolicy::NoWait>();
 }
 
-Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression)
+EncoderStat encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression)
 {
     if (compression.method == compression::CompressionMethod::None) {
         std::copy(in.begin(), in.end(), std::back_inserter(out));
@@ -125,18 +125,18 @@ Error<> encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& co
 
     const bool final_block = in.size() < compression::get_block_size(compression);
     const CompressionFlags flags = utils::switch_flag(FinalBlock, final_block);
-    return std::get<2>(compress(in.begin(), in.end(), compression, flags, std::back_inserter(out))).error;
+    return std::get<2>(compress(in.begin(), in.end(), compression, flags, std::back_inserter(out))).status;
 }
 
-Error<> encode(std::istream& in, std::size_t size, std::ostream& out,
-               const compression::CompressionParams& compression)
+EncoderStat encode(std::istream& in, std::size_t size, std::ostream& out,
+            const compression::CompressionParams& compression)
 {
     SQUEEZE_TRACE();
 
     if (compression.method == compression::CompressionMethod::None) {
         SQUEEZE_TRACE("Compression method is none, plain copying...");
-        auto e = utils::ioscopy(in, in.tellg(), out, out.tellp(), size);
-        return e ? Error<>{"failed copying stream", e.report()} : success;
+        EncoderStat s = utils::ioscopy(in, in.tellg(), out, out.tellp(), size);
+        return s ? success : EncoderStat{"failed copying stream", s};
     }
 
     const std::size_t buffer_size = compression::get_block_size(compression);
@@ -154,10 +154,10 @@ Error<> encode(std::istream& in, std::size_t size, std::ostream& out,
         }
         inbuf.resize(in.gcount());
 
-        auto e = encode_buffer(inbuf, outbuf, compression);
-        if (e) [[unlikely]] {
+        auto s = encode_buffer(inbuf, outbuf, compression);
+        if (s.failed()) [[unlikely]] {
             SQUEEZE_ERROR("Failed encoding buffer");
-            return {"failed encoding buffer", e.report()};
+            return {"failed encoding buffer", s};
         }
 
         out.write(outbuf.data(), outbuf.size());

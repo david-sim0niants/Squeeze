@@ -5,7 +5,7 @@
 
 #include "entry_common.h"
 #include "entry_header.h"
-#include "error.h"
+#include "status.h"
 #include "compression/params.h"
 
 namespace squeeze {
@@ -16,6 +16,9 @@ using compression::CompressionParams;
  * Could as well be called EntrySource or something. */
 class EntryInput {
 public:
+    /* Status return type of this class methods. */
+    using Stat = StatStr;
+
     /* The content type.
      * A monostate (no state) mainly refers to a directory as directories don't have any content.
      * An input stream mainly refers to a regular file contents.
@@ -25,7 +28,7 @@ public:
     virtual ~EntryInput() = default;
 
     /* Initialize the entry input and get references to the entry header and its content. */
-    virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) = 0;
+    virtual Stat init(EntryHeader& entry_header, ContentType& content) = 0;
     /* De-initialize the entry output. This always needs to be called if an init method
      * has been called, including exception handling cases. */
     virtual void deinit() noexcept = 0;
@@ -69,11 +72,11 @@ public:
     {
     }
 
-    virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
+    virtual Stat init(EntryHeader& entry_header, ContentType& content) override;
     virtual void deinit() noexcept override;
 
 protected:
-    Error<EntryInput> init_entry_header(EntryHeader& entry_header);
+    Stat init_entry_header(EntryHeader& entry_header);
 
     std::optional<std::ifstream> file;
 };
@@ -89,7 +92,7 @@ public:
     {
     }
 
-    virtual Error<EntryInput> init(EntryHeader& entry_header, ContentType& content) override;
+    virtual Stat init(EntryHeader& entry_header, ContentType& content) override;
     virtual void deinit() noexcept override;
 
 public:

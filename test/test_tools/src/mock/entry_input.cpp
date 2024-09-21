@@ -4,7 +4,9 @@
 
 namespace squeeze::test_tools::mock {
 
-Error<EntryInput> EntryInput::init(EntryHeader &entry_header, ContentType &content)
+using Stat = EntryInput::Stat;
+
+Stat EntryInput::init(EntryHeader& entry_header, ContentType& content)
 {
     init_entry_header(entry_header);
     content = std::visit( utils::Overloaded {

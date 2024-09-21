@@ -7,7 +7,7 @@
 #include "entry_common.h"
 
 #include "compression/params.h"
-#include "error.h"
+#include "status.h"
 #include "utils/enum.h"
 
 namespace squeeze {
@@ -41,14 +41,14 @@ struct EntryHeader {
      * This is useful as the entry header is usually encoded and written before
      * the content but the content size might be unknown before being encoded,
      * thus it might need a re-encoding after the content is encoded and written. */
-    static Error<EntryHeader> encode_content_size(std::ostream& output, uint64_t content_size);
+    static StatStr encode_content_size(std::ostream& output, uint64_t content_size);
     /* Decode the content size. Just mirrors encode_content_size method. */
-    static Error<EntryHeader> decode_content_size(std::istream& output, uint64_t& content_size);
+    static StatStr decode_content_size(std::istream& output, uint64_t& content_size);
 
     /* Encode the entry header. */
-    static Error<EntryHeader> encode(std::ostream& output, const EntryHeader& entry_header);
+    static StatStr encode(std::ostream& output, const EntryHeader& entry_header);
     /* Decode the entry header. */
-    static Error<EntryHeader> decode(std::istream& input, EntryHeader& entry_header);
+    static StatStr decode(std::istream& input, EntryHeader& entry_header);
 
     using EncodedPathSizeType = uint32_t;
 
@@ -58,6 +58,6 @@ struct EntryHeader {
         sizeof(attributes) + sizeof(EncodedPathSizeType);
 };
 
-template<> std::string utils::stringify(const EntryHeader& header);
+template<> void print_to(std::ostream& os, const EntryHeader& header);
 
 }

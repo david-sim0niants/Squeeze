@@ -8,7 +8,8 @@
 
 namespace squeeze {
 
-Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const CompressionParams& compression)
+DecoderStat decode(std::ostream& out, std::size_t size, std::istream& in,
+        const CompressionParams& compression)
 {
     using namespace compression;
     using CompressionFlags::ExpectFinalBlock;
@@ -16,8 +17,8 @@ Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const Comp
 
     if (compression.method == CompressionMethod::None) {
         SQUEEZE_TRACE("Compression method is none, plain copying...");
-        auto e = utils::ioscopy(in, in.tellg(), out, out.tellp(), size);
-        return e ? Error<>{"failed copying stream", e.report()} : success;
+        StatStr s = utils::ioscopy(in, in.tellg(), out, out.tellp(), size);
+        return s ? success : StatStr{"failed copying stream", s};
     }
 
     const std::size_t outbuf_size = get_block_size(compression);
@@ -33,9 +34,9 @@ Error<> decode(std::ostream& out, std::size_t size, std::istream& in, const Comp
         DecompressionResult result;
         std::tie(out_it, in_it, result) =
             decompress(out_it, out_it_end, compression, ExpectFinalBlock, in_it, in_it_end);
-        if (result.error) [[unlikely]] {
+        if (result.status.failed()) [[unlikely]] {
             SQUEEZE_ERROR("Failed decoding buffer");
-            return {"failed decoding buffer", result.error.report()};
+            return {"failed decoding buffer", result.status};
         }
 
         if (in_it == in_it_end) {

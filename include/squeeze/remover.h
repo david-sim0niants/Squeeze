@@ -5,7 +5,7 @@
 #include <queue>
 
 #include "entry_iterator.h"
-#include "error.h"
+#include "status.h"
 
 namespace squeeze {
 
@@ -15,6 +15,9 @@ namespace squeeze {
  * by calling the provided perform_removes() method. Immediate task-running remove()
  * method also exists for convenience. */
 class Remover {
+public:
+    using Stat = StatStr;
+
 protected:
     struct FutureRemove;
     struct FutureRemoveCompare {
@@ -26,11 +29,11 @@ public:
     ~Remover();
 
     /* Register a future remove operation by providing an iterator pointing to the entry to be removed.
-     * Pass an optional pointer to a future error to assign when the task is done. */
-    void will_remove(const EntryIterator& it, Error<Remover> *err = nullptr);
+     * Pass an optional pointer to a future status to assign when the task is done. */
+    void will_remove(const EntryIterator& it, Stat *err = nullptr);
 
     /* Remove an entry immediately by passing an iterator pointing to it. */
-    Error<Remover> remove(const EntryIterator& it);
+    Stat remove(const EntryIterator& it);
 
     /* Perform the registered removes.
      * The method guarantees that the put pointer of the target stream

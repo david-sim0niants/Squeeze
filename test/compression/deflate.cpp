@@ -24,20 +24,20 @@ TEST_P(DeflateTest, EncodeDecode)
     deflate_params.header_bits = DeflateHeaderBits::FinalBlock | DeflateHeaderBits::DynamicHuffman;
     std::vector<char> buffer;
 
-    auto [in_it, out_it, e] = deflate(deflate_params, data.begin(), data.end(), std::back_inserter(buffer));
+    auto [in_it, out_it, s] = deflate(deflate_params, data.begin(), data.end(), std::back_inserter(buffer));
     EXPECT_EQ(in_it, data.end());
-    EXPECT_TRUE(e.successful()) << e.report();
+    EXPECT_TRUE(s.successful()) << s.report();
 
     const double compression_ratio = data.size() / (double)buffer.size();
     EXPECT_GE(compression_ratio, 1.0);
 
     std::vector<char> rest_data (data.size());
     {
-        auto [out_it, in_it, header_bits, e] =
+        auto [out_it, in_it, header_bits, s] =
             inflate(rest_data.begin(), rest_data.end(), buffer.begin(), buffer.end());
         EXPECT_EQ(out_it, rest_data.end());
         EXPECT_EQ(in_it, buffer.end());
-        EXPECT_TRUE(e.successful()) << e.report();
+        EXPECT_TRUE(s.successful()) << s.report();
     }
 
     ASSERT_THAT(rest_data, Pointwise(Eq(), data));

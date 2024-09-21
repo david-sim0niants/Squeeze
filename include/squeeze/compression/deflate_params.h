@@ -1,7 +1,7 @@
 #pragma once
 
 #include "squeeze/compression/lz77_params.h"
-#include "squeeze/utils/stringify.h"
+#include "squeeze/status.h"
 #include "squeeze/utils/enum.h"
 
 namespace squeeze::compression {
@@ -24,33 +24,35 @@ struct DeflateParams {
 
 }
 
-template<> inline std::string squeeze::utils::stringify(const compression::DeflateHeaderBits& header_bits)
+template<> inline void squeeze::print_to(std::ostream& os, const compression::DeflateHeaderBits& header_bits)
 {
     using namespace std::string_literals;
     using enum compression::DeflateHeaderBits;
-    std::string str = '[' + (((header_bits & FinalBlock) == FinalBlock) ? "FINAL | "s : ""s);
+
+    const char *final_str = (((header_bits & FinalBlock) == FinalBlock) ? "FINAL | " : "");
+    const char *type_str = "";
+
     switch (header_bits & TypeMask) {
     case Store:
-        str += "STORE";
+        type_str = "STORE";
         break;
     case FixedHuffman:
-        str += "FIXED_HUFFMAN";
+        type_str = "FIXED_HUFFMAN";
         break;
     case DynamicHuffman:
-        str += "DYNAMIC_HUFFMAN";
+        type_str = "DYNAMIC_HUFFMAN";
         break;
     case Reserved:
-        str += "RESERVED";
+        type_str = "RESERVED";
         break;
     default:
         break;
     }
-    str += ']';
-    return str;
+    print_to(os, '[', final_str, type_str, ']');
 }
 
-template<> inline std::string squeeze::utils::stringify(const compression::DeflateParams& params)
+template<> inline void squeeze::print_to(std::ostream& os, const compression::DeflateParams& params)
 {
-    return "{ header_bits=" + stringify(params.header_bits) +
-        ", lz77_encoder_params=" + utils::stringify(params.lz77_encoder_params) + " }";
+    return print_to(os, "{ header_bits=", params.header_bits,
+                        ", lz77_encoder_params=", params.lz77_encoder_params, " }");
 }

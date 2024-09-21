@@ -11,14 +11,16 @@ namespace squeeze {
  * Could as well be called EntrySink or something. */
 class EntryOutput {
 public:
+    /* Status return type of this class methods. */
+    using Stat = StatStr;
+
     /* Initialize the entry output by providing an entry header. Should either return a pointer
      * to an output stream if it exists, NULL if it doesn't (and not supposed to) or an error. */
-    virtual Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) = 0;
+    virtual Stat init(EntryHeader&& entry_header, std::ostream *& stream) = 0;
     /* Initialize the entry output as a symlink by passing entry header and a symlink target. */
-    virtual Error<EntryOutput> init_symlink(
-            const EntryHeader& entry_header, const std::string& target) = 0;
+    virtual Stat init_symlink(EntryHeader&& entry_header, const std::string& target) = 0;
     /* Finalize the entry output. This can be used to do some post-processing tasks. */
-    virtual Error<EntryOutput> finalize() = 0;
+    virtual Stat finalize() = 0;
     /* De-initialize the entry output. This always needs to be called if an init(_symlink) method
      * has been called, including exception handling cases. */
     virtual void deinit() noexcept = 0;
@@ -29,10 +31,9 @@ public:
 /* Derived class of EntryOutput that creates a file for storing extracted data. */
 class FileEntryOutput : public EntryOutput {
 public:
-    virtual Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) override;
-    virtual Error<EntryOutput> init_symlink(
-            const EntryHeader& entry_header, const std::string& target) override;
-    virtual Error<EntryOutput> finalize() override;
+    virtual Stat init(EntryHeader&& entry_header, std::ostream *& stream) override;
+    virtual Stat init_symlink(EntryHeader&& entry_header, const std::string& target) override;
+    virtual Stat finalize() override;
     virtual void deinit() noexcept override;
 
 private:
@@ -47,10 +48,9 @@ public:
         : stream(stream)
     {}
 
-    virtual Error<EntryOutput> init(const EntryHeader& entry_header, std::ostream *& stream) override;
-    virtual Error<EntryOutput> init_symlink(
-            const EntryHeader& entry_header, const std::string& target) override;
-    virtual Error<EntryOutput> finalize() override
+    virtual Stat init(EntryHeader&& entry_header, std::ostream *& stream) override;
+    virtual Stat init_symlink(EntryHeader&& entry_header, const std::string& target) override;
+    virtual Stat finalize() override
     {
         return success;
     }

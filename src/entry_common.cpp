@@ -2,9 +2,9 @@
 
 namespace squeeze {
 
-template<> std::string utils::stringify<EntryAttributes>(const EntryAttributes& attributes)
+template<> void print_to(std::ostream& os, const EntryAttributes& attributes)
 {
-    std::string str = "?rwxrwxrwx";
+    char str[] = "?rwxrwxrwx";
     switch (attributes.type) {
     case EntryType::RegularFile:
         str[0] = '-';
@@ -31,11 +31,11 @@ template<> std::string utils::stringify<EntryAttributes>(const EntryAttributes& 
             EntryPermissions::OthersWrite,
             EntryPermissions::OthersExec,
         }) {
-        str[i] = test_flag(attributes.permissions, perm) ? str[i] : '-';
+        str[i] = utils::test_flag(attributes.permissions, perm) ? str[i] : '-';
         ++i;
     }
 
-    return str;
+    os << str;
 }
 
 }

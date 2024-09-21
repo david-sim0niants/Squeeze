@@ -36,8 +36,8 @@ TEST_P(EncodeDecodeTest, EncodeDecode)
     content.write(data.data(), content_size);
 
     std::stringstream compressed;
-    auto ene = encode(content, content_size, compressed, compression);
-    EXPECT_TRUE(ene.successful()) << ene.report();
+    EncoderStat en_stat = encode(content, content_size, compressed, compression);
+    EXPECT_TRUE(en_stat.successful()) << en_stat.report();
 
     const std::size_t compressed_size = compressed.tellp();
 
@@ -45,8 +45,8 @@ TEST_P(EncodeDecodeTest, EncodeDecode)
     EXPECT_GE(compression_ratio, 1.0);
 
     std::stringstream restored_content;
-    auto dee = decode(restored_content, compressed_size, compressed, compression);
-    EXPECT_TRUE(dee.successful()) << dee.report();
+    DecoderStat de_stat = decode(restored_content, compressed_size, compressed, compression);
+    EXPECT_TRUE(de_stat.successful()) << de_stat.report();
 
     ASSERT_THAT(restored_content.view(), Pointwise(Eq(), content.view()));
 }

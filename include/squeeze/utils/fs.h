@@ -5,16 +5,16 @@
 #include <fstream>
 #include <filesystem>
 
-#include "squeeze/error.h"
+#include "squeeze/status.h"
 #include "squeeze/entry_common.h"
 
 namespace squeeze::utils {
 
-std::variant<std::fstream, ErrorCode> make_regular_file(std::string_view path);
-std::variant<std::ofstream, ErrorCode> make_regular_file_out(std::string_view path);
-ErrorCode make_directory(std::string_view path, EntryPermissions perms);
-ErrorCode make_symlink(std::string_view path, std::string_view link_to, EntryPermissions perms);
-ErrorCode set_permissions(const std::filesystem::path& path, EntryPermissions perms);
+std::variant<std::fstream, StatCode> make_regular_file(std::string_view path);
+std::variant<std::ofstream, StatCode> make_regular_file_out(std::string_view path);
+StatCode make_directory(std::string_view path, EntryPermissions perms);
+StatCode make_symlink(std::string_view path, std::string_view link_to, EntryPermissions perms);
+StatCode set_permissions(const std::filesystem::path& path, EntryPermissions perms);
 
 void convert(const EntryPermissions& from, std::filesystem::perms& to);
 void convert(const std::filesystem::perms& from, EntryPermissions& to);

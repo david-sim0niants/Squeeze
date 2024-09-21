@@ -4,8 +4,9 @@
 
 namespace squeeze::test_tools::mock {
 
-Error<EntryOutput> EntryOutput::init(
-        const EntryHeader& entry_header, std::ostream *& stream)
+using Stat = EntryOutput::Stat;
+
+Stat EntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
 {
     switch (entry_header.attributes.type) {
         using enum EntryType;
@@ -38,8 +39,7 @@ Error<EntryOutput> EntryOutput::init(
     return success;
 }
 
-Error<EntryOutput> EntryOutput::init_symlink(
-        const EntryHeader& entry_header, const std::string& target)
+Stat EntryOutput::init_symlink(EntryHeader&& entry_header, const std::string& target)
 {
     auto symlink = fs.make<Symlink>(entry_header.path, std::string(target));
     this->file = symlink;
@@ -49,7 +49,7 @@ Error<EntryOutput> EntryOutput::init_symlink(
     return success;
 }
 
-Error<EntryOutput> EntryOutput::finalize()
+Stat EntryOutput::finalize()
 {
     file->set_permissions(permissions);
     return success;

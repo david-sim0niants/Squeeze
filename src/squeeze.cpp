@@ -24,7 +24,7 @@ bool Squeeze::update()
         auto node = appendee_path_map.extract(entry_header.path);
         if (node.empty())
             continue;
-        will_remove(it, node.mapped()->error);
+        will_remove(it, node.mapped()->status);
         SQUEEZE_TRACE("Will update {}", it->second.path);
     }
 

@@ -40,9 +40,9 @@ TEST_P(LZ77Test, EncodeDecodeTokens)
         const std::size_t nr_syms_encoded = token.get_nr_syms_within();
 
         std::size_t rest_data_i = rest_data.size();
-        auto e = decoder.decode_once(token);
-        EXPECT_TRUE(e.successful()) << e.report();
-        if (e.failed())
+        auto s = decoder.decode_once(token);
+        EXPECT_TRUE(s.successful()) << s.report();
+        if (s.failed())
             break;
 
         std::size_t rest_data_i_end = rest_data.size();
@@ -69,10 +69,10 @@ TEST_P(LZ77Test, EncodeDecodePackedTokens)
         if (p_token.is_len_dist()) {
             ASSERT_LT(++i, buffer.size());
             const DeflateLZ77::DistExtra dist_extra = buffer[i].get_dist_extra();
-            auto e = decoder.decode_once(p_token.get_len_sym(), p_token.get_len_extra(),
+            auto s = decoder.decode_once(p_token.get_len_sym(), p_token.get_len_extra(),
                                          p_token.get_dist_sym(), dist_extra);
-            EXPECT_TRUE(e.successful()) << e.report();
-            if (e.failed())
+            EXPECT_TRUE(s.successful()) << s.report();
+            if (s.failed())
                 break;
         } else {
             decoder.decode_once(p_token.get_literal());

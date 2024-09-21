@@ -10,17 +10,17 @@ namespace squeeze::compression {
 
 inline void PrintTo(const CompressionParams& params, std::ostream *os)
 {
-    *os << utils::stringify(params);
+    print_to(*os, params);
 }
 
 inline void PrintTo(const LZ77EncoderParams& params, std::ostream *os)
 {
-    *os << utils::stringify(params);
+    print_to(*os, params);
 }
 
 inline void PrintTo(const DeflateParams& params, std::ostream *os)
 {
-    *os << utils::stringify(params);
+    print_to(*os, params);
 }
 
 }

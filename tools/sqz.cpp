@@ -204,10 +204,10 @@ private:
         state.flags |= Dirty;
 
         if (state.flags & RecurseFlag) {
-            fsqz->will_append_recursively(path, state.compression, make_back_inserter_lambda(write_errors));
+            fsqz->will_append_recursively(path, state.compression, make_back_inserter_lambda(write_stats));
         } else {
-            write_errors.emplace_back();
-            fsqz->will_append(path, state.compression, &write_errors.back());
+            write_stats.emplace_back();
+            fsqz->will_append(path, state.compression, &write_stats.back());
         }
 
         return EXIT_SUCCESS;
@@ -220,15 +220,15 @@ private:
         state.flags |= Dirty;
 
         if (path == "*") {
-            fsqz->will_remove_all(make_back_inserter_lambda(write_errors));
+            fsqz->will_remove_all(make_back_inserter_lambda(write_stats));
             return EXIT_SUCCESS;
         }
 
         if (state.flags & RecurseFlag) {
-            fsqz->will_remove_recursively(path, make_back_inserter_lambda(write_errors));
+            fsqz->will_remove_recursively(path, make_back_inserter_lambda(write_stats));
         } else {
-            write_errors.emplace_back();
-            fsqz->will_remove(path, &write_errors.back());
+            write_stats.emplace_back();
+            fsqz->will_remove(path, &write_stats.back());
         }
 
         return EXIT_SUCCESS;
@@ -240,24 +240,24 @@ private:
         assert(fsqz.has_value());
 
         if (path == "*") {
-            std::deque<Error<Reader>> read_errors;
-            fsqz->extract_all(make_back_inserter_lambda(read_errors));
-            for (auto& err : read_errors)
-                if (err)
-                    std::cerr << err.report() << '\n';
+            std::deque<Reader::Stat> read_stats;
+            fsqz->extract_all(make_back_inserter_lambda(read_stats));
+            for (auto& stat : read_stats)
+                if (stat.failed())
+                    print_to(std::cerr, stat, '\n');
             return EXIT_SUCCESS;
         }
 
         if (state.flags & RecurseFlag) {
-            std::deque<Error<Reader>> read_errors;
-            fsqz->extract_recursively(path, make_back_inserter_lambda(read_errors));
-            for (auto& err : read_errors)
-                if (err)
-                    std::cerr << err.report() << '\n';
+            std::deque<Reader::Stat> read_stats;
+            fsqz->extract_recursively(path, make_back_inserter_lambda(read_stats));
+            for (auto& stat : read_stats)
+                if (stat.failed())
+                    print_to(std::cerr, stat, '\n');
         } else {
-            Error<Reader> err = fsqz->extract(path);
-            if (err)
-                std::cerr << err.report() << '\n';
+            Reader::Stat stat = fsqz->extract(path);
+            if (stat.failed())
+                print_to(std::cerr, stat, '\n');
         }
 
         return EXIT_SUCCESS;
@@ -321,16 +321,15 @@ private:
             return EXIT_SUCCESS;
 
         int exit_code = EXIT_SUCCESS;
-        const bool succeeded = fsqz->update();
+        fsqz->update();
 
-        if (not succeeded)
-            for (auto err : write_errors) {
-                if (err) {
-                    exit_code = EXIT_FAILURE;
-                    std::cerr << err.report() << '\n';
-                }
+        for (auto& stat : write_stats) {
+            if (stat.failed()) {
+                exit_code = EXIT_FAILURE;
+                print_to(std::cerr, stat, '\n');
             }
-        write_errors.clear();
+        }
+        write_stats.clear();
 
         std::filesystem::resize_file(sqz_fn, sqz_file.tellp());
 
@@ -343,13 +342,12 @@ private:
         assert(sqz.has_value());
         for (auto it = sqz->begin(); it != sqz->end(); ++it) {
             const auto& entry_header = it->second;
-            std::cout << squeeze::utils::stringify(entry_header.attributes)
-                      << "    " << entry_header.path;
+            std::stringstream extra;
             if (entry_header.attributes.type == EntryType::Symlink) {
-                std::cout << " -> ";
-                sqz->extract(it, std::cout);
+                extra << " -> ";
+                sqz->extract(it, extra);
             }
-            std::cout << std::endl;
+            print_to(std::cout, entry_header.attributes, "    ", entry_header.path, extra.view(), '\n');
         }
     }
 
@@ -540,7 +538,7 @@ private:
     std::fstream sqz_file;
     std::optional<Squeeze> sqz;
     std::optional<wrap::FileSqueeze> fsqz;
-    std::deque<Error<Writer>> write_errors;
+    std::deque<Writer::Stat> write_stats;
 };
 
 }

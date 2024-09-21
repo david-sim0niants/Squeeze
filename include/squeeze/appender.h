@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "entry_input.h"
-#include "error.h"
+#include "status.h"
 #include "append_scheduler.h"
 #include "encoder.h"
 
@@ -21,15 +21,19 @@ namespace squeeze {
  * Entry input is a generalized interface for providing an entry header and
  * corresponding entry content to be processed. */
 class Appender {
+public:
+    /* Status return type of this class methods. */
+    using Stat = AppendScheduler::Stat;
+
 protected:
     struct FutureAppend {
-        FutureAppend(EntryInput& entry_input, Error<Appender> *error)
-            : entry_input(entry_input), error(error)
+        FutureAppend(EntryInput& entry_input, Stat *status)
+            : entry_input(entry_input), status(status)
         {
         }
 
         EntryInput& entry_input;
-        Error<Appender> *error;
+        Stat *status;
     };
 
 public:
@@ -46,22 +50,22 @@ public:
 
     /* Register a future append operation by creating an entry input with the supplied type and parameters.
      * The entry input memory will be managed by the interface.
-     * Pass a reference to a future error to assign when the task is done. */
+     * Pass a reference to a future status to assign when the task is done. */
     template<typename T, typename ...Args>
-    inline void will_append(Error<Appender>& err, Args&&... args)
+    inline void will_append(StatStr& stat, Args&&... args)
         requires std::is_base_of_v<EntryInput, T>
     {
-        will_append(std::make_unique<T>(std::forward<Args>(args)...), &err);
+        will_append(std::make_unique<T>(std::forward<Args>(args)...), &stat);
     }
 
     /* Register a future append operation by passing an rvalue unique pointer to the entry input.
      * The entry input memory will be managed by the interface.
-     * Pass an optional pointer to a future error to assign when the task is done. */
-    void will_append(std::unique_ptr<EntryInput>&& entry_input, Error<Appender> *err = nullptr);
+     * Pass an optional pointer to a future status to assign when the task is done. */
+    void will_append(std::unique_ptr<EntryInput>&& entry_input, Stat *status = nullptr);
     /* Register a future append operation by passing a reference to the entry input.
      * The entry input memory will NOT be managed by the interface.
-     * Pass an optional pointer to a future error to assign when the task is done. */
-    void will_append(EntryInput& entry_input, Error<Appender> *err = nullptr);
+     * Pass an optional pointer to a future status to assign when the task is done. */
+    void will_append(EntryInput& entry_input, Stat *status = nullptr);
 
     /* Perform the registered appends.
      * The method guarantees that the put pointer of the target stream
@@ -70,14 +74,14 @@ public:
 
     /* Append an entry immediately by creating an entry input with the supplied type and parameters. */
     template<typename T, typename ...Args>
-    inline Error<Appender> append(Args&&... args) requires std::is_base_of_v<EntryInput, T>
+    inline Stat append(Args&&... args) requires std::is_base_of_v<EntryInput, T>
     {
         T entry_input(std::forward<Args>(args)...);
         return append(entry_input);
     }
 
     /* Append an entry immediately by passing a reference to the entry input. */
-    Error<Appender> append(EntryInput& entry_input);
+    Stat append(EntryInput& entry_input);
 
 protected:
     /* Runs the scheduler tasks */
