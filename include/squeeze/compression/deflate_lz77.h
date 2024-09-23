@@ -414,7 +414,7 @@ class DeflateLZ77::Decoder {
 public:
     /* Construct from the provided output iterator(s). */
     explicit Decoder(OutIt out_it, OutItEnd... out_it_end)
-        : internal(search_size, lookahead_size, out_it, out_it_end...)
+        : internal(search_size, out_it, out_it_end...)
     {
     }
 

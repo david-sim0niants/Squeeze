@@ -30,7 +30,7 @@ TEST_P(LZ77Test, EncodeDecodeTokens)
     auto encoder = LZ77<>::make_encoder(std::get<1>(GetParam()),
                                         search_size, lookahead_size, data.begin(), data.end());
     std::vector<char> rest_data;
-    auto decoder = LZ77<>::make_decoder(search_size, lookahead_size, std::back_inserter(rest_data));
+    auto decoder = LZ77<>::make_decoder(search_size, std::back_inserter(rest_data));
 
     while (true) {
         auto data_it = encoder.get_it();
@@ -82,7 +82,15 @@ TEST_P(LZ77Test, EncodeDecodePackedTokens)
     ASSERT_THAT(rest_data, Pointwise(Eq(), data));
 }
 
-static const auto test_inputs = make_generated_test_on_data_inputs(16, 1234, 16);
+static std::vector<TestOnDataInputCustom> gen_custom_inputs()
+{
+    std::vector<TestOnDataInputCustom> custom_inputs;
+    custom_inputs = get_default_custom_inputs();
+    custom_inputs.emplace_back(std::vector<char>(1 << 16, 0));
+    return custom_inputs;
+};
+
+static const auto test_inputs = make_generated_test_on_data_inputs(16, 1234, 16, gen_custom_inputs());
 
 #define SQUEEZE_COMPRESSION_TESTING_INSTANTIATE_LZ77_TEST(level) \
     INSTANTIATE_TEST_SUITE_P(Level_##level, LZ77Test, \

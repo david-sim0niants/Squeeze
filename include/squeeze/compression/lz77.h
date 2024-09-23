@@ -56,12 +56,11 @@ public:
         return Encoder<InIt, InItEnd...>(params, search_size, lookahead_size, in_it, in_it_end...);
     }
 
-    /* Make a decoder from the provided search_size, lookahead_size and output iterator(s). */
+    /* Make a decoder from the provided search_size and output iterator(s). */
     template<std::output_iterator<Sym> OutIt, typename... OutItEnd>
-    static inline auto make_decoder(std::size_t search_size, std::size_t lookahead_size,
-            OutIt out_it, OutItEnd... out_it_end)
+    static inline auto make_decoder(std::size_t search_size, OutIt out_it, OutItEnd... out_it_end)
     {
-        return Decoder<OutIt, OutItEnd...>(search_size, lookahead_size, out_it, out_it_end...);
+        return Decoder<OutIt, OutItEnd...>(search_size, out_it, out_it_end...);
     }
 };
 
@@ -220,7 +219,7 @@ private:
         auto [max_match_len, max_match_dist] = find_longest_match_from_chain(pos_chain);
 
         if (max_match_len <= params.match_insert_threshold)
-            pos_chain.push_front(window.get_curr_peek_pos());
+            pos_chain.push_front(window.get_lookahead_pos());
 
         return std::make_tuple(sym, max_match_len, max_match_dist);
     }
@@ -230,14 +229,14 @@ private:
     {
         std::size_t max_match_len = 1, max_match_dist = 0;
         auto pos_it = pos_chain.begin();
-        for (; pos_it != pos_chain.end() && *pos_it >= window.get_offset(); ++pos_it) {
+        for (; pos_it != pos_chain.end() && *pos_it >= window.get_search_pos(); ++pos_it) {
             const auto [match_len, match_dist] = window.find_match(*pos_it);
             if (match_len > max_match_len) {
                 max_match_len = match_len;
                 max_match_dist = match_dist;
             }
         }
-        // erase old positions that are behind the search window (pos < offset)
+        // erase old positions that are behind the search window (pos < search pos)
         pos_chain.erase(pos_it, pos_chain.end());
         return std::make_pair(max_match_len, max_match_dist);
     }
@@ -254,10 +253,10 @@ template<LZ77Policy Policy>
 template<std::output_iterator<typename Policy::Sym> OutIt, typename... OutItEnd>
 class LZ77<Policy>::Decoder {
 public:
-    /* Construct from the provided search_size, lookahead_size and output iterator(s). */
-    Decoder(std::size_t search_size, std::size_t lookahead_size, OutIt out_it, OutItEnd... out_it_end)
-        :   lookahead_size(lookahead_size),
-            full_size(search_size + lookahead_size),
+    /* Construct from the provided search_size and output iterator(s). */
+    Decoder(std::size_t search_size, OutIt out_it, OutItEnd... out_it_end)
+        :   search_buffer(search_size, Sym()),
+            search_end_it(search_buffer.data(), search_buffer.size(), 0),
             seq(out_it, out_it_end...)
     {
     }
@@ -265,9 +264,8 @@ public:
     /* Construct as a continuation of another decoder with new iterator(s). */
     template<std::output_iterator<Sym> PrevOutIt, typename... PrevOutItEnd>
     Decoder(const Decoder<PrevOutIt, PrevOutItEnd...>& prev, OutIt out_it, OutItEnd... out_it_end)
-        :   lookahead_size(prev.lookahead_size),
-            full_size(prev.full_size),
-            window(prev.window),
+        :   search_buffer(prev.search_buffer),
+            search_end_it(prev.search_end_it),
             seq(out_it, out_it_end...)
     {
         // processing the partial token (if not none) in a newly continued decoder
@@ -277,9 +275,8 @@ public:
     /* Construct as a continuation of another decoder with new iterator(s). */
     template<std::output_iterator<Sym> PrevOutIt, typename... PrevOutItEnd>
     Decoder(Decoder<PrevOutIt, PrevOutItEnd...>&& prev, OutIt out_it, OutItEnd... out_it_end)
-        :   lookahead_size(prev.lookahead_size),
-            full_size(prev.full_size),
-            window(std::move(prev.window)),
+        :   search_buffer(std::move(prev.search_buffer)),
+            search_end_it(std::move(prev.search_end_it)),
             seq(out_it, out_it_end...)
     {
         // processing the partial token (if not none) in a newly continued decoder
@@ -295,10 +292,8 @@ public:
     /* Decode length and distance codes. */
     StatStr decode_once(std::size_t len, std::size_t dist)
     {
-        if (dist > window.size()) [[unlikely]]
+        if (dist > search_buffer.size()) [[unlikely]]
             return "invalid distance that points further behind data";
-        if (len > lookahead_size) [[unlikely]]
-            return "length too large";
         decode_len_dist_raw(len, dist);
         return success;
     }
@@ -375,30 +370,24 @@ private:
         }
 
         *seq.it = sym; ++seq.it;
-        window.push_back(sym);
-
-        if (window.size() > full_size) [[unlikely]]
-            window.pop_front();
-
+        *search_end_it = sym; ++search_end_it;
         partial_token = Token();
     }
 
     inline void decode_len_dist_raw(std::size_t len, std::size_t dist)
     {
-        for (; len > 0 && seq.is_valid(); --len, ++seq.it) {
-            const Sym sym = window[window.size() - dist];
+        for (misc::CircularIterator<Sym> search_it = search_end_it - dist;
+             len > 0 && seq.is_valid();
+             --len, ++seq.it, ++search_it, ++search_end_it) {
+            const Sym sym = *search_it;
             *seq.it = sym;
-            window.push_back(sym);
+            *search_end_it = sym;
         }
-
-        const std::size_t redundant_size = window.size() - std::min(window.size(), full_size);
-        window.erase(window.begin(), window.begin() + redundant_size);
-
         partial_token = len == 0 ? Token() : Token(len, dist);
     }
 
-    std::size_t lookahead_size, full_size;
-    std::deque<Sym> window;
+    std::vector<Sym> search_buffer;
+    misc::CircularIterator<Sym> search_end_it;
     misc::Sequence<OutIt, OutItEnd...> seq;
     Token partial_token;
 };

@@ -3,11 +3,12 @@
 #include <concepts>
 #include <iterator>
 #include <cassert>
-#include <deque>
+#include <vector>
 #include <tuple>
 #include <algorithm>
 
 #include "squeeze/misc/sequence.h"
+#include "squeeze/misc/circular_iterator.h"
 
 namespace squeeze::compression {
 
@@ -18,11 +19,25 @@ namespace squeeze::compression {
 template<typename Sym, std::input_iterator InIt, typename... InItEnd>
 class LZ77SlidingWindow {
 public:
+    using CircularIterator = misc::CircularIterator<Sym>;
+
+    struct Pivot {
+        CircularIterator iter;
+        std::size_t pos;
+
+        Pivot(Sym *data, std::size_t size, std::size_t pos) : iter(data, size), pos(pos)
+        {
+        }
+    };
+
     /* Construct from the provided search_size, lookahead_size and input iterator(s); */
     LZ77SlidingWindow(std::size_t search_size, std::size_t lookahead_size, InIt in_it, InItEnd... in_it_end)
-        : search_size(search_size), lookahead_size(lookahead_size), seq(in_it, in_it_end...)
+        :
+        search_size(search_size), lookahead_size(lookahead_size),
+        buffer(search_size + lookahead_size), pivot(buffer.data(), buffer.size(), search_size),
+        seq(in_it, in_it_end...)
     {
-        refetch_data();
+        fetch_data(lookahead_size);
     }
 
     /* Construct as a continuation of another sliding window with new iterator(s). */
@@ -30,11 +45,9 @@ public:
     LZ77SlidingWindow(const LZ77SlidingWindow<PrevInIt, PrevInItEnd...>& prev, InIt in_it, InItEnd... in_it_end)
         :
         search_size(prev.search_size), lookahead_size(prev.lookahead_size),
-        search(prev.search), lookahead(prev.lookahead),
-        offset(prev.offset),
+        buffer(buffer), pivot(prev.pivot),
         seq(in_it, in_it_end...)
     {
-        refetch_data();
     }
 
     /* Construct as a continuation of another sliding window with new iterator(s). */
@@ -42,17 +55,15 @@ public:
     LZ77SlidingWindow(LZ77SlidingWindow<PrevInIt, PrevInItEnd...>&& prev, InIt in_it, InItEnd... in_it_end)
         :
         search_size(prev.search_size), lookahead_size(prev.lookahead_size),
-        search(std::move(prev.search)), lookahead(std::move(prev.lookahead)),
-        offset(prev.offset),
+        buffer(std::move(buffer)), pivot(std::move(prev.pivot)),
         seq(in_it, in_it_end...)
     {
-        refetch_data();
     }
 
     /* Check if the window is empty and no more data is to come. */
     inline bool is_empty() const noexcept
     {
-        return !seq.is_valid() && lookahead.empty();
+        return !seq.is_valid() && 0 == lookahead_size;
     }
 
     /* Get the lookahead size. */
@@ -67,76 +78,58 @@ public:
         return search_size;
     }
 
-    /* Get the current search size. */
-    inline std::size_t get_curr_search_size() const noexcept
+    /* Get the current absolute search buffer position (the position of the first symbol of it). */
+    inline std::size_t get_search_pos() const noexcept
     {
-        return search.size();
+        return pivot.pos - search_size;
     }
 
-    /* Get the current offset. */
-    inline std::size_t get_offset() const noexcept
+    /* Get the current absolute lookahead buffer position (the position of the first symbol of it). */
+    inline std::size_t get_lookahead_pos() const noexcept
     {
-        return offset;
-    }
-
-    /* Get the absolute position of the first symbol in the lookahead window. */
-    inline std::size_t get_curr_peek_pos() const noexcept
-    {
-        return offset + search.size();
+        return pivot.pos;
     }
 
     /* Peek at the lookahead window. Returns the iterator at which the peek stopped. */
     template<std::output_iterator<Sym> OutIt>
     OutIt peek(OutIt peek_it, std::size_t n)
     {
-        refetch_data();
-        return std::copy_n(lookahead.begin(), std::min(n, lookahead.size()), peek_it);
+        return std::copy_n(pivot.iter, std::min(n, lookahead_size), peek_it);
     }
 
-    /* Advance by one symbol. Assuming the lookahead window is not empty, and thus
-     * must only be called after a prior call to peek() that returned non-empty data. */
+    /* Advance by one symbol. */
     void advance_once()
     {
-        assert(!lookahead.empty());
-        search.push_back(lookahead.front());
-        lookahead.pop_front();
-        if (search.size() > search_size) {
-            search.pop_front();
-            ++offset;
-        }
+        assert(1 <= lookahead_size);
+        ++pivot.iter;
+        ++pivot.pos;
+        fetch_data(1);
     }
 
     /* Advance by the given length of symbols. The given length shall not exceed a match length
      * found by a prior call to find_match() and the overall lookahead size. */
     void advance(std::size_t len)
     {
-        assert(len <= lookahead.size());
-        search.insert(search.end(),
-                lookahead.begin(), lookahead.begin() + len);
-        lookahead.erase(lookahead.begin(), lookahead.begin() + len);
-        const std::size_t search_advance_len =
-            search.size() - std::min(search.size(), search_size);
-        search.erase(search.begin(), search.begin() + search_advance_len);
-        offset += search_advance_len;
+        assert(len <= lookahead_size);
+        pivot.iter += len;
+        pivot.pos += len;
+        fetch_data(len);
     }
 
-    /* Find the longest match starting from the given position. Assuming pos >= offset. */
+    /* Find the longest match starting from the given position. */
     std::pair<std::size_t, std::size_t> find_match(std::size_t pos) const
     {
-        assert(pos >= offset);
+        assert(pos < pivot.pos);
+        assert(pivot.pos - pos <= search_size);
 
-        auto search_it = search.begin() + (pos - offset);
-        auto lookah_it = lookahead.begin();
-        const auto search_it_end = search.end();
-        const auto lookah_it_end = lookahead.end();
+        CircularIterator lookah_it = pivot.iter;
+        CircularIterator lookah_it_end = lookah_it + lookahead_size;
+        CircularIterator search_it = pivot.iter - (pivot.pos - pos);
 
-        std::tie(search_it, lookah_it) = mismatch(search_it, search_it_end, lookah_it, lookah_it_end);
-        if (search_it == search_it_end) // search overflow case
-            // finding rest of the match within the lookahead window
-            lookah_it = std::mismatch(lookah_it, lookah_it_end, lookahead.begin()).first;
+        std::tie(lookah_it, search_it) = std::mismatch(lookah_it, lookah_it_end, search_it);
 
-        const std::size_t match_len = std::distance(lookahead.begin(), lookah_it);
-        const std::size_t match_dist = search.size() - (pos - offset);
+        const std::size_t match_len = std::distance(pivot.iter, lookah_it);
+        const std::size_t match_dist = pivot.pos - pos;
         return std::make_pair(match_len, match_dist);
     }
 
@@ -167,29 +160,18 @@ public:
     }
 
 private:
-    /* Custom implementation of std::mismatch with addition of checking both iterator ends. */
-    template<std::input_iterator ItL, std::input_iterator ItR>
-    static std::pair<ItL, ItR> mismatch(ItL it_l, ItL it_l_end, ItR it_r, ItR it_r_end)
+    inline void fetch_data(std::size_t len)
     {
-        for (; it_l != it_l_end && it_r != it_r_end && *it_l == *it_r; ++it_l, ++it_r);
-        return std::make_pair(it_l, it_r);
-    }
-
-    /* Re-fetch data from the iterator(s). */
-    inline void refetch_data()
-    {
-        for (; seq.is_valid() && lookahead.size() < lookahead_size; ++seq.it)
-            lookahead.push_back(*seq.it);
+        CircularIterator fill_it = pivot.iter + (lookahead_size - len);
+        for (; seq.is_valid() && len > 0; ++seq.it, ++fill_it, --len)
+            *fill_it = *seq.it;
+        lookahead_size -= len;
     }
 
     std::size_t search_size, lookahead_size;
-    std::deque<Sym> search, lookahead;
-    std::size_t offset = 0;
+    std::vector<Sym> buffer;
+    Pivot pivot;
     misc::Sequence<InIt, InItEnd...> seq;
 };
-
-template<std::input_iterator InIt, typename... InItEnd>
-LZ77SlidingWindow(InIt, InItEnd...) ->
-    LZ77SlidingWindow<std::remove_cvref_t<std::iter_value_t<InIt>>, InIt, InItEnd...>;
 
 }
