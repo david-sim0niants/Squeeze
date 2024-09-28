@@ -5,6 +5,8 @@
 #include <type_traits>
 #include <concepts>
 
+#include "squeeze/printing.h"
+
 namespace squeeze {
 
 /* The encoded token that either holds a symbol (with len = 1, dist = 0),
@@ -78,5 +80,24 @@ private:
     std::size_t len = 0;
     std::size_t dist = 0;
 };
+
+template<typename Sym>
+void print_to(std::ostream& os, const LZ77Token<Sym>& token)
+{
+    using Token = LZ77Token<Sym>;
+    switch (token.get_type()) {
+    case Token::None:
+        print_to(os, "<nil>");
+        break;
+    case Token::Symbol:
+        print_to(os, token.get_sym());
+        break;
+    case Token::LenDist:
+        print_to(os, '<', token.get_len(), ", ", token.get_dist(), '>');
+        break;
+    default:
+        break;
+    }
+}
 
 }

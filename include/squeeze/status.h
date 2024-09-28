@@ -202,9 +202,9 @@ public:
                 {
                     squeeze::print_to(os, "SUCCESS");
                 },
-                [&os] (const auto& str)
+                [&os] (const auto& message)
                 {
-                    squeeze::print_to(os, str);
+                    squeeze::print_to(os, message);
                 },
             }, Base::message);
     }

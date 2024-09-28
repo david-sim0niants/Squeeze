@@ -14,14 +14,24 @@ namespace squeeze::compression {
  * symbols and extra bits. */
 class DeflateLZ77 {
 public:
+    /* Policy of LZ77 per the DEFLATE spec. */
     struct Policy {
         using Sym = char;
-        static constexpr std::size_t min_len = 3;
+        static constexpr std::size_t min_match_len = 3;
+        static constexpr std::size_t search_size = 1 << 15;
+        static constexpr std::size_t lookahead_size = 258;
     };
 
     using LZ77_ = LZ77<Policy>;
+    /* Literal type */
     using Literal = LZ77_::Sym;
-    static constexpr std::size_t min_len = LZ77_::min_len;
+    /* Min match length. */
+    static constexpr std::size_t min_match_len = LZ77_::min_match_len;
+    /* Search buffer size. */
+    static constexpr std::size_t search_size = LZ77_::search_size;
+    /* Lookahead buffer size. */
+    static constexpr std::size_t lookahead_size = LZ77_::lookahead_size;
+    /* Token type */
     using Token = LZ77_::Token;
 
     /* 5 bit length symbol that maps from [0-28] to [257-285] length symbols of the
@@ -49,13 +59,13 @@ public:
     inline static PackedLen pack_len(std::size_t len)
     {
         assert(len <= lookahead_size && "length too large");
-        assert(len >= min_len && "length too small");
-        return static_cast<PackedLen>(len - min_len);
+        assert(len >= min_match_len && "length too small");
+        return static_cast<PackedLen>(len - min_match_len);
     }
 
     inline static std::size_t unpack_len(PackedLen p_len)
     {
-        return static_cast<std::size_t>(p_len) + min_len;
+        return static_cast<std::size_t>(p_len) + min_match_len;
     }
 
     inline static PackedDist pack_dist(std::size_t dist)
@@ -164,7 +174,7 @@ public:
     template<std::input_iterator InIt, typename... InItEnd>
     inline static auto make_encoder(const LZ77EncoderParams& params, InIt in_it, InItEnd... in_it_end)
     {
-        return Encoder<InIt, InItEnd...>(in_it, in_it_end...);
+        return Encoder<InIt, InItEnd...>(params, in_it, in_it_end...);
     }
 
     /* Make a decoder from the provided output iterator(s). */
@@ -178,11 +188,6 @@ public:
     static constexpr LenSym max_len_sym = 28;
     /* Max distance symbol */
     static constexpr DistSym max_dist_sym = 29;
-
-    /* Search window size. */
-    static constexpr std::size_t search_size = 1 << 15;
-    /* Lookahead window size. */
-    static constexpr std::size_t lookahead_size = 258;
 };
 
 /* Representation of an LZ77 token in a packed 16-bit that is more memory-efficient and
@@ -308,7 +313,7 @@ public:
 
     /* Construct from the provided params and input iterator(s). */
     explicit Encoder(const LZ77EncoderParams& params, InIt in_it, InItEnd... in_it_end)
-        : internal(params, search_size, lookahead_size, in_it, in_it_end...)
+        : internal(params, in_it, in_it_end...)
     {
     }
 
@@ -414,7 +419,7 @@ class DeflateLZ77::Decoder {
 public:
     /* Construct from the provided output iterator(s). */
     explicit Decoder(OutIt out_it, OutItEnd... out_it_end)
-        : internal(search_size, out_it, out_it_end...)
+        : internal(out_it, out_it_end...)
     {
     }
 

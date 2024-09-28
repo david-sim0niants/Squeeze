@@ -46,7 +46,7 @@ Stat FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
         std::error_code ec;
         auto symlink_target = std::filesystem::read_symlink(entry_header.path, ec);
         if (ec)
-            return {"failed reading symlink", Status(ec)};
+            return {"failed reading symlink - " + path, Status(ec)};
         content = symlink_target.string();
         break;
     }
@@ -54,7 +54,7 @@ Stat FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
         SQUEEZE_TRACE("'{}' is a regular file", path);
         file = std::ifstream(path, std::ios_base::binary | std::ios_base::in);
         if (!*file)
-            return "failed opening a file";
+            return "failed opening a file: " + path;
         content = &*file;
         break;
     default:

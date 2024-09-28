@@ -19,21 +19,16 @@ using namespace test_common;
 using LZ77TestInput = std::tuple<const TestOnDataInput *, LZ77EncoderParams>;
 
 class LZ77Test : public ::testing::TestWithParam<LZ77TestInput> {
-protected:
-    static constexpr std::size_t search_size = 1 << 15;
-    static constexpr std::size_t lookahead_size = 258;
 };
 
 TEST_P(LZ77Test, EncodeDecodeTokens)
 {
     std::vector<char> data {std::get<0>(GetParam())->get_data()};
-    auto encoder = LZ77<>::make_encoder(std::get<1>(GetParam()),
-                                        search_size, lookahead_size, data.begin(), data.end());
+    auto encoder = LZ77<>::make_encoder(std::get<1>(GetParam()), data.begin(), data.end());
     std::vector<char> rest_data;
-    auto decoder = LZ77<>::make_decoder(search_size, std::back_inserter(rest_data));
+    auto decoder = LZ77<>::make_decoder(std::back_inserter(rest_data));
 
     while (true) {
-        auto data_it = encoder.get_it();
         LZ77<>::Token token = encoder.encode_once();
         if (token.get_type() == LZ77<>::Token::None)
             break;
@@ -49,6 +44,9 @@ TEST_P(LZ77Test, EncodeDecodeTokens)
         const std::size_t nr_syms_decoded = rest_data_i_end - rest_data_i;
 
         EXPECT_EQ(nr_syms_encoded, nr_syms_decoded);
+
+        if (HasFailure())
+            print_to(std::cerr, token);
     }
 
     ASSERT_THAT(rest_data, Pointwise(Eq(), data));

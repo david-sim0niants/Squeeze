@@ -7,7 +7,8 @@
 
 namespace squeeze::misc {
 
-template<typename T>
+template<typename T, std::size_t size>
+    requires (size > 0)
 class CircularIterator {
 public:
     using iterator_category = std::random_access_iterator_tag;
@@ -20,34 +21,10 @@ public:
 
     CircularIterator() = default;
 
-    CircularIterator(T *data, std::size_t size, std::size_t index = 0)
-        : data(data), size(size), index(index)
+    CircularIterator(T *data, std::size_t index = 0) : data(data), index(index)
     {
-        if (0 == size)
-            throw Exception<CircularIterator>("can't have 0 size");
         if (index >= size)
             throw Exception<CircularIterator>("index out of the range");
-    }
-
-    CircularIterator(const CircularIterator&) = default;
-    CircularIterator& operator=(const CircularIterator&) = default;
-
-    CircularIterator(CircularIterator&& other) noexcept
-    {
-        swap(other);
-    }
-
-    CircularIterator& operator=(CircularIterator&& other) noexcept
-    {
-        swap(other);
-        return *this;
-    }
-
-    inline void swap(CircularIterator& other) noexcept
-    {
-        std::swap(data, other.data);
-        std::swap(size, other.size);
-        std::swap(index, other.index);
     }
 
     inline reference operator*() noexcept
@@ -72,7 +49,7 @@ public:
 
     inline CircularIterator& operator++() noexcept
     {
-        index = (size == ++index ? 0 : index);
+        ++index %= size;
         return *this;
     }
 
@@ -85,7 +62,7 @@ public:
 
     inline CircularIterator& operator--() noexcept
     {
-        index = (0 == index-- ? size : index);
+        --index %= size;
         return *this;
     }
 
@@ -98,7 +75,7 @@ public:
 
     inline CircularIterator& operator+=(std::ptrdiff_t off) noexcept
     {
-        index = peek(+off);
+        index = peek(off);
         return *this;
     }
 
@@ -122,9 +99,7 @@ public:
 
     inline std::ptrdiff_t operator-(const CircularIterator& rhs) const noexcept
     {
-        const T *lhs_ptr = get_ptr();
-        const T *rhs_ptr = rhs.get_ptr();
-        return lhs_ptr >= rhs_ptr ? (lhs_ptr - rhs_ptr) : (size - (rhs_ptr - lhs_ptr));
+        return (get_ptr() - rhs.get_ptr()) % size;
     }
 
     inline bool operator==(const CircularIterator& rhs) const noexcept
@@ -170,19 +145,7 @@ public:
 private:
     inline std::size_t peek(std::ptrdiff_t off) const noexcept
     {
-        return off < 0 ? peek_left(-off) : peek_right(off);
-    }
-
-    inline std::size_t peek_right(std::size_t off) const noexcept
-    {
-        assert(off <= size);
-        return (index + off) - (index >= size - off ? size : 0);
-    }
-
-    inline std::size_t peek_left(std::size_t off) const noexcept
-    {
-        assert(off <= size);
-        return (index - off) + (index < off ? size : 0);
+        return (index + off) % size;
     }
 
     inline T *get_ptr() noexcept
@@ -196,7 +159,6 @@ private:
     }
 
     T *data = nullptr;
-    std::size_t size = 0;
     std::size_t index = 0;
 };
 
