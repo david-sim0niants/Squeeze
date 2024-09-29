@@ -49,6 +49,9 @@ TEST_P(LZ77Test, EncodeDecodeTokens)
             print_to(std::cerr, token);
     }
 
+    if (HasFailure())
+        print_to(std::cerr, '\n');
+
     ASSERT_THAT(rest_data, Pointwise(Eq(), data));
 }
 
@@ -84,7 +87,7 @@ static std::vector<TestOnDataInputCustom> gen_custom_inputs()
 {
     std::vector<TestOnDataInputCustom> custom_inputs;
     custom_inputs = get_default_custom_inputs();
-    custom_inputs.emplace_back(std::vector<char>(1 << 16, 0));
+    custom_inputs.emplace_back(std::vector<char>(1 << 18, '0'));
     return custom_inputs;
 };
 

@@ -52,14 +52,24 @@ public:
         return buffer;
     }
 
-    inline std::size_t get_pos() const
+    inline std::size_t get_pos() const noexcept
     {
         return pos;
     }
 
-    inline std::size_t get_end_pos() const
+    inline std::size_t get_end_pos() const noexcept
     {
         return pos + size;
+    }
+
+    inline std::size_t get_filled_size() const noexcept
+    {
+        return std::min(size, pos);
+    }
+
+    inline std::size_t get_filled_pos() const noexcept
+    {
+        return std::max(pos, size);
     }
 
     /* Check if the suffix of the given length matches a sequence of the same length

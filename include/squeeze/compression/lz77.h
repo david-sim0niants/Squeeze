@@ -101,7 +101,6 @@ public:
     {
         if (0 == params.match_insert_threshold)
             throw Exception<Encoder>("match insert threshold is 0");
-        fetch_min_match_data();
     }
 
     /* Construct as a continuation of another encoder with new iterator(s). */
@@ -148,7 +147,7 @@ public:
 
         // try to find the best match
         const Sym sym = *(search_window.get_pivot() - min_match_len);
-        auto [match_len, match_dist] = find_better_match(min_match_len);
+        auto [match_len, match_dist] = find_better_match(min_match_len - 1);
 
         std::size_t nr_processed_fetch_syms = match_len;
 
@@ -156,7 +155,7 @@ public:
             // longest match not "long enough", try lazy matching
             auto [lazy_match_len, lazy_match_dist] = try_lazy_matching(match_len);
             if (lazy_match_len > match_len) { // lazy matching succeeded
-                cached_token = Token(lazy_match_len, lazy_match_dist); // storing it in cache
+                cached_token = Token(lazy_match_len, lazy_match_dist); // caching it
                 match_len = 1; match_dist = 0; // current match will be a single-symbol match
                 nr_processed_fetch_syms = lazy_match_len + match_len;
             }
@@ -240,6 +239,7 @@ private:
     /* Mark the specified number of fetched symbols as processed. */
     inline void mark_processed(std::size_t nr_processed_fetch_syms)
     {
+        assert(nr_fetched_syms >= nr_processed_fetch_syms);
         nr_fetched_syms -= nr_processed_fetch_syms;
     }
 
@@ -252,120 +252,121 @@ private:
         }
     }
 
-    /* Find the best match that is longer or equal to the specified match length.
-     * Otherwise, return {1, 0} ("only one symbol matched to itself"). */
+    /* Try lazy matching by skipping one symbol and finding a better match with the next one. */
+    std::tuple<std::size_t, std::size_t> try_lazy_matching(std::size_t match_len)
+    {
+        match_len = std::max(match_len, min_match_len);
+        assert(nr_fetched_syms >= match_len);
+        if (match_len == nr_fetched_syms && !try_fetch_sym())
+            return std::make_tuple(0, 0);
+        else
+            return find_better_match(match_len - 1);
+    }
+
+    /* Find the best match that is strictly longer than the specified length.
+     * Otherwise return {1, 0} ("only one symbol matched and it matched to itself"). */
     std::tuple<std::size_t, std::size_t> find_better_match(std::size_t match_len)
     {
-        assert(match_len >= min_match_len);
-
-        ChainKey chain_key {};
-        const std::size_t min_match_pos = search_window.get_end_pos() - (match_len - min_match_len);
-        construct_chain_key(search_window.get_pivot() - match_len, chain_key);
-
-        Chain& pos_chain = hash_chains[chain_key];
+        assert(match_len + 1 >= min_match_len);
         std::size_t match_dist = 0;
-        std::tie(match_len, match_dist) = find_better_match_from_chain(pos_chain, match_len);
 
+        const bool peak_match = find_better_match_from_hash_chains(match_len, match_dist);
+
+        // try to find an overlapping match, even if the match reached its peak,
+        // as smaller distances are more favorable
+        std::size_t overlapping_match_len = match_len - !!(peak_match);
+        find_better_match_overlapping_min_match(overlapping_match_len, match_dist);
+        // branchlessly get the new match length
+        match_len = overlapping_match_len + !!(overlapping_match_len < match_len);
+
+        // if the match distance found so far is 0, then there's no repeated sequence to match,
+        // so the match length should be 1, meaning a single-symbol match
         if (0 == match_dist)
             match_len = 1;
 
-        if (match_len <= params.match_insert_threshold)
+        return std::make_tuple(match_len, match_dist);
+    }
+
+    /* Find the best match from the hash chains that is strictly longer than the specified match length.
+     * Return whether the match reached its peak. */
+    bool find_better_match_from_hash_chains(std::size_t& match_len, std::size_t& match_dist)
+    {
+        assert(match_len + 1 >= min_match_len);
+
+        ChainKey chain_key {};
+        construct_chain_key(search_window.get_pivot() - (match_len + 1), chain_key);
+        const std::size_t min_match_pos = search_window.get_end_pos() - (match_len + 1 - min_match_len);
+
+        Chain& pos_chain = hash_chains[chain_key];
+        const bool peak_match = find_better_match_from_chain(pos_chain, match_len, match_dist);
+
+        if ((0 == match_dist ? 1 : match_len) <= params.match_insert_threshold)
             pos_chain.push_front(min_match_pos);
 
-        return std::make_tuple(match_len, match_dist);
+        return peak_match;
     }
 
-    /* Find the longest repeated sequence match from the given position chain
-     * that is longer or equal to the specified length. Return a 0 distance otherwise. */
-    std::tuple<std::size_t, std::size_t> find_better_match_from_chain(Chain& pos_chain, std::size_t match_len)
+    /* Find the best match from the specified position chain that is strictly
+     * longer than the specified match length. Return whether the match reached its peak. */
+    bool find_better_match_from_chain(Chain& pos_chain, std::size_t& match_len, std::size_t& match_dist)
     {
-        assert(match_len >= min_match_len);
-        std::size_t match_dist = 0;
+        assert(match_len + 1 >= min_match_len);
+
         auto pos_it = pos_chain.begin();
 
-        skip_too_recent_matches_from_chain(pos_chain, pos_it);
-        find_equal_match_from_chain_and_extend(pos_chain, pos_it, match_len, match_dist) &&
-        find_longer_match_from_chain_and_extend(pos_chain, pos_it, match_len, match_dist);
-        clear_too_early_matches(pos_chain, pos_it);
-
-        return std::make_tuple(match_len, match_dist);
-    }
-
-    /* Skips matches that are currently beyond the end of the search window. */
-    inline void skip_too_recent_matches_from_chain(const Chain& pos_chain, auto& pos_it) const
-    {
+        // skip too recent matches that are currently beyond the end of the search window
         for (; pos_it != pos_chain.end() && *pos_it >= search_window.get_end_pos(); ++pos_it);
-    }
 
-    /* Wraps find_and_extend_match_from_chain with extra_sym_fetched=false assumption. */
-    inline bool find_equal_match_from_chain_and_extend(const Chain& pos_chain,
-            auto& pos_it, std::size_t& match_len, std::size_t& match_dist)
-    {
-        return find_and_extend_match_from_chain<false>(pos_chain, pos_it, match_len, match_dist);
-    }
+        bool peak_match = false;
+        for (; pos_it != pos_chain.end() && *pos_it >= search_window.get_pos() && !peak_match; ++pos_it)
+            peak_match = match_and_extend_at<min_match_len>(*pos_it, match_len, match_dist);
 
-    /* Wraps find_and_extend_match_from_chain with extra_sym_fetched=true assumption. */
-    inline bool find_longer_match_from_chain_and_extend(const Chain& pos_chain,
-            auto& pos_it, std::size_t& match_len, std::size_t& match_dist)
-    {
-        return find_and_extend_match_from_chain<true>(pos_chain, pos_it, match_len, match_dist);
-    }
-
-    /* Erase old positions that are behind the search window. */
-    inline void clear_too_early_matches(Chain& pos_chain, auto& pos_it)
-    {
+        // erase too early matches that are behind the search window
         pos_chain.erase(pos_it, pos_chain.end());
-        pos_it = pos_chain.end();
+
+        return peak_match;
     }
 
-    /* This method has two "modes", and as a template, simultaneously implements two methods.
-     *
-     * In the first "mode", with extra_sym_fetched=false, it assumes that no extra unmatched symbol
-     * has been fetched and pushed to the search buffer and it just tries to find a potential match
-     * from the position chain and match it against the newly fetch symbols at the end of the search
-     * buffer with the exact specified length.
-     * This "mode" is an edge case that should run before the general case or the second "mode".
-     * If it finds a successful exact-length match, it calls fetch_and_match() to try to extend its match.
-     * After that the "extra unmatched symbol fetched" assumption works and this method should be called
-     * again with the second "mode". Otherwise if it doesn't find any successful match at all,
-     * just returns false indicating no match could be found from the position chain.
-     *
-     * In the second "mode", with extra_sym_fetched=true, it assumes that an extra unmatched symbol
-     * has been prior fetched and pushed to the search buffer. Now instead of trying to find an
-     * exact-length match, it looks for a one symbol longer match, trying to also match the recently
-     * fetched extra symbol. If such match is found, the match length is incremented and
-     * fetch_and_match() is called. */
-    template<bool extra_sym_fetched>
-    bool find_and_extend_match_from_chain(const Chain& pos_chain,
-            auto& pos_it, std::size_t& match_len, std::size_t& match_dist)
+    /* Find the best match that overlaps the min match symbols with small distances in the
+     * range [1, min_match_len - 1]. Return whether the match reached its peak. */
+    bool find_better_match_overlapping_min_match(std::size_t& match_len, std::size_t& match_dist)
     {
-        for (; pos_it != pos_chain.end() && *pos_it >= search_window.get_pos(); ++pos_it) {
-            const std::size_t pos = *pos_it;
-
-            const std::size_t expected_match_len = match_len - min_match_len + extra_sym_fetched;
-            if (not search_window.suffix_matches_at(pos, expected_match_len))
-                continue;
-            auto match_it = search_window.get_iter_at(pos + expected_match_len);
-
-            match_len += extra_sym_fetched;
-            match_dist = search_window.get_end_pos() - pos + min_match_len - match_len;
-
-            const bool match_peaked = fetch_and_match(match_it, match_len);
-            if (not extra_sym_fetched or match_peaked) {
-                ++pos_it;
-                return !match_peaked;
-            }
-        }
+        assert(search_window.get_end_pos() >= match_len + 1);
+        std::size_t pos = search_window.get_end_pos() - match_len - 1;
+        for (std::size_t i = 1; i < min_match_len && pos > search_window.get_filled_pos(); ++i)
+            if (match_and_extend_at<0>(--pos, match_len, match_dist))
+                return true;
         return false;
     }
 
-    /* This method tries to extend an existing match by fetching more symbols to match against to.
-     * If during that no more symbols could be fetched from the input (when there are none left),
-     * or if the match reached its "peak" (became equal to the conceptual lookahead buffer size),
-     * it returns false indicating that there's no need to try to find any longer match.
-     * Otherwise it ends up with a fetched symbol that failed to match with ts the corresponding one
-     * in the search buffer and that is when the match normally stops.
-     * After that the "extra unmatched symbol fetched" assumption works. */
+    /* Find a match at the specified position with the specified length and if it's found, try to
+     * extend it by fetching more symbols. Return whether the match reached its peak.
+     * When the match reaches its peak, no fetched symbol is left unmatched, otherwise number
+     * of fetched symbols is one bigger than the extended size. */
+    template<std::size_t pos_shift>
+    bool match_and_extend_at(std::size_t pos, std::size_t& match_len, std::size_t& match_dist)
+    {
+        assert(match_len + 1 >= pos_shift);
+
+        const std::size_t expected_match_len = match_len + 1 - pos_shift;
+        assert(search_window.get_end_pos() >= pos + expected_match_len);
+        if (not search_window.suffix_matches_at(pos, expected_match_len))
+            return false;
+
+        ++match_len;
+        match_dist = search_window.get_end_pos() - pos - match_len + pos_shift;
+
+        auto match_it = search_window.get_iter_at(pos + match_len - pos_shift);
+        return fetch_and_match(match_it, match_len);
+    }
+
+    /* Fetch symbols and match against them, extending the match.
+     * Return true if the match reached its peak, which is either
+     * the match length became equal to the lookahead buffer (conceptual) size,
+     * or at some point no more symbols could be fetched to match against.
+     * Return false if the matching stopped simply because of a symbol mismatch.
+     * In this case, it should be noted that the last unmatched symbol has also
+     * been fetched and will appear at the end of the search buffer. */
     bool fetch_and_match(CircularIterator match_it, std::size_t& match_len)
     {
         while (true) {
@@ -379,18 +380,6 @@ private:
             ++match_it;
             ++match_len;
         }
-    }
-
-    /* Try lazy matching by skipping one symbol and trying a match with the next one. */
-    std::tuple<std::size_t, std::size_t> try_lazy_matching(std::size_t match_len)
-    {
-        match_len = std::max(match_len, min_match_len);
-        assert(nr_fetched_syms >= match_len);
-        assert(nr_fetched_syms - match_len <= 1);
-        if (match_len == nr_fetched_syms && !try_fetch_sym())
-            return std::make_tuple(0, 0);
-        else
-            return find_better_match(match_len);
     }
 
 private:

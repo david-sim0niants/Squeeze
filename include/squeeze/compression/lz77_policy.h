@@ -31,7 +31,7 @@ concept LZ77Policy = requires
         requires T::lookahead_size == T::lookahead_size;
         requires T::lookahead_size > 0;
 
-        requires T::search_size >= T::min_match_len && T::lookahead_size >= T::min_match_len;
+        requires T::search_size >= T::lookahead_size && T::lookahead_size >= T::min_match_len;
     };
 
 template<typename Sym_ = char>
