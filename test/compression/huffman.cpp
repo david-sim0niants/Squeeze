@@ -29,7 +29,7 @@ protected:
     static std::vector<Huffman<>::CodeLen> gen_code_lengths(const std::vector<Huffman<>::Freq>& freqs)
     {
         std::vector<Huffman<>::CodeLen> code_lens (freqs.size());
-        compression::Huffman<>::sort_find_code_lengths(freqs.begin(), freqs.end(), code_lens.begin());
+        compression::Huffman<>::find_code_lengths(freqs.begin(), freqs.size(), code_lens.begin());
         return code_lens;
     }
 
@@ -71,7 +71,7 @@ protected:
     {
         std::array<Huffman<>::Freq, 256> freqs {};
         count_freqs(data, freqs);
-        Huffman<>::sort_find_code_lengths(freqs.begin(), freqs.end(), code_lens.begin());
+        Huffman<>::find_code_lengths(freqs.begin(), freqs.size(), code_lens.begin());
         Huffman<>::gen_codes(code_lens.begin(), code_lens.end(), codes.begin());
     }
 };

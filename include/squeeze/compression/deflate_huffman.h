@@ -63,10 +63,9 @@ public:
     static void find_code_len_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_it_end,
             CodeLenCodeLenIt clcl_it)
     {
-        CodeLenFreq code_len_freqs[code_len_alphabet_size] {};
-        count_code_len_freqs(code_len_it, code_len_it_end, code_len_freqs);
-        CodeLenHuffman::sort_find_code_lengths(
-                std::begin(code_len_freqs), std::end(code_len_freqs), clcl_it);
+        std::array<CodeLenFreq, code_len_alphabet_size> code_len_freqs {};
+        count_code_len_freqs(code_len_it, code_len_it_end, code_len_freqs.begin());
+        CodeLenHuffman::template find_code_lengths<code_len_alphabet_size>(code_len_freqs.begin(), clcl_it);
     }
 
     /* Validate code lengths of the code lengths alphabet. */

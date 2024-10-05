@@ -5,7 +5,7 @@
 #include <climits>
 #include <utility>
 #include <bitset>
-#include <deque>
+#include <vector>
 #include <unordered_map>
 #include <algorithm>
 
@@ -83,7 +83,7 @@ private:
     /* A sequence of symbols of min_match_len size used for finding matches in the hash chain. */
     using ChainKey = std::bitset<min_match_len * sizeof(Sym) * CHAR_BIT>;
     /* Chain type used in the hash chains. */
-    using Chain = std::deque<std::size_t>;
+    using Chain = std::vector<std::size_t>;
     /* The circular iterator type. */
     using CircularIterator = typename SlidingWindow::CircularIterator;
 
@@ -101,6 +101,7 @@ public:
     {
         if (0 == params.match_insert_threshold)
             throw Exception<Encoder>("match insert threshold is 0");
+        hash_chains.reserve(search_size);
     }
 
     /* Construct as a continuation of another encoder with new iterator(s). */
@@ -301,7 +302,7 @@ private:
         const bool peak_match = find_better_match_from_chain(pos_chain, match_len, match_dist);
 
         if ((0 == match_dist ? 1 : match_len) <= params.match_insert_threshold)
-            pos_chain.push_front(min_match_pos);
+            pos_chain.push_back(min_match_pos);
 
         return peak_match;
     }
@@ -312,17 +313,17 @@ private:
     {
         assert(match_len + 1 >= min_match_len);
 
-        auto pos_it = pos_chain.begin();
+        auto pos_it = pos_chain.rbegin();
 
         // skip too recent matches that are currently beyond the end of the search window
-        for (; pos_it != pos_chain.end() && *pos_it >= search_window.get_end_pos(); ++pos_it);
+        for (; pos_it != pos_chain.rend() && *pos_it >= search_window.get_end_pos(); ++pos_it);
 
         bool peak_match = false;
-        for (; pos_it != pos_chain.end() && *pos_it >= search_window.get_pos() && !peak_match; ++pos_it)
+        for (; pos_it != pos_chain.rend() && *pos_it >= search_window.get_pos() && !peak_match; ++pos_it)
             peak_match = match_and_extend_at<min_match_len>(*pos_it, match_len, match_dist);
 
         // erase too early matches that are behind the search window
-        pos_chain.erase(pos_it, pos_chain.end());
+        // pos_chain.erase(pos_it, pos_chain.end());
 
         return peak_match;
     }

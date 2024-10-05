@@ -301,12 +301,14 @@ private:
         count_freqs(data, litlen_freq, dist_freq);
 
         std::span<CodeLen> litlen_code_lens (code_lens.data(), litlen_alphabet_size);
-        Huffman_::sort_find_code_lengths(litlen_freq.begin(), litlen_freq.end(), litlen_code_lens.data());
+        Huffman_::template
+            find_code_lengths<litlen_alphabet_size>(litlen_freq.begin(), litlen_code_lens.data());
         assert(Huffman_::validate_code_lens(litlen_code_lens.begin(), litlen_code_lens.end()));
         litlen_code_lens = strip_trailing_zeros(litlen_code_lens, literal_term_alphabet_size);
 
         std::span<CodeLen> dist_code_lens (code_lens.data() + litlen_code_lens.size(), dist_alphabet_size);
-        Huffman_::sort_find_code_lengths(dist_freq.begin(), dist_freq.end(), dist_code_lens.data());
+        Huffman_::template
+            find_code_lengths<dist_alphabet_size>(dist_freq.begin(), dist_code_lens.data());
         assert(Huffman_::validate_code_lens(dist_code_lens.begin(), dist_code_lens.end()));
         dist_code_lens = strip_trailing_zeros(dist_code_lens, 1);
 

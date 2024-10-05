@@ -92,7 +92,7 @@ public:
 
         count_freqs(in_it, in_it_end, freqs.data());
         std::array<CodeLen, alphabet_size> code_lens {};
-        Huffman<Policy>::sort_find_code_lengths(freqs.begin(), freqs.end(), code_lens.begin());
+        Huffman<Policy>::template find_code_lengths<alphabet_size>(freqs.begin(), code_lens.begin());
         std::array<Code, alphabet_size> codes {};
         Huffman<Policy>::gen_codes(code_lens.begin(), code_lens.end(), codes.data());
 

@@ -7,6 +7,7 @@
 
 #include "huffman_policy.h"
 #include "huffman_tree.h"
+#include "huffman_package_merge.h"
 #include "squeeze/exception.h"
 #include "squeeze/utils/iterator_concepts.h"
 #include "squeeze/misc/bitcoder.h"
@@ -26,6 +27,8 @@ public:
     static constexpr CodeLen code_len_limit = Policy::code_len_limit;
     using Code = std::bitset<code_len_limit>;
 
+    using PackageMerge = HuffmanPackageMerge<Freq, CodeLen>;
+
     template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         std::output_iterator<Char> OutIt = typename std::vector<Char>::iterator, typename OutItEnd = void>
     class Encoder;
@@ -34,64 +37,20 @@ public:
         std::input_iterator InIt = typename std::vector<Char>::iterator, typename InItEnd = void>
     class Decoder;
 
-private:
-    using Symset = std::vector<unsigned int>;
-
-    /* A pack type used in package-merge algorithm. */
-    struct Pack {
-        Freq freq; /* Cumulative frequency of all symbols in the symset. */
-        Symset symset; /* The symbol set. */
-
-        explicit Pack(Freq freq, Symset&& symset = {}) : freq(freq), symset(std::move(symset))
-        {
-        }
-
-        explicit Pack(Pack left, Pack right) : freq(left.freq + right.freq), symset()
-        {
-            symset.reserve(left.symset.size() + right.symset.size());
-            symset.insert(symset.end(), left.symset.begin(), left.symset.end());
-            symset.insert(symset.end(), right.symset.begin(), right.symset.end());
-        }
-    };
-
-    using PackSet = std::vector<Pack>;
-
-    enum SortAssume {
-        AssumeSorted, DontAssumeSorted
-    };
-
 public:
-    /* Find code lengths for each frequency.
-     * This does not assume that frequencies are sorted and handles the sorting itself. */
-    template<RandomAccessInputIterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
-    static inline void sort_find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it)
-    {
-        package_merge<DontAssumeSorted>(freq_it, freq_it_end, code_len_it, code_len_limit);
-    }
-
-    /* Find code lengths for each frequency with a custom code length limit.
-     * This does not assume that frequencies are sorted and handles the sorting itself. */
-    template<RandomAccessInputIterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
-    static inline void sort_find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it,
-            CodeLen custom_limit)
-    {
-        package_merge<DontAssumeSorted>(freq_it, freq_it_end, code_len_it, custom_limit);
-    }
-
-    /* Find code lengths for each frequency. This assumes that frequencies are sorted. */
+    /* Find code lengths for each frequency. */
     template<std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
-    static inline void find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it)
+    static inline void find_code_lengths(FreqIt freq_it, std::size_t nr_freqs, CodeLenIt code_len_it)
     {
-        package_merge<AssumeSorted>(freq_it, freq_it_end, code_len_it, code_len_limit);
+        PackageMerge::template package_merge<code_len_limit>(freq_it, nr_freqs, code_len_it);
     }
 
-    /* Find code lengths for each frequency with a custom code length limit.
-     * This assumes that frequencies are sorted. */
-    template<std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
-    static inline void find_code_lengths(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it,
-            CodeLen custom_limit)
+    /* Find code lengths for each frequency. Assumes the number of frequencies is compile-time constant. */
+    template<std::size_t nr_freqs, std::input_iterator FreqIt,
+        RandomAccessOutputIterator<CodeLen> CodeLenIt>
+    static inline void find_code_lengths(FreqIt freq_it, CodeLenIt code_len_it)
     {
-        package_merge<AssumeSorted>(freq_it, freq_it_end, code_len_it, custom_limit);
+        PackageMerge::template package_merge<code_len_limit, nr_freqs>(freq_it, code_len_it);
     }
 
     /* Validate code lengths. Ignores zero lengths.
@@ -122,7 +81,7 @@ public:
         return nr_nz_code_lens <= 1 or sum_code == (1ULL << code_len_limit);
     }
 
-    /* Generate canonical Huffman codes based on the provided the code lengths. */
+    /* Generate canonical Huffman codes based on the provided code lengths. */
     template<RandomAccessInputIterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
     static inline void gen_codes(CodeLenIt code_len_it, CodeLenIt code_len_it_end, CodeIt code_it)
     {
@@ -163,79 +122,6 @@ public:
     }
 
 private:
-    /* The package-merge algorithm used for finding length-limited Huffman code lengths
-     * for the given set of frequencies. */
-    template<SortAssume sort_assume,
-        std::input_iterator FreqIt, RandomAccessOutputIterator<CodeLen> CodeLenIt>
-    static void package_merge(FreqIt freq_it, FreqIt freq_it_end, CodeLenIt code_len_it, CodeLen depth)
-    {
-        if (freq_it == freq_it_end)
-            return;
-
-        const PackSet packset_per_level = package_freqs<sort_assume>(freq_it, freq_it_end);
-        switch (packset_per_level.size()) {
-        case 1:
-            ++*(code_len_it + packset_per_level.front().symset.front());
-        case 0:
-            return;
-        default:
-            break;
-        }
-
-        if (packset_per_level.size() > (1 << depth))
-            throw Exception<Huffman>("too many symbols or too small depth");
-
-        PackSet packset;
-        while (depth--) {
-            package(packset);
-            merge(packset, packset_per_level);
-        }
-        calc_length(packset, packset_per_level.size(), code_len_it);
-    }
-
-    /* Makes initial packages containing only one symbol with its corresponding frequency. */
-    template<SortAssume sort_assume, std::input_iterator FreqIt>
-    static PackSet package_freqs(FreqIt freq_it, FreqIt freq_it_end)
-    {
-        PackSet packset;
-        for (Symset::value_type sym = 0; freq_it != freq_it_end; ++freq_it, ++sym)
-            if (*freq_it != 0) // ignore 0 frequencies, code lengths for them will be set to 0
-                packset.emplace_back(*freq_it, Symset{static_cast<Symset::value_type>(sym)});
-        if constexpr (sort_assume == DontAssumeSorted)
-            std::sort(packset.begin(), packset.end(), compare_packs);
-        return packset;
-    }
-
-    /* Combine every pair of packages into one. Ignore the last package if it got no pair. */
-    static void package(PackSet& packset)
-    {
-        for (size_t i = 1; i < packset.size(); i += 2)
-            packset[i / 2] = Pack(packset[i - 1], packset[i]);
-        packset.erase(packset.begin() + (packset.size() / 2), packset.end());
-    }
-
-    /* Merge a per-level sorted packset into the current sorted packset. */
-    static void merge(PackSet& packset, const PackSet& packset_per_level)
-    {
-        packset.reserve(packset.size() + packset_per_level.size());
-        std::copy(packset_per_level.begin(), packset_per_level.end(), std::back_inserter(packset));
-        std::inplace_merge(packset.begin(), packset.end() - packset_per_level.size(), packset.end(),
-                compare_packs);
-    }
-
-    /* Calculate length of each symbol. */
-    template<RandomAccessOutputIterator<CodeLen> CodeLenIt>
-    static void calc_length(const PackSet& packset, std::size_t nr_syms, CodeLenIt code_len_it)
-    {
-        std::fill_n(code_len_it, nr_syms, 0);
-        std::size_t nr_packs = 2 * nr_syms - 2;
-        for (std::size_t i = 0; i < nr_packs; ++i) {
-            for (auto sym : packset[i].symset) {
-                ++*(code_len_it + sym);
-            }
-        }
-    }
-
     template<RandomAccessInputIterator CodeLenIt>
     static std::vector<std::pair<CodeLen, std::size_t>>
         get_sorted_code_lens(CodeLenIt code_len_it, CodeLenIt code_len_it_end)
@@ -246,11 +132,6 @@ private:
             code_lens.emplace_back(*code_len_it, code_lens.size());
         std::sort(code_lens.begin(), code_lens.end());
         return code_lens;
-    }
-
-    inline static bool compare_packs(const Pack& left, const Pack& right)
-    {
-        return left.freq < right.freq;
     }
 };
 
