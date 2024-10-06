@@ -9,9 +9,12 @@
 
 namespace squeeze::compression {
 
+/* The Deflate coding interface. Provides methods for encoding/decoding data
+ * using the DEFLATE algorithm as specified by the DEFLATE specification (RFC1951). */
 template<DeflatePolicy Policy = BasicDeflatePolicy>
 class Deflate {
 public:
+    /* Status return type of this class methods. */
     using Stat = StatStr;
 
     using HuffmanPolicy = typename Policy::HuffmanPolicy;
@@ -27,13 +30,20 @@ public:
     using CodeLenCode = typename DHuffman::CodeLenCode;
     using CodeLenCodeLen = typename DHuffman::CodeLenCodeLen;
 
+    /* Literal type used in an LZ77 intermediate representation. */
     using Literal = DeflateLZ77::Literal;
+    /* Literal-Length symbol type. */
     using LitLenSym = uint16_t;
+    /* Length symbol type used in an LZ77 intermediate representation. */
     using LenSym = DeflateLZ77::LenSym;
+    /* Distance symbol type used in an LZ77 intermediate representation. */
     using DistSym = DeflateLZ77::DistSym;
+    /* Length extra bits type used in an LZ77 intermediate representation. */
     using LenExtra = DeflateLZ77::LenExtra;
+    /* Distance extra bits type used in an LZ77 intermediate representation. */
     using DistExtra = DeflateLZ77::DistExtra;
 
+    /* Packed tokens used in an LZ77 intermediate representation. */
     using PackedToken = DeflateLZ77::PackedToken;
 
     template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
@@ -46,41 +56,49 @@ public:
         requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(InItEnd) <= 1)
     class Decoder;
 
+    /* Check if a literal/length symbol is a literal. */
     inline static constexpr bool is_literal(LitLenSym litlen_sym)
     {
         return litlen_sym < term_sym;
     }
 
+    /* Get the literal/length symbol as a literal if it's one. */
     inline static constexpr Literal get_literal(LitLenSym litlen_sym)
     {
         return Literal(litlen_sym & 0xFF);
     }
 
+    /* Check if the literal/length symbol is a terminator symbol. */
     inline static constexpr bool is_term(LitLenSym litlen_sym)
     {
         return litlen_sym == term_sym;
     }
 
+    /* Check if the literal/length symbol is a length symbol. */
     inline static constexpr bool is_len_sym(LitLenSym litlen_sym)
     {
         return litlen_sym > term_sym && litlen_sym <= to_litlen(DeflateLZ77::max_len_sym);
     }
 
+    /* Get the literal/length symbol as a length symbol if it's one. */
     inline static constexpr LenSym get_len_sym(LitLenSym litlen_sym)
     {
         return LenSym(litlen_sym - literal_term_alphabet_size);
     }
 
+    /* Check if the distance symbol is valid. */
     inline static constexpr bool is_valid_dist_sym(DistSym dist_sym)
     {
         return dist_sym <= DeflateLZ77::max_dist_sym;
     }
 
+    /* Convert the literal into a literal/length symbol. */
     inline static constexpr LitLenSym to_litlen(Literal literal)
     {
         return static_cast<std::make_unsigned_t<Literal>>(literal);
     }
 
+    /* Convert the length symbol into a literal/length symbol. */
     inline static constexpr LitLenSym to_litlen(LenSym len_sym)
     {
         return static_cast<LitLenSym>(len_sym) + literal_term_alphabet_size;
@@ -100,13 +118,20 @@ public:
         return Decoder<Char, char_size, InIt, InItEnd>(bit_decoder);
     }
 
+    /* Size of alphabet of literals and the terminator symbol combined. */
     static constexpr std::size_t literal_term_alphabet_size = 257;
+    /* Length alphabet size. */
     static constexpr std::size_t len_alphabet_size = DeflateLZ77::max_len_sym + 1;
+    /* Literal/Length alphabet size. */
     static constexpr std::size_t litlen_alphabet_size = literal_term_alphabet_size + len_alphabet_size;
+    /* Distance alphabet size. */
     static constexpr std::size_t dist_alphabet_size = DeflateLZ77::max_dist_sym + 1;
+    /* The terminator symbol. */
     static constexpr LitLenSym term_sym = 0x100;
 
 private:
+    /* Generate literal/length and distance codes for the corresponding code lengths,
+     * using the provided storages. */
     static std::tuple<std::span<Code>, std::span<Code>>
         gen_codes(std::span<const CodeLen> litlen_code_lens, std::span<const CodeLen> dist_code_lens,
                   std::span<Code> litlen_codes_storage, std::span<Code> dist_codes_storage)
@@ -120,6 +145,7 @@ private:
         return std::make_tuple(litlen_codes, dist_codes);
     }
 
+    /* Build literal/length and distance Huffman trees for the corresponding lengths. */
     static std::tuple<HuffmanTree, HuffmanTree, Stat> huffman_build_trees(
             std::span<const CodeLen> litlen_code_lens, std::span<const CodeLen> dist_code_lens)
     {
@@ -143,6 +169,7 @@ private:
     }
 };
 
+/* The Deflate::Encoder class. Supports encoding data, header_bits, and both at once. */
 template<DeflatePolicy Policy>
 template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename ...OutItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(OutItEnd) <= 1)
@@ -152,6 +179,7 @@ public:
     using BitEncoder = misc::BitEncoder<Char, char_size, OutIt, OutItEnd...>;
 
 private:
+    /* Intermediate LZ77 compressed data representation. */
     using IntermediateData = std::vector<PackedToken>;
 
 public:
@@ -159,6 +187,7 @@ public:
     {
     }
 
+    /* Encode both the header and the data. */
     template<std::input_iterator InIt, typename... InItEnd>
         requires (sizeof...(InItEnd) <= 1)
     Stat encode(const DeflateParams& params, InIt in_it, InItEnd... in_it_end)
@@ -169,6 +198,7 @@ public:
         return s;
     }
 
+    /* Encode the header bits. */
     inline Stat encode_header_bits(DeflateHeaderBits header_bits)
     {
         // non-compressed blocks are not supported (BTYPE=00)
@@ -180,6 +210,7 @@ public:
             return "failed encoding header bits";
     }
 
+    /* Encode data only. */
     template<std::input_iterator InIt, typename... InItEnd>
         requires (sizeof...(InItEnd) <= 1)
     inline Stat encode_data(const DeflateParams& params, InIt in_it, InItEnd... in_it_end)
@@ -188,6 +219,7 @@ public:
     }
 
 private:
+    /* Apply LZ77 encoding on the data and convert it into an intermediate representation. */
     template<std::input_iterator InIt, typename... InItEnd>
         requires (sizeof...(InItEnd) <= 1)
     IntermediateData lz77_encode(const LZ77EncoderParams& params, InIt in_it, InItEnd... in_it_end)
@@ -199,10 +231,11 @@ private:
         return lz77_output;
     }
 
+    /* Apply Huffman encoding on the intermediate data. */
     Stat huffman_encode(const IntermediateData& data)
     {
         std::array<CodeLen, litlen_alphabet_size + dist_alphabet_size> code_lens_storage {};
-        auto [litlen_code_lens, dist_code_lens] = find_code_lens(data, code_lens_storage);
+        auto [litlen_code_lens, dist_code_lens] = huffman_find_code_lens(data, code_lens_storage);
 
         std::span both_code_lens {code_lens_storage.data(), litlen_code_lens.size() + dist_code_lens.size()};
 
@@ -218,6 +251,30 @@ private:
             return "failed encoding literal/length and distance symbols and extra bits";
     }
 
+    /* Find lengths of the literal/length and distance codes suitable for the intermediate data. */
+    std::tuple<std::span<CodeLen>, std::span<CodeLen>>
+        huffman_find_code_lens(const IntermediateData& data, std::span<CodeLen> code_lens)
+    {
+        std::array<Freq, litlen_alphabet_size> litlen_freq {};
+        std::array<Freq, dist_alphabet_size> dist_freq {};
+        count_freqs(data, litlen_freq, dist_freq);
+
+        std::span<CodeLen> litlen_code_lens (code_lens.data(), litlen_alphabet_size);
+        Huffman_::template
+            find_code_lengths<litlen_alphabet_size>(litlen_freq.begin(), litlen_code_lens.data());
+        assert(Huffman_::validate_code_lens(litlen_code_lens.begin(), litlen_code_lens.end()));
+        litlen_code_lens = strip_trailing_zeros(litlen_code_lens, literal_term_alphabet_size);
+
+        std::span<CodeLen> dist_code_lens (code_lens.data() + litlen_code_lens.size(), dist_alphabet_size);
+        Huffman_::template
+            find_code_lengths<dist_alphabet_size>(dist_freq.begin(), dist_code_lens.data());
+        assert(Huffman_::validate_code_lens(dist_code_lens.begin(), dist_code_lens.end()));
+        dist_code_lens = strip_trailing_zeros(dist_code_lens, 1);
+
+        return std::make_tuple(litlen_code_lens, dist_code_lens);
+    }
+
+    /* Encode the code lengths using code length Huffman coding. */
     Stat huffman_encode_code_lens(std::size_t nr_litlen_codes, std::size_t nr_dist_codes,
             std::span<const CodeLen> both_code_lens)
     {
@@ -228,6 +285,7 @@ private:
         return s;
     }
 
+    /* Encode the number of literal/length and distance codes. */
     Stat encode_nr_codes(std::size_t nr_litlen_codes, std::size_t nr_dist_codes)
     {
         if (encode_nr_litlen_codes(nr_litlen_codes) && encode_nr_dist_codes(nr_dist_codes))
@@ -236,18 +294,21 @@ private:
             return "failed encoding the numbers of literal/length and distance code lengths";
     }
 
+    /* Encode the number of literal/length codes. */
     bool encode_nr_litlen_codes(std::size_t nr_litlen_codes)
     {
         assert(nr_litlen_codes - literal_term_alphabet_size <= 31);
         return bit_encoder.template encode_bits<5>(nr_litlen_codes - literal_term_alphabet_size);
     }
 
+    /* Encode the number of distance codes. */
     bool encode_nr_dist_codes(std::size_t nr_dist_codes)
     {
         assert(nr_dist_codes - 1 <= 31);
         return bit_encoder.template encode_bits<5>(nr_dist_codes - 1);
     }
 
+    /* Huffman-encode symbols in the intermediate data, given the code lengths. */
     bool huffman_encode_syms(const IntermediateData& data,
             std::span<const CodeLen> litlen_code_lens, std::span<const CodeLen> dist_code_lens)
     {
@@ -293,36 +354,6 @@ private:
         return successful_so_far;
     }
 
-    std::tuple<std::span<CodeLen>, std::span<CodeLen>>
-        find_code_lens(const IntermediateData& data, std::span<CodeLen> code_lens)
-    {
-        std::array<Freq, litlen_alphabet_size> litlen_freq {};
-        std::array<Freq, dist_alphabet_size> dist_freq {};
-        count_freqs(data, litlen_freq, dist_freq);
-
-        std::span<CodeLen> litlen_code_lens (code_lens.data(), litlen_alphabet_size);
-        Huffman_::template
-            find_code_lengths<litlen_alphabet_size>(litlen_freq.begin(), litlen_code_lens.data());
-        assert(Huffman_::validate_code_lens(litlen_code_lens.begin(), litlen_code_lens.end()));
-        litlen_code_lens = strip_trailing_zeros(litlen_code_lens, literal_term_alphabet_size);
-
-        std::span<CodeLen> dist_code_lens (code_lens.data() + litlen_code_lens.size(), dist_alphabet_size);
-        Huffman_::template
-            find_code_lengths<dist_alphabet_size>(dist_freq.begin(), dist_code_lens.data());
-        assert(Huffman_::validate_code_lens(dist_code_lens.begin(), dist_code_lens.end()));
-        dist_code_lens = strip_trailing_zeros(dist_code_lens, 1);
-
-        return std::make_tuple(litlen_code_lens, dist_code_lens);
-    }
-
-    std::span<CodeLenCodeLen> find_code_len_code_lens(
-            std::span<const CodeLen> code_lens, std::span<CodeLenCodeLen> clcl)
-    {
-        DHuffman::find_code_len_code_lens(code_lens.begin(), code_lens.end(), clcl.data());
-        assert(DHuffman::validate_code_len_code_lens(clcl.begin(), clcl.end()));
-        return strip_trailing_zeros(clcl, DHuffman::min_nr_code_len_codes);
-    }
-
     template<std::integral T>
     static std::span<T> strip_trailing_zeros(std::span<T> code_lens, std::size_t min_size)
     {
@@ -331,6 +362,7 @@ private:
         return code_lens.first(size);
     }
 
+    /* Count frequencies for each literal/length and distance symbols in the intermediate data. */
     static void count_freqs(const IntermediateData& data,
             std::array<Freq, litlen_alphabet_size>& litlen_freq,
             std::array<Freq, dist_alphabet_size>& dist_freq)
@@ -362,6 +394,7 @@ private:
     BitEncoder& bit_encoder;
 };
 
+/* The Deflate::Decoder class. Supports decoding data, header_bits, and both at once. */
 template<DeflatePolicy Policy>
 template<typename Char, std::size_t char_size, std::input_iterator InIt, typename... InItEnd>
     requires ((sizeof(Char) <= sizeof(unsigned long long) * CHAR_BIT) && sizeof...(InItEnd) <= 1)
@@ -374,6 +407,7 @@ public:
     {
     }
 
+    /* Decode both the header and the data. */
     template<std::output_iterator<char> OutIt, typename... OutItEnd>
     std::tuple<OutIt, DeflateHeaderBits, Stat> decode(OutIt out_it, OutItEnd... out_it_end)
     {
@@ -389,6 +423,7 @@ public:
         return std::make_tuple(out_it, header_bits, std::move(s));
     }
 
+    /* Decode the header bits. */
     std::tuple<DeflateHeaderBits, Stat> decode_header_bits()
     {
         std::bitset<3> header_bits {};
@@ -397,6 +432,7 @@ public:
         return std::make_tuple(static_cast<DeflateHeaderBits>(header_bits.to_ullong()), std::move(ss));
     }
 
+    /* Decode data only. */
     template<std::output_iterator<char> OutIt, typename... OutItEnd>
     std::tuple<OutIt, Stat> decode_data(OutIt out_it, OutItEnd... out_it_end)
     {
@@ -404,6 +440,9 @@ public:
     }
 
 private:
+    /* Decode the data by Huffman and LZ77. Unlike encoding, decoding is not split
+     * into separate steps for LZ77 and Huffman coding, but rather each LZ77 token
+     * that is decoded by Huffman, is immediately decoded by LZ77. */
     template<std::output_iterator<char> OutIt, typename ...OutItEnd>
     std::tuple<OutIt, Stat> lz77_huffman_decode(OutIt out_it, OutItEnd... out_it_end)
     {
@@ -415,6 +454,7 @@ private:
             return lz77_huffman_decode_syms(litlen_code_lens, dist_code_lens, out_it, out_it_end...);
     }
 
+    /* Decode Huffman code length codes. */
     std::tuple<std::span<CodeLen>, std::span<CodeLen>, Stat>
         huffman_decode_code_lens(std::span<CodeLen> code_lens)
     {
@@ -438,6 +478,7 @@ private:
         return result;
     }
 
+    /* Decode the number of literal/length and distance codes. */
     Stat decode_nr_codes(std::size_t& nr_litlen_codes, std::size_t& nr_dist_codes)
     {
         if (decode_nr_litlen_codes(nr_litlen_codes) && decode_nr_dist_codes(nr_dist_codes)) [[likely]]
@@ -446,6 +487,7 @@ private:
             return "failed decoding the numbers of literal/length and distance code lengths";
     }
 
+    /* Decode the number of literal/length codes. */
     inline bool decode_nr_litlen_codes(std::size_t& nr_litlen_codes)
     {
         bool s = bit_decoder.template decode_bits<5>(nr_litlen_codes);
@@ -453,6 +495,7 @@ private:
         return s;
     }
 
+    /* Decode the number of distance codes. */
     inline bool decode_nr_dist_codes(std::size_t& nr_dist_codes)
     {
         bool s = bit_decoder.template decode_bits<5>(nr_dist_codes);
@@ -460,6 +503,8 @@ private:
         return s;
     }
 
+    /* Decode the symbols in the input data by Huffman and LZ77,
+     * based on the literal/length and distance code lengths. */
     template<std::output_iterator<char> OutIt, typename ...OutItEnd>
     std::tuple<OutIt, Stat> lz77_huffman_decode_syms(
             std::span<const CodeLen> litlen_code_lens,
@@ -485,6 +530,8 @@ private:
         return lz77_huffman_decode_syms(litlen_tree.get_root(), dist_tree.get_root(), out_it, out_it_end...);
     }
 
+    /* Decode the symbols in the input data by Huffman and LZ77,
+     * based on the literal/length and distance Huffman trees. */
     template<std::output_iterator<char> OutIt, typename ...OutItEnd>
     std::tuple<OutIt, Stat> lz77_huffman_decode_syms(
             const HuffmanTreeNode *litlen_tree_node, const HuffmanTreeNode *dist_tree_node,
@@ -528,6 +575,7 @@ private:
         return std::make_tuple(lz77_decoder.get_it(), std::exchange(s, success));
     }
 
+    /* Huffman-decode a literal/length symbol. */
     std::optional<LitLenSym> huffman_decode_litlen_sym(const HuffmanTreeNode *litlen_tree_node)
     {
         bool successful = false;
@@ -536,6 +584,7 @@ private:
         return successful ? std::optional(LitLenSym(sym_idx)) : std::nullopt;
     }
 
+    /* Huffman-decode a distance symbol. */
     std::optional<DistSym> huffman_decode_dist_sym(const HuffmanTreeNode *dist_tree_node)
     {
         bool successful = false;
@@ -544,6 +593,8 @@ private:
         return successful ? std::optional(DistSym(sym_idx)) : std::nullopt;
     }
 
+    /* Huffman-decode the length extra bits and the distance symbol and extra bits.
+     * This is needed when the first decoded literal/length symbol is a length symbol. */
     std::tuple<LenExtra, DistSym, DistExtra, Stat> huffman_decode_len_extra_and_dist(
             LenSym len_sym, const HuffmanTreeNode *dist_tree_node)
     {
@@ -582,6 +633,8 @@ private:
     BitDecoder& bit_decoder;
 };
 
+/* Deflate data and write it to the bit encoder.
+ * Return the input iterator and status at the point when encoding stopped. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
          std::input_iterator InIt = typename std::vector<char>::iterator,
@@ -595,7 +648,9 @@ inline std::tuple<InIt, StatStr> deflate(const DeflateParams& params,
     return std::make_tuple(in_it_end, encoder.encode(params, in_it, in_it_end));
 }
 
-template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
+/* Inflate data by reading it form the bit decoder.
+ * Return the output iterator, header bits and status at the point when decoding stopped. */
+template<typename Char = char, std::size_t char_size = sizeof(Char) *  CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
          std::output_iterator<char> OutIt = typename std::vector<char>::iterator,
          std::input_iterator InIt = typename std::vector<Char>::iterator, typename ...InItEnd>
@@ -606,6 +661,7 @@ std::tuple<OutIt, DeflateHeaderBits, StatStr> inflate(OutIt out_it, OutIt out_it
     return Deflate<Policy>::make_decoder(bit_decoder).decode(out_it, out_it_end);
 }
 
+/* Deflate data. Return (InIt, OutIt, Stat) triple at the point when encoding stopped. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
          std::input_iterator InIt = typename std::vector<Char>::iterator,
@@ -627,6 +683,7 @@ std::tuple<InIt, OutIt, StatStr>
     return std::make_tuple(in_it, out_it, success);
 }
 
+/* Decode data. Return (OutIt, InIt, DeflateHeaderBits, Stat) tuple at the point when decoding stopped. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
          DeflatePolicy Policy = BasicDeflatePolicy,
          std::output_iterator<char> OutIt = typename std::vector<char>::iterator,

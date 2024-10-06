@@ -163,7 +163,7 @@ private:
 };
 
 /* Encode data using Huffman15 with the given bit encoder.
- * Return input iterator at the point when encoding stopped and an error or success message. */
+ * Return the input iterator and status at the point when encoding stopped. */
 template<bool use_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
         std::input_iterator InIt = typename std::vector<char>::iterator,
@@ -180,7 +180,7 @@ inline std::tuple<InIt, StatStr> huffman15_encode(
 }
 
 /* Decode data using Huffman15 with the given bit encoder.
- * Return output iterator at the point when decoding stopped and an error or success message. */
+ * Return the output iterator and status at the point when decoding stopped. */
 template<bool expect_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
         std::output_iterator<char> OutIt = typename std::vector<Char>::iterator,
@@ -196,7 +196,7 @@ inline std::tuple<OutIt, StatStr> huffman15_decode(
         template decode_data<expect_term>(out_it, out_it_end);
 }
 
-/* Encode data using Huffman15. Return (InIt, OutIt, Error) triple at the point when encoding stopped. */
+/* Encode data using Huffman15. Return (InIt, OutIt, Stat) triple at the point when encoding stopped. */
 template<bool use_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
         std::input_iterator InIt = typename std::vector<char>::iterator,
@@ -221,7 +221,7 @@ std::tuple<InIt, OutIt, StatStr> huffman15_encode(
     return std::make_tuple(in_it, out_it, success);
 }
 
-/* Decode data using Huffman15. Return (OutIt, InIt, Error) triple at the point when decoding stopped. */
+/* Decode data using Huffman15. Return (OutIt, InIt, Stat) triple at the point when decoding stopped. */
 template<bool expect_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
         std::output_iterator<char> OutIt = typename std::vector<char>::iterator,
