@@ -32,6 +32,13 @@ public:
         assert(len != 0 && dist != 0);
     }
 
+    /* Explicitly initialize all members. */
+    constexpr LZ77Token(Sym sym, std::size_t len, std::size_t dist)
+        : sym(sym), len(len), dist(dist)
+    {
+        assert(len != 0 && dist != 0 || dist == 0 && (len == 1 || len == 0));
+    }
+
     constexpr inline bool is_none() const noexcept
     {
         return len == 0;

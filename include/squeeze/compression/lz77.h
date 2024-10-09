@@ -4,9 +4,7 @@
 #include <cassert>
 #include <climits>
 #include <utility>
-#include <bitset>
-#include <vector>
-#include <unordered_map>
+#include <array>
 #include <algorithm>
 
 #include "lz77_policy.h"
@@ -75,15 +73,11 @@ public:
  * matches starting from the next symbol. A threshold defined in LZ77EncoderParams controls how long
  * the best-found match should be to skip the lazy match. Greater the value, slower but more
  * efficient may be the compression.
- * Another parameter defines how long a best-found match should be to skip insertion into the hash chain. */
+ * Another parameter defines how long a best-found match shall be to skip insertion into its hash chain. */
 template<LZ77Policy Policy>
 template<std::input_iterator InIt, typename... InItEnd>
 class LZ77<Policy>::Encoder {
 private:
-    /* A sequence of symbols of min_match_len size used for finding matches in the hash chain. */
-    using ChainKey = std::bitset<min_match_len * sizeof(Sym) * CHAR_BIT>;
-    /* Chain type used in the hash chains. */
-    using Chain = std::vector<std::size_t>;
     /* The circular iterator type. */
     using CircularIterator = typename SlidingWindow::CircularIterator;
 
@@ -101,18 +95,18 @@ public:
     {
         if (0 == params.match_insert_threshold)
             throw Exception<Encoder>("match insert threshold is 0");
-        hash_chains.reserve(search_size);
     }
 
     /* Construct as a continuation of another encoder with new iterator(s). */
     template<std::input_iterator PrevInIt, typename... PrevInItEnd>
     Encoder(const Encoder<PrevInIt, PrevInItEnd...>& prev, InIt in_it, InItEnd... in_it_end)
         :   params(prev.params),
-            search_window(search_window),
-            nr_fetched_syms(nr_fetched_syms),
-            hash_chains(prev.hash_chains),
-            seq(in_it, in_it_end...),
-            cached_token(prev.cached_token)
+            search_window(prev.search_window),
+            nr_fetched_syms(prev.nr_fetched_syms),
+            head(prev.head),
+            prev(prev.prev),
+            cached_token(prev.cached_token),
+            seq(in_it, in_it_end...)
     {
     }
 
@@ -120,11 +114,12 @@ public:
     template<std::input_iterator PrevInIt, typename... PrevInItEnd>
     Encoder(Encoder<PrevInIt, PrevInItEnd...>&& prev, InIt in_it, InItEnd... in_it_end)
         :   params(std::move(prev.params)),
-            search_window(std::move(search_window)),
-            nr_fetched_syms(std::move(nr_fetched_syms)),
-            hash_chains(std::move(prev.hash_chains)),
-            seq(in_it, in_it_end...),
-            cached_token(std::move(prev.cached_token))
+            search_window(std::move(prev.search_window)),
+            nr_fetched_syms(std::move(prev.nr_fetched_syms)),
+            head(std::move(prev.head)),
+            prev(std::move(prev.prev)),
+            cached_token(std::move(prev.cached_token)),
+            seq(in_it, in_it_end...)
     {
     }
 
@@ -134,41 +129,26 @@ public:
         if (cached_token.get_type() != Token::None) [[unlikely]]
             return std::exchange(cached_token, Token()); // return the cached token from previous calculations
 
-        fetch_min_match_data();
-        assert(nr_fetched_syms <= min_match_len);
-
-        if (0 == nr_fetched_syms) [[unlikely]]
-            return {}; // no fetched symbols, the encoding is done with the current input, return none token
-
-        if (min_match_len > nr_fetched_syms) { // insufficient fetched symbols to do any match
-            const Sym sym = *(search_window.get_pivot() - nr_fetched_syms);
-            mark_processed(1);
-            return sym; // return a symbol token
+        Token token = find_longest_match(); // get token for the longest match
+        if (token.is_none() || token.get_len() >= params.lazy_match_threshold) {
+            // if the token is a none token (zero-length) or is either sufficiently long, return it
+            mark_processed(token.get_len());
+            return token;
         }
 
-        // try to find the best match
-        const Sym sym = *(search_window.get_pivot() - min_match_len);
-        auto [match_len, match_dist] = find_better_match(min_match_len - 1);
-
-        std::size_t nr_processed_fetch_syms = match_len;
-
-        if (match_len <= params.lazy_match_threshold) {
-            // longest match not "long enough", try lazy matching
-            auto [lazy_match_len, lazy_match_dist] = try_lazy_matching(match_len);
-            if (lazy_match_len > match_len) { // lazy matching succeeded
-                cached_token = Token(lazy_match_len, lazy_match_dist); // caching it
-                match_len = 1; match_dist = 0; // current match will be a single-symbol match
-                nr_processed_fetch_syms = lazy_match_len + match_len;
-            }
+        // otherwise, try lazy matching
+        mark_processed(1); // mark the first matched symbol as processed
+        cached_token = lazy_find_longest_match(token.get_len());
+        if (cached_token.is_len_dist()) { // lazy matching produced a longer match
+            assert(cached_token.get_len() > token.get_len());
+            mark_processed(cached_token.get_len()); // mark the lazy-matched symbols as processed
+            assert(nr_fetched_syms <= min_match_len);
+            return token.get_sym(); // return the first symbol in the original match
+        } else { // lazy matching didn't produce a longer match
+            mark_processed(token.get_len() - 1); // marking the rest of matched symbols as processed
+            assert(nr_fetched_syms <= min_match_len);
+            return token; // return the full token of the original match
         }
-
-        mark_processed(nr_processed_fetch_syms);
-        assert(nr_fetched_syms <= min_match_len);
-
-        if (1 == match_len)
-            return sym;
-        else
-            return {match_len, match_dist};
     }
 
     /* Check if the encoder has finished encoding with the current sequence. */
@@ -204,6 +184,59 @@ public:
     }
 
 private:
+    /* Find the longest match for the current input. */
+    Token find_longest_match()
+    {
+        fetch_min_match_data();
+        if (0 == nr_fetched_syms)
+            return {};
+        else if (nr_fetched_syms < min_match_len)
+            return *(search_window.get_pivot() - nr_fetched_syms);
+
+        const Sym match_sym = *(search_window.get_pivot() - min_match_len);
+        std::size_t match_len = min_match_len - 1, match_dist = 0;
+        find_longest_rep_seq_match_from(match_len, match_dist);
+
+        if (0 == match_dist)
+            match_len = 1;
+        return {match_sym, match_len, match_dist};
+    }
+
+    /* Skip by one symbol and try to find a longer match. */
+    Token lazy_find_longest_match(std::size_t match_len)
+    {
+        if (match_len >= min_match_len) {
+            assert(nr_fetched_syms <= match_len);
+            assert(match_len - nr_fetched_syms <= 1);
+            if (can_fetch_sym())
+                fetch_sym();
+            else
+                return {};
+
+            if (match_len == nr_fetched_syms) {
+                if (can_fetch_sym())
+                    fetch_sym();
+                else
+                    return {};
+            }
+        } else {
+            assert(nr_fetched_syms <= min_match_len);
+            match_len = min_match_len - 1;
+            fetch_min_match_data();
+            if (min_match_len > nr_fetched_syms)
+                return {};
+            assert(min_match_len == nr_fetched_syms);
+        }
+
+        std::size_t match_dist = 0;
+        find_longest_rep_seq_match_from(match_len, match_dist);
+
+        if (0 == match_dist)
+            return {};
+        else
+            return {match_len, match_dist};
+    }
+
     [[nodiscard]]
     inline bool can_fetch_sym() const
     {
@@ -233,7 +266,7 @@ private:
     /* Fetch the minimal amount of data used for finding matches. */
     inline void fetch_min_match_data()
     {
-        while (can_fetch_sym() && nr_fetched_syms < min_match_len)
+        while (nr_fetched_syms < min_match_len && can_fetch_sym())
             fetch_sym();
     }
 
@@ -244,98 +277,94 @@ private:
         nr_fetched_syms -= nr_processed_fetch_syms;
     }
 
-    /* Construct a chain key from the min match symbols starting from the specified iterator. */
-    inline static void construct_chain_key(CircularIterator it, ChainKey& chain_key)
-    {
-        for (std::size_t i = 0; i < min_match_len; ++i, ++it) {
-            chain_key <<= sizeof(Sym) * CHAR_BIT;
-            chain_key |= static_cast<std::make_unsigned_t<Sym>>(*it);
-        }
-    }
-
-    /* Try lazy matching by skipping one symbol and finding a better match with the next one. */
-    std::tuple<std::size_t, std::size_t> try_lazy_matching(std::size_t match_len)
-    {
-        match_len = std::max(match_len, min_match_len);
-        assert(nr_fetched_syms >= match_len);
-        if (match_len == nr_fetched_syms && !try_fetch_sym())
-            return std::make_tuple(0, 0);
-        else
-            return find_better_match(match_len - 1);
-    }
-
-    /* Find the best match that is strictly longer than the specified length.
-     * Otherwise return {1, 0} ("only one symbol matched and it matched to itself"). */
-    std::tuple<std::size_t, std::size_t> find_better_match(std::size_t match_len)
+    /* Find the longest repeated sequence match that is strictly longer than the specified length. */
+    void find_longest_rep_seq_match_from(std::size_t& match_len, std::size_t& match_dist)
     {
         assert(match_len + 1 >= min_match_len);
-        std::size_t match_dist = 0;
-
-        const bool peak_match = find_better_match_from_hash_chains(match_len, match_dist);
+        const bool peak_match = find_longer_match_from_hash_chains(match_len, match_dist);
 
         // try to find an overlapping match, even if the match reached its peak,
         // as smaller distances are more favorable
         std::size_t overlapping_match_len = match_len - !!(peak_match);
-        find_better_match_overlapping_min_match(overlapping_match_len, match_dist);
-        // branchlessly get the new match length
+        find_longer_match_overlapping_min_match(overlapping_match_len, match_dist);
         match_len = overlapping_match_len + !!(overlapping_match_len < match_len);
-
-        // if the match distance found so far is 0, then there's no repeated sequence to match,
-        // so the match length should be 1, meaning a single-symbol match
-        if (0 == match_dist)
-            match_len = 1;
-
-        return std::make_tuple(match_len, match_dist);
     }
 
-    /* Find the best match from the hash chains that is strictly longer than the specified match length.
-     * Return whether the match reached its peak. */
-    bool find_better_match_from_hash_chains(std::size_t& match_len, std::size_t& match_dist)
+    /* Find the longest match from hash chains that is strictly longer than
+     * the specified match length. Return whether the match reached its peak. */
+    bool find_longer_match_from_hash_chains(std::size_t& match_len, std::size_t& match_dist)
     {
         assert(match_len + 1 >= min_match_len);
+        assert(match_len + 1 >= nr_fetched_syms);
 
-        ChainKey chain_key {};
-        construct_chain_key(search_window.get_pivot() - (match_len + 1), chain_key);
-        const std::size_t min_match_pos = search_window.get_end_pos() - (match_len + 1 - min_match_len);
+        const std::size_t min_match_pos = search_window.get_end_pos() - (match_len + 1);
+        const std::size_t chain_index = get_chain_index_for(search_window.get_pivot() - (match_len + 1));
+        const bool peak_match = find_longer_match_from_chain(head[chain_index], match_len, match_dist);
 
-        Chain& pos_chain = hash_chains[chain_key];
-        const bool peak_match = find_better_match_from_chain(pos_chain, match_len, match_dist);
-
-        if ((0 == match_dist ? 1 : match_len) <= params.match_insert_threshold)
-            pos_chain.push_back(min_match_pos);
+        if ((0 == match_dist ? 1 : match_len) <= params.match_insert_threshold
+            && head[chain_index] < min_match_pos)
+            update_hash_chain(chain_index, min_match_pos);
 
         return peak_match;
     }
 
-    /* Find the best match from the specified position chain that is strictly
+    /* Get index for calculated hash for min_match_len amount of symbols, starting
+     * from the given iterator, that is used to access the associated hash chain. */
+    inline static std::size_t get_chain_index_for(CircularIterator it)
+    {
+        return get_chain_hash_for(it) % search_size;
+    }
+
+    /* Calculate hash for min_match_len amount of symbols starting from the given iterator
+     * that is used to access the associated hash chain. */
+    inline static std::uintmax_t get_chain_hash_for(CircularIterator it)
+    {
+        static constexpr unsigned int hash_shift = 5;
+        std::uintmax_t key = 0;
+        for (std::size_t i = 0; i < min_match_len; ++i, ++it) {
+            key <<= sizeof(Sym) * hash_shift;
+            key ^= static_cast<std::make_unsigned_t<Sym>>(*it);
+        }
+        return key;
+    }
+
+    /* Find the longest match from the specified position chain that is strictly
      * longer than the specified match length. Return whether the match reached its peak. */
-    bool find_better_match_from_chain(Chain& pos_chain, std::size_t& match_len, std::size_t& match_dist)
+    inline bool find_longer_match_from_chain(std::size_t pos, std::size_t& match_len, std::size_t& match_dist)
     {
-        assert(match_len + 1 >= min_match_len);
+        // skip too recent positions (usually added by lazy matching)
+        for (; pos + match_len + 1 >= search_window.get_end_pos(); pos = get_prev_pos(pos));
 
-        auto pos_it = pos_chain.rbegin();
-
-        // skip too recent matches that are currently beyond the end of the search window
-        for (; pos_it != pos_chain.rend() && *pos_it >= search_window.get_end_pos(); ++pos_it);
-
-        bool peak_match = false;
-        for (; pos_it != pos_chain.rend() && *pos_it >= search_window.get_pos() && !peak_match; ++pos_it)
-            peak_match = match_and_extend_at<min_match_len>(*pos_it, match_len, match_dist);
-
-        // erase too early matches that are behind the search window
-        // pos_chain.erase(pos_it, pos_chain.end());
-
-        return peak_match;
+        // find the longest match by iterating to previous positions
+        for (; pos >= search_window.get_pos(); pos = get_prev_pos(pos))
+            if (match_and_extend_at(pos, match_len, match_dist))
+                return true;
+        return false;
     }
 
-    /* Find the best match that overlaps the min match symbols with small distances in the
+    /* Get the previous position from the current position within the hash chain. */
+    inline std::size_t get_prev_pos(std::size_t cur_pos) const
+    {
+        assert(0 != cur_pos);
+        return prev[cur_pos % search_size];
+    }
+
+    /* Add a new position to the hash chain. */
+    inline void update_hash_chain(const std::size_t chain_index, const std::size_t new_pos)
+    {
+        assert(new_pos != head[chain_index]);
+        prev[new_pos % search_size] = head[chain_index];
+        head[chain_index] = new_pos;
+    }
+
+    /* Find the longest match that overlaps the min match symbols with small distances in the
      * range [1, min_match_len - 1]. Return whether the match reached its peak. */
-    bool find_better_match_overlapping_min_match(std::size_t& match_len, std::size_t& match_dist)
+    bool find_longer_match_overlapping_min_match(std::size_t& match_len, std::size_t& match_dist)
     {
         assert(search_window.get_end_pos() >= match_len + 1);
         std::size_t pos = search_window.get_end_pos() - match_len - 1;
         for (std::size_t i = 1; i < min_match_len && pos > search_window.get_filled_pos(); ++i)
-            if (match_and_extend_at<0>(--pos, match_len, match_dist))
+            if (match_and_extend_at(--pos, match_len, match_dist))
                 return true;
         return false;
     }
@@ -344,20 +373,17 @@ private:
      * extend it by fetching more symbols. Return whether the match reached its peak.
      * When the match reaches its peak, no fetched symbol is left unmatched, otherwise number
      * of fetched symbols is one bigger than the extended size. */
-    template<std::size_t pos_shift>
     bool match_and_extend_at(std::size_t pos, std::size_t& match_len, std::size_t& match_dist)
     {
-        assert(match_len + 1 >= pos_shift);
-
-        const std::size_t expected_match_len = match_len + 1 - pos_shift;
-        assert(search_window.get_end_pos() >= pos + expected_match_len);
-        if (not search_window.suffix_matches_at(pos, expected_match_len))
+        assert(search_window.get_end_pos() >= pos + match_len + 1);
+        if (not search_window.suffix_matches_at(pos, match_len + 1))
             return false;
 
         ++match_len;
-        match_dist = search_window.get_end_pos() - pos - match_len + pos_shift;
+        match_dist = search_window.get_end_pos() - pos - match_len;
+        assert(match_dist > 0);
 
-        auto match_it = search_window.get_iter_at(pos + match_len - pos_shift);
+        auto match_it = search_window.get_iter_at(pos + match_len);
         return fetch_and_match(match_it, match_len);
     }
 
@@ -365,9 +391,9 @@ private:
      * Return true if the match reached its peak, which is either
      * the match length became equal to the lookahead buffer (conceptual) size,
      * or at some point no more symbols could be fetched to match against.
-     * Return false if the matching stopped simply because of a symbol mismatch.
-     * In this case, it should be noted that the last unmatched symbol has also
-     * been fetched and will appear at the end of the search buffer. */
+     * Return false if the matching stopped because of a symbol mismatch.
+     * In this case the last unmatched symbol has also been fetched
+     * and will appear at the end of the search buffer. */
     bool fetch_and_match(CircularIterator match_it, std::size_t& match_len)
     {
         while (true) {
@@ -384,12 +410,12 @@ private:
     }
 
 private:
-    LZ77EncoderParams params;
-    SlidingWindow search_window;
-    std::size_t nr_fetched_syms = 0;
-    std::unordered_map<ChainKey, Chain> hash_chains;
-    misc::Sequence<InIt, InItEnd...> seq;
-    Token cached_token;
+    LZ77EncoderParams params; /* Parameters */
+    SlidingWindow search_window; /* The sliding search window */
+    std::size_t nr_fetched_syms = 0; /* Number of fetched symbols */
+    std::array<std::size_t, search_size> head {}, prev {}; /* Hash chains. */
+    Token cached_token; /* The cached token to be returned in the next encoding step. */
+    misc::Sequence<InIt, InItEnd...> seq; /* The input sequence. */
 };
 
 /* The LZ77::Decoder class. Decodes what the encoder encodes. */
@@ -408,6 +434,7 @@ public:
     template<std::output_iterator<Sym> PrevOutIt, typename... PrevOutItEnd>
     Decoder(const Decoder<PrevOutIt, PrevOutItEnd...>& prev, OutIt out_it, OutItEnd... out_it_end)
         :   search_window(prev.search_window),
+            partial_token(prev.partial_token),
             seq(out_it, out_it_end...)
     {
         // processing the partial token (if not none) in a newly continued decoder
@@ -417,7 +444,8 @@ public:
     /* Construct as a continuation of another decoder with new iterator(s). */
     template<std::output_iterator<Sym> PrevOutIt, typename... PrevOutItEnd>
     Decoder(Decoder<PrevOutIt, PrevOutItEnd...>&& prev, OutIt out_it, OutItEnd... out_it_end)
-        :   search_window(search_window),
+        :   search_window(std::move(prev.search_window)),
+            partial_token(std::move(prev.partial_token)),
             seq(out_it, out_it_end...)
     {
         // processing the partial token (if not none) in a newly continued decoder
@@ -527,9 +555,9 @@ private:
         partial_token = len == 0 ? Token() : Token(len, dist);
     }
 
-    SlidingWindow search_window;
-    misc::Sequence<OutIt, OutItEnd...> seq;
-    Token partial_token;
+    SlidingWindow search_window; /* The sliding search window. */
+    Token partial_token; /* Partially processed token to be processed in the next decoding step. */
+    misc::Sequence<OutIt, OutItEnd...> seq; /* Output sequence. */
 };
 
 }
