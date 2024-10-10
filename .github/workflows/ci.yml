@@ -19,8 +19,15 @@ jobs:
         compiler:
           - { cc: gcc, cxx: g++ }
           - { cc: clang, cxx: clang++ }
-        build_type: [ Release, Debug ]
-        sanitizer: [none, thread]
+        build_type: [ RelWithDebInfo, Debug ]
+        sanitizer: [ none, thread, address ]
+        exclude:
+          # Exclude address sanitizer with gcc
+          - compiler: { cc: gcc, cxx: g++ }
+            sanitizer: address
+          # Exclude address sanitizer with RelWithDebInfo
+          - build_type: RelWithDebInfo
+            sanitizer: address
 
     runs-on: ubuntu-latest
 
