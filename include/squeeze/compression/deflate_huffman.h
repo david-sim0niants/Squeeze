@@ -80,7 +80,7 @@ public:
     inline static void gen_code_len_codes(CodeLenCodeLenIt clcl_it, CodeLenCodeLenIt clcl_it_end,
             CodeLenCodeIt clc_it)
     {
-        return CodeLenHuffman::gen_codes(clcl_it, clcl_it_end, clc_it);
+        return CodeLenHuffman::template gen_codes<code_len_alphabet_size>(clcl_it, clcl_it_end, clc_it);
     }
 
     /* Make an encoder using the given bit encoder. */

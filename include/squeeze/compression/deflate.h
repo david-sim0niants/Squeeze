@@ -139,8 +139,10 @@ private:
         std::span litlen_codes (litlen_codes_storage.data(), litlen_code_lens.size());
         std::span dist_codes (dist_codes_storage.data(), dist_code_lens.size());
 
-        Huffman_::gen_codes(litlen_code_lens.begin(), litlen_code_lens.end(), litlen_codes.data());
-        Huffman_::gen_codes(dist_code_lens.begin(), dist_code_lens.end(), dist_codes.data());
+        Huffman_::template gen_codes<litlen_alphabet_size>
+            (litlen_code_lens.begin(), litlen_code_lens.end(), litlen_codes.data());
+        Huffman_::template gen_codes<dist_alphabet_size>
+            (dist_code_lens.begin(), dist_code_lens.end(), dist_codes.data());
 
         return std::make_tuple(litlen_codes, dist_codes);
     }

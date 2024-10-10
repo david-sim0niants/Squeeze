@@ -94,7 +94,7 @@ public:
         std::array<CodeLen, alphabet_size> code_lens {};
         Huffman<Policy>::template find_code_lengths<alphabet_size>(freqs.begin(), code_lens.begin());
         std::array<Code, alphabet_size> codes {};
-        Huffman<Policy>::gen_codes(code_lens.begin(), code_lens.end(), codes.data());
+        Huffman<Policy>::template gen_codes<alphabet_size>(code_lens.begin(), code_lens.end(), codes.data());
 
         Stat s = encode_code_lens(code_lens.begin(), code_lens.end());
         if (s.failed()) [[unlikely]]
@@ -143,7 +143,7 @@ public:
             return {out_it, "invalid code lengths decoded"};
 
         std::array<Code, alphabet_size> codes {};
-        Huffman<Policy>::gen_codes(code_lens.begin(), code_lens.end(), codes.data());
+        Huffman<Policy>::template gen_codes<alphabet_size>(code_lens.begin(), code_lens.end(), codes.data());
 
         HuffmanTree tree;
         StatStr st = tree.build_from_codes(codes.begin(), codes.end(), code_lens.begin(), code_lens.end());

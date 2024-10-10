@@ -5,6 +5,8 @@
 #include <atomic>
 #include <concepts>
 
+#include "cpu_info.h"
+
 namespace squeeze::misc {
 
 /* Interface for a thread pool.
@@ -19,7 +21,7 @@ private:
 public:
     /* Initialize the thread pool and optionally provide number of worker threads to create.
      * Defaults to the number of cores in the system and it's NOT recommended to pass a bigger number. */
-    explicit ThreadPool(const unsigned concurrency = std::thread::hardware_concurrency());
+    explicit ThreadPool(const unsigned concurrency = get_nr_available_cpu_cores());
     ~ThreadPool();
 
     template<std::invocable F>

@@ -85,19 +85,21 @@ public:
     template<RandomAccessInputIterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
     static inline void gen_codes(CodeLenIt code_len_it, CodeLenIt code_len_it_end, CodeIt code_it)
     {
-        const std::size_t nr_code_lens = std::distance(code_len_it, code_len_it_end);
-        std::vector<std::pair<CodeLen, std::size_t>> cl_idx_pairs_storage(nr_code_lens);
+        const std::size_t nr_codes = std::distance(code_len_it, code_len_it_end);
+        std::vector<std::pair<CodeLen, std::size_t>> cl_idx_pairs_storage(nr_codes);
         gen_codes(code_len_it, code_it, cl_idx_pairs_storage);
     }
 
     /* Generate canonical Huffman codes based on the provided code lengths.
-     * Assumes the number of codes is compile-time constant. */
-    template<std::size_t nr_codes,
+     * Assumes that the max number of codes in general (usually the alphabet size) is compile-time constant.
+     * This helps avoiding dynamic memory allocation. */
+    template<std::size_t max_nr_codes,
         RandomAccessInputIterator CodeLenIt, RandomAccessOutputIterator<Code> CodeIt>
-    static inline void gen_codes(CodeLenIt code_len_it, CodeIt code_it)
+    static inline void gen_codes(CodeLenIt code_len_it, CodeLenIt code_len_it_end, CodeIt code_it)
     {
-        std::array<std::pair<CodeLen, std::size_t>, nr_codes> cl_idx_pairs_storage;
-        gen_codes(code_len_it, code_it, cl_idx_pairs_storage);
+        const std::size_t nr_codes = std::distance(code_len_it, code_len_it_end);
+        std::array<std::pair<CodeLen, std::size_t>, max_nr_codes> cl_idx_pairs_storage;
+        gen_codes(code_len_it, code_it, std::span(cl_idx_pairs_storage.data(), nr_codes));
     }
 
     /* Make an encoder using the given bit encoder. */
