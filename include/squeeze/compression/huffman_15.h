@@ -100,11 +100,11 @@ public:
         if (s.failed()) [[unlikely]]
             return std::make_tuple(in_it, Stat{"failed encoding code lengths", s});
 
-        auto huffman_encoder = Huffman<Policy>::make_encoder(bit_encoder);
+        auto huffman_encoder = Huffman<Policy>::make_encoder(codes.data(), code_lens.data(), bit_encoder);
         if constexpr (use_term)
-            in_it = huffman_encoder.encode_syms(codes.data(), code_lens.data(), in_it, in_it_end, term_sym);
+            in_it = huffman_encoder.encode_syms(in_it, in_it_end, term_sym);
         else
-            in_it = huffman_encoder.encode_syms(codes.data(), code_lens.data(), in_it, in_it_end);
+            in_it = huffman_encoder.encode_syms(in_it, in_it_end);
         return {in_it, success};
     }
 
@@ -150,11 +150,11 @@ public:
         if (st.failed())
             return {out_it, Stat{"failed building a Huffman tree", st}};
 
-        auto huffman_decoder = Huffman<Policy>::make_decoder(bit_decoder);
+        auto huffman_decoder = Huffman<Policy>::make_decoder(tree.get_root(), bit_decoder);
         if constexpr (expect_term)
-            out_it = huffman_decoder.decode_syms(tree.get_root(), out_it, out_it_end, term_sym);
+            out_it = huffman_decoder.decode_syms(out_it, out_it_end, term_sym);
         else
-            out_it = huffman_decoder.decode_syms(tree.get_root(), out_it, out_it_end);
+            out_it = huffman_decoder.decode_syms(out_it, out_it_end);
         return {out_it, success};
     }
 

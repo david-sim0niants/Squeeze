@@ -71,26 +71,28 @@ public:
         return success;
     }
 
-    template<std::input_iterator BoolInIt>
-    unsigned int find_symbol(BoolInIt bool_it) const
+    inline std::optional<unsigned int> decode_sym_from(auto& bit_decoder) const
     {
         const HuffmanTreeNode *node = this;
-        while (not node->is_leaf()) {
-            node = *bool_it ? node->right : node->left;
-            ++bool_it;
-            assert(node != nullptr && "non-full binary tree passed to the decoder");
-        }
+        bool bit;
+        while (!node->is_leaf() && bit_decoder.read_bit(bit))
+            node = bit ? node->get_right() : node->get_left();
 
-        if (node->symbol == sentinel_symbol)
-            throw Exception<HuffmanTreeNode>("reached a sentinel symbol index while decoding Huffman codes");
-
-        return node->symbol;
+        if (node->is_leaf() && !node->is_sentinel())
+            return node->get_symbol();
+        else
+            return std::nullopt;
     }
 
-    inline bool validate_full_tree() const
+    inline bool validate_full_tree() const noexcept
     {
         return ((left and right) and (left->validate_full_tree() and right->validate_full_tree())
              or (not left and not right));
+    }
+
+    inline bool is_sentinel() const noexcept
+    {
+        return symbol == sentinel_symbol;
     }
 
     static constexpr unsigned int sentinel_symbol = (unsigned int)(-1);

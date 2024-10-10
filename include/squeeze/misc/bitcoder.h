@@ -264,22 +264,20 @@ public:
     }
 
     /* Read a single bit. */
-    bool read_bit(bool& succeeded)
+    bool read_bit(bool& bit)
     {
         if (0 == mid_pos) {
-            succeeded = seq.is_valid();
-            if (not succeeded)
+            if (not seq.is_valid())
                 return false;
 
             mid_chr = *seq.it; ++seq.it;
             mid_pos = char_size;
         }
 
-        succeeded = true;
         --mid_pos;
-        const bool bit = !!(mid_chr >> mid_pos);
+        bit = !!(mid_chr >> mid_pos);
         mid_chr &= (Char(1) << mid_pos) - 1;
-        return bit;
+        return true;
     }
 
     /* Obtain the remaining bits and reset. */
@@ -335,26 +333,6 @@ public:
     {
         const std::size_t N = (nr_bits + char_size - mid_pos);
         return (N / char_size) - !(N % char_size);
-    }
-
-    /* Make a bit-reader iterator. */
-    auto make_bit_reader_iterator(bool& succeded)
-    {
-        struct ReadBitFunctor {
-            ReadBitFunctor(BitDecoder& self, bool& succeeded)
-                : self(&self), succeeded(&succeeded)
-            {
-            }
-
-            inline bool operator()() const
-            {
-                return self->read_bit(*succeeded);
-            }
-
-            BitDecoder *self;
-            bool *succeeded;
-        };
-        return utils::FunctionInputIterator(ReadBitFunctor(*this, succeded));
     }
 
 private:

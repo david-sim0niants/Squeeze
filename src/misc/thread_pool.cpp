@@ -64,6 +64,8 @@ private:
                 break;
 
             task();
+            task = nullptr;
+
             state.store(State::Idle, std::memory_order::release);
             state.notify_one();
         }

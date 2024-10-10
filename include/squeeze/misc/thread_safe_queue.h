@@ -12,8 +12,8 @@ namespace squeeze::misc {
 namespace detail {
 
 /* This class implements the core functionalities of a thread-safe queue.
- * It's separated from the template ThreadSafeQueue to be able to implement
- * type-agnostic functionalities in the source file.
+ * Separated from the template ThreadSafeQueue to separately implement
+ * type-agnostic functionalities and avoid duplicate code generation.
  * Internally uses a linked list and two mutexes to protect the head and tail nodes,
  * as well as an atomic size variable to optimize the lock and wait/notify usages. */
 class BaseThreadSafeQueue {
@@ -236,7 +236,7 @@ public:
     }
 
     /* Returns number of elements in the queue. */
-    inline size_t get_size() const
+    inline std::size_t get_size() const
     {
         return Base::get_size();
     }

@@ -57,7 +57,7 @@ public:
     }
 
     /* Get the number of tasks left to run. */
-    inline size_t get_nr_tasks_left() const
+    inline std::size_t get_nr_tasks_left() const
     {
         return task_q.get_size();
     }

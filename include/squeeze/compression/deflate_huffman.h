@@ -65,7 +65,7 @@ public:
     {
         std::array<CodeLenFreq, code_len_alphabet_size> code_len_freqs {};
         count_code_len_freqs(code_len_it, code_len_it_end, code_len_freqs.begin());
-        CodeLenHuffman::template find_code_lengths<code_len_alphabet_size>(code_len_freqs.begin(), clcl_it);
+        CodeLenHuffman::template find_code_lengths<code_len_alphabet_size>(code_len_freqs.data(), clcl_it);
     }
 
     /* Validate code lengths of the code lengths alphabet. */
@@ -325,17 +325,14 @@ public:
     }
 
     /* Decode a single code length with its repetitions. */
-    bool decode_code_len_sym(const HuffmanTreeNode *node, std::size_t& nr_reps, CodeLen& code_len)
+    bool decode_code_len_sym(const HuffmanTreeNode *tree_root, std::size_t& nr_reps, CodeLen& code_len)
     {
-        bool s = true;
-        const unsigned int symbol_index = node->find_symbol(
-                bit_decoder.make_bit_reader_iterator(s));
-        if (not s)
-            return s;
-        else if (symbol_index >= code_len_alphabet_size)
-            throw Exception<Decoder>("invalid symbol index in a Huffman tree node");
+        std::optional<unsigned int> sym_idx = tree_root->decode_sym_from(bit_decoder);
+        if (!sym_idx.has_value())
+            return false;
 
-        CodeLen code_len_sym = code_len_alphabet[symbol_index];
+        bool s = true;
+        CodeLen code_len_sym = code_len_alphabet[*sym_idx];
         switch (code_len_sym) {
         case 0x10:
         {

@@ -243,9 +243,9 @@ TEST_P(HuffmanTestOnData, EncodesDecodesSymbols)
 
     std::vector<char> buffer;
     auto bit_encoder = misc::make_bit_encoder(std::back_inserter(buffer));
-    auto huffman_encoder = Huffman<>::make_encoder(bit_encoder);
+    auto huffman_encoder = Huffman<>::make_encoder(codes.data(), code_lens.data(), bit_encoder);
 
-    auto it = huffman_encoder.encode_syms(codes.data(), code_lens.data(), data.begin(), data.end());
+    auto it = huffman_encoder.encode_syms(data.begin(), data.end());
     ASSERT_EQ(it, data.end());
     ASSERT_EQ(bit_encoder.finalize(), 0);
 
@@ -253,13 +253,13 @@ TEST_P(HuffmanTestOnData, EncodesDecodesSymbols)
     EXPECT_GE(compression_ratio, 1.0F);
 
     auto bit_decoder = misc::make_bit_decoder(buffer.begin());
-    auto huffman_decoder = Huffman<>::make_decoder(bit_decoder);
     HuffmanTree tree;
     ASSERT_TRUE(tree.build_from_codes(codes.begin(), codes.end(),
                                       code_lens.begin(), code_lens.end()).successful());
+    auto huffman_decoder = Huffman<>::make_decoder(tree.get_root(), bit_decoder);
 
     std::vector<char> rest_data (data.size());
-    auto rest_it = huffman_decoder.decode_syms(tree.get_root(), rest_data.begin(), rest_data.end());
+    auto rest_it = huffman_decoder.decode_syms(rest_data.begin(), rest_data.end());
     ASSERT_EQ(rest_it, rest_data.end());
 
     ASSERT_THAT(rest_data, Pointwise(Eq(), data));

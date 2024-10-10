@@ -23,7 +23,7 @@ public:
     /* Perform all the registered entry append and remove operations.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream.
-     * Returns true if fully succeeded or false if some errors happened and may need to be checked. */
+     * Returns true if fully successful, or false if errors occurred and may need further checking. */
     bool write();
 
 private:

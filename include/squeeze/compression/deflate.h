@@ -319,11 +319,16 @@ private:
 
         bool successful_so_far = true;
 
+        auto litlen_encoder = Huffman_::make_encoder(
+                litlen_codes.data(), litlen_code_lens.data(), bit_encoder);
+        auto dist_encoder = Huffman_::make_encoder(
+                dist_codes.data(), dist_code_lens.data(), bit_encoder);
+
         for (auto it = data.begin(); it != data.end() && successful_so_far; ++it) {
             PackedToken token = *it;
             if (token.is_literal()) {
-                LitLenSym sym = to_litlen(token.get_literal());
-                successful_so_far = bit_encoder.encode_bits(litlen_codes[sym], litlen_code_lens[sym]);
+                const LitLenSym sym = to_litlen(token.get_literal());
+                successful_so_far = litlen_encoder.encode_sym(sym);
             } else if (token.is_len_dist()) {
                 ++it;
                 if (it == data.end())
@@ -341,9 +346,9 @@ private:
                 const std::size_t dist_extra_bits = DeflateLZ77::get_nr_dist_extra_bits(dist_sym);
 
                 successful_so_far =
-                    bit_encoder.encode_bits(litlen_codes[litlen_sym], litlen_code_lens[litlen_sym]) &&
+                    litlen_encoder.encode_sym(litlen_sym) &&
                     bit_encoder.encode_bits(len_extra, len_extra_bits) &&
-                    bit_encoder.encode_bits(dist_codes[dist_sym], dist_code_lens[dist_sym]) &&
+                    dist_encoder.encode_sym(dist_sym) &&
                     bit_encoder.encode_bits(dist_extra, dist_extra_bits);
             } else [[unlikely]] {
                 throw Exception<Encoder>("invalid token");
@@ -540,10 +545,16 @@ private:
         auto lz77_decoder = DeflateLZ77::make_decoder(out_it, out_it_end...);
         Stat s = success;
 
+        auto litlen_decoder = Huffman_::make_decoder(litlen_tree_node, bit_decoder);
+        auto dist_decoder = Huffman_::make_decoder(dist_tree_node, bit_decoder);
+
         while (not lz77_decoder.is_finished() && bit_decoder.is_valid()) {
-            std::optional<LitLenSym> opt_litlen_sym = huffman_decode_litlen_sym(litlen_tree_node);
-            if (!opt_litlen_sym)
+            std::optional<LitLenSym> opt_litlen_sym = litlen_decoder.decode_sym();
+            if (!opt_litlen_sym) {
+                s = {"failed decoding literal/length symbol"};
                 break;
+            }
+
             const LitLenSym litlen_sym = *opt_litlen_sym;
 
             if (is_literal(litlen_sym)) {
@@ -557,7 +568,7 @@ private:
                 DistExtra dist_extra = 0;
 
                 std::tie(len_extra, dist_sym, dist_extra, s) =
-                    huffman_decode_len_extra_and_dist(len_sym, dist_tree_node);
+                    huffman_decode_len_extra_and_dist(len_sym, dist_decoder);
                 if (s.failed()) [[unlikely]]
                     break;
 
@@ -575,28 +586,10 @@ private:
         return std::make_tuple(lz77_decoder.get_it(), std::exchange(s, success));
     }
 
-    /* Huffman-decode a literal/length symbol. */
-    std::optional<LitLenSym> huffman_decode_litlen_sym(const HuffmanTreeNode *litlen_tree_node)
-    {
-        bool successful = false;
-        unsigned int sym_idx = litlen_tree_node->find_symbol(
-                bit_decoder.make_bit_reader_iterator(successful));
-        return successful ? std::optional(LitLenSym(sym_idx)) : std::nullopt;
-    }
-
-    /* Huffman-decode a distance symbol. */
-    std::optional<DistSym> huffman_decode_dist_sym(const HuffmanTreeNode *dist_tree_node)
-    {
-        bool successful = false;
-        unsigned int sym_idx = dist_tree_node->find_symbol(
-                bit_decoder.make_bit_reader_iterator(successful));
-        return successful ? std::optional(DistSym(sym_idx)) : std::nullopt;
-    }
-
     /* Huffman-decode the length extra bits and the distance symbol and extra bits.
      * This is needed when the first decoded literal/length symbol is a length symbol. */
     std::tuple<LenExtra, DistSym, DistExtra, Stat> huffman_decode_len_extra_and_dist(
-            LenSym len_sym, const HuffmanTreeNode *dist_tree_node)
+            LenSym len_sym, auto& decoder)
     {
         std::tuple<LenExtra, DistSym, DistExtra, Stat> result = std::make_tuple(0, 0, 0, success);
         auto& [len_extra, dist_sym, dist_extra, s] = result;
@@ -607,7 +600,7 @@ private:
             return result;
         }
 
-        std::optional<DistSym> opt_dist_sym = huffman_decode_dist_sym(dist_tree_node);
+        std::optional<DistSym> opt_dist_sym = decoder.decode_sym();
         if (!opt_dist_sym) [[unlikely]] {
             s = "failed decoding distance symbol";
             return result;
