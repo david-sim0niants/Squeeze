@@ -150,7 +150,7 @@ private:
     }
 
 private:
-    static constexpr size_t close_flag = (size_t)1 << (sizeof(size_t) * CHAR_WIDTH - 1);
+    static constexpr size_t close_flag = (size_t)1 << (sizeof(size_t) * CHAR_BIT - 1);
     static constexpr size_t max_size = close_flag - 1;
     static constexpr size_t size_bits = ~close_flag;
 

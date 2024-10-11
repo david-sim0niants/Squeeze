@@ -4,6 +4,7 @@
 #include <functional>
 #include <atomic>
 #include <concepts>
+#include <semaphore>
 
 #include "cpu_info.h"
 

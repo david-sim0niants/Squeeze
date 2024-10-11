@@ -19,7 +19,7 @@ Stat FileEntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
     case EntryType::RegularFile:
         {
             SQUEEZE_TRACE("'{}' is a regular file", entry_header.path);
-            this->final_entry_header = entry_header;
+            this->final_entry_header = std::move(entry_header);
             return std::visit(utils::Overloaded {
                     [this, &stream](std::ofstream&& f) -> Stat
                     {
@@ -27,11 +27,11 @@ Stat FileEntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
                         stream = &*file;
                         return success;
                     },
-                    [this, &entry_header](StatCode&& stat) -> Stat
+                    [this](StatCode&& stat) -> Stat
                     {
-                        return {"failed making a regular file '" + entry_header.path + '\'', stat};
+                        return {"failed making a regular file '" + final_entry_header->path + '\'', stat};
                     }
-                }, utils::make_regular_file_out(entry_header.path));
+                }, utils::make_regular_file_out(final_entry_header->path));
         }
     case EntryType::Directory:
         {

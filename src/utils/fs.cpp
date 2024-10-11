@@ -31,9 +31,18 @@ std::variant<std::ofstream, StatCode> make_regular_file_out(std::string_view pat
     if (ec)
         return ec;
 
-    std::ofstream file(path, std::ios_base::binary | std::ios_base::out | std::ios_base::app);
+    std::filesystem::remove(path, ec);
+    if (ec) {
+        std::filesystem::permissions(path, std::filesystem::perms::owner_write);
+        std::filesystem::remove(path, ec);
+        if (ec)
+            return ec;
+    }
+
+    std::ofstream file(path, std::ios_base::binary);
     if (!file)
         return std::make_error_code(std::errc::io_error);
+
     file.seekp(0, std::ios::beg);
     return file;
 }
