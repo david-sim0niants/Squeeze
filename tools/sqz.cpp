@@ -53,10 +53,18 @@ public:
                 short_options, long_options, long_options + std::size(long_options));
         int exit_code = handle_arguments();
         arg_parser.reset();
+
         state.flags = 0;
+        state.compression = default_compression;
         mode = Append;
+
         return exit_code;
     }
+
+    static constexpr compression::CompressionParams default_compression = {
+        .method = compression::CompressionMethod::Deflate,
+        .level = 8,
+    };
 
     static constexpr char short_options[] = "ARXLhrCl";
     static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse", "compression", "log-level"};
@@ -515,8 +523,8 @@ Options:
     -r, --recurse       Enable recursive mode: directories will be processed recursively
         --no-recurse    Disable non-recursive mode: directories won't be processed recursively
     -C, --compression   Specify compression info in a form of 'method' or 'level' or 'method/level',
-                        where method is one of the following: {none, huffman}; and level is an integer with
-                        the following bounds for each method: {[0-0], [0-8]}
+                        where method is one of the following: {none, huffman, deflate}; and level is an integer with
+                        the following bounds for each method: {[0-0], [0-8], [0-8]}
     -l, --log-level     Set the log level which can be one of the following:
                         [trace, debug, info, warn, error, critical, off] or:
                         [0,     1,     2,    3,    4,     5,        6  ] or:
@@ -530,7 +538,7 @@ private:
     ModeFlags mode = Append;
     struct State {
         int flags = 0;
-        compression::CompressionParams compression;
+        compression::CompressionParams compression = default_compression;
     } state;
 
     std::optional<ArgParser> arg_parser;
