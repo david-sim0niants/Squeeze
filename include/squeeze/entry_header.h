@@ -8,7 +8,6 @@
 
 #include "compression/params.h"
 #include "status.h"
-#include "utils/enum.h"
 
 namespace squeeze {
 
@@ -16,11 +15,10 @@ using compression::CompressionParams;
 
 /* Struct that contains the entry header data. */
 struct EntryHeader {
-    uint64_t content_size = 0; /* Entry content size */
     struct {
         uint8_t major = 0, minor = 0;
-
     } major_minor_version = {}; /* Major and minor versions */
+    uint64_t content_size = 0; /* Entry content size */
     CompressionParams compression; /* Compression used */
     EntryAttributes attributes; /* Entry attributes including its file type and permissions */
     std::string path; /* The path itself */
@@ -50,7 +48,7 @@ struct EntryHeader {
     /* Decode the entry header. */
     static StatStr decode(std::istream& input, EntryHeader& entry_header);
 
-    using EncodedPathSizeType = uint32_t;
+    using EncodedPathSizeType = uint16_t;
 
     /* Size of the static part of the encoded header */
     static constexpr size_t encoded_static_size =

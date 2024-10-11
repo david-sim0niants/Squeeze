@@ -15,8 +15,8 @@ TEST(EntryHeader, EncodeDecode)
     test_tools::generators::PRNG prng(1234);
 
     EntryHeader original_entry_header = {
-        .content_size = static_cast<uint64_t>(prng(0, std::numeric_limits<int>::max())),
         .major_minor_version = {version.major, version.minor},
+        .content_size = static_cast<uint64_t>(prng(0, std::numeric_limits<int>::max())),
         .compression = {
             .method = compression::CompressionMethod::None,
             .level = 0,

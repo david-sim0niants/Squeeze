@@ -10,6 +10,7 @@ enum class CompressionMethod : uint8_t {
     None = 0,
     Huffman,
     Deflate,
+    Unknown = 0xFF,
 };
 
 }
