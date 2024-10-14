@@ -1,3 +1,5 @@
+set(INSTALL_GTEST OFF)
+set(INSTALL_GTEST OFF)
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -20,10 +22,5 @@ set(TARGET_NAME test_all)
 add_executable(${TARGET_NAME} ${TEST_SRC_FILES})
 target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${TARGET_NAME} squeeze test_tools gtest gmock)
-
-# include(GoogleTest)
-# gtest_discover_tests(${TARGET_NAME})
-
-set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of GTest" FORCE)
 
 add_subdirectory(test_tools)

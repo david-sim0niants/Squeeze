@@ -28,6 +28,8 @@ endif ()
 if (MSVC)
     # for MACRO(, ## __VA_ARGS__) syntax to omit trailing commas in macro expansions
     target_compile_options(${TARGET_NAME} PUBLIC /Zc:preprocessor)
+    # export all symbols from the DLL
+    set_target_properties(${TARGET_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif ()
 
 set(SANITIZE "none" CACHE STRING "Enable sanitizer: none, address, thread")
