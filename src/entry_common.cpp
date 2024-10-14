@@ -5,7 +5,7 @@ namespace squeeze {
 template<> void print_to(std::ostream& os, const EntryAttributes& attributes)
 {
     char str[] = "?rwxrwxrwx";
-    switch (attributes.type) {
+    switch (attributes.get_type()) {
     case EntryType::RegularFile:
         str[0] = '-';
         break;
@@ -19,6 +19,8 @@ template<> void print_to(std::ostream& os, const EntryAttributes& attributes)
         break;
     }
 
+    const EntryPermissions permissions = attributes.get_permissions();
+
     int i = 1;
     for (EntryPermissions perm : {
             EntryPermissions::OwnerRead,
@@ -31,7 +33,7 @@ template<> void print_to(std::ostream& os, const EntryAttributes& attributes)
             EntryPermissions::OthersWrite,
             EntryPermissions::OthersExec,
         }) {
-        str[i] = utils::test_flag(attributes.permissions, perm) ? str[i] : '-';
+        str[i] = utils::test_flag(permissions, perm) ? str[i] : '-';
         ++i;
     }
 

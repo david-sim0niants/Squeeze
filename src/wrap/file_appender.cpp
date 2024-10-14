@@ -14,7 +14,6 @@ bool FileAppender::will_append(const std::filesystem::path& path,
         appender.will_append<FileEntryInput>(*stat, std::move(better_path), compression);
     else
         appender.will_append<FileEntryInput>(std::move(better_path), compression);
-
     return true;
 }
 

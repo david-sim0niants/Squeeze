@@ -1,4 +1,4 @@
-#include "squeeze/decoder.h"
+#include "squeeze/decode.h"
 
 #include "squeeze/common.h"
 #include "squeeze/compression/compression.h"
@@ -8,7 +8,7 @@
 
 namespace squeeze {
 
-DecoderStat decode(std::ostream& out, std::size_t size, std::istream& in,
+StatStr decode(std::ostream& out, std::size_t size, std::istream& in,
         const CompressionParams& compression)
 {
     using namespace compression;

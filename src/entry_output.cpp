@@ -13,7 +13,7 @@ using Stat = EntryOutput::Stat;
 
 Stat FileEntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
 {
-    switch (entry_header.attributes.type) {
+    switch (entry_header.attributes.get_type()) {
     case EntryType::None:
         return "cannot extract none type entry without a custom output stream";
     case EntryType::RegularFile:
@@ -37,7 +37,7 @@ Stat FileEntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
         {
             SQUEEZE_TRACE("'{}' is a directory", entry_header.path);
             stream = nullptr;
-            StatCode sc = utils::make_directory(entry_header.path, entry_header.attributes.permissions);
+            StatCode sc = utils::make_directory(entry_header.path, entry_header.attributes.get_permissions());
             if (sc.failed())
                 return {"failed making directory '" + entry_header.path + '\'', sc};
             else
@@ -53,7 +53,7 @@ Stat FileEntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
 Stat FileEntryOutput::init_symlink(EntryHeader&& entry_header, const std::string &target)
 {
     SQUEEZE_TRACE("'{}' is a symlink", entry_header.path);
-    StatCode sc = utils::make_symlink(entry_header.path, target, entry_header.attributes.permissions);
+    StatCode sc = utils::make_symlink(entry_header.path, target, entry_header.attributes.get_permissions());
     if (sc.failed())
         return {"failed creating symlink '" + entry_header.path + " -> " + target + '\'', sc};
     else
@@ -67,7 +67,7 @@ Stat FileEntryOutput::finalize()
         return success;
 
     StatCode sc = utils::set_permissions(final_entry_header->path,
-                                         final_entry_header->attributes.permissions);
+            final_entry_header->attributes.get_permissions());
     if (sc.failed()) {
         SQUEEZE_ERROR("Failed setting file permissions");
         return {"failed setting file permissions", sc};

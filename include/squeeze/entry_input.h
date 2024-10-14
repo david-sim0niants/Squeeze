@@ -81,6 +81,13 @@ protected:
     std::optional<std::ifstream> file;
 };
 
+static constexpr EntryAttributes default_attributes = {
+    EntryType::None,
+    EntryPermissions::OwnerRead | EntryPermissions::OwnerWrite |
+    EntryPermissions::GroupRead | EntryPermissions::GroupWrite |
+    EntryPermissions::OthersRead | EntryPermissions::OthersWrite,
+};
+
 /* Derived class of BasicEntryInput that relies on a pre-existing content and entry header to read from. */
 class CustomContentEntryInput : public BasicEntryInput {
 public:
@@ -95,15 +102,6 @@ public:
     virtual Stat init(EntryHeader& entry_header, ContentType& content) override;
     virtual void deinit() noexcept override;
 
-public:
-    static constexpr EntryAttributes default_attributes = {
-        EntryType::None,
-        EntryPermissions::OwnerRead | EntryPermissions::OwnerWrite |
-        EntryPermissions::GroupRead | EntryPermissions::GroupWrite |
-        EntryPermissions::OthersRead | EntryPermissions::OthersWrite,
-    };
-
-protected:
     void init_entry_header(EntryHeader& entry_header);
 
 protected:

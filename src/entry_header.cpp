@@ -24,7 +24,6 @@ StatStr encode_any(std::ostream& output, const T& obj)
 template<typename T>
 StatStr decode_any(std::istream& input, T& obj)
 {
-    std::errc err;
     input.read(reinterpret_cast<char *>(&obj), sizeof(obj));
     if (utils::validate_stream_fail_eof(input)) [[unlikely]]
         return "input read error";
@@ -69,7 +68,7 @@ StatStr encode_compression_params(std::ostream& output, const CompressionParams&
 StatStr decode_compression_params(std::istream& input, CompressionParams& params)
 {
     using compression::CompressionMethod;
-    std::underlying_type_t<CompressionMethod> method_int;
+    std::underlying_type_t<CompressionMethod> method_int {};
     StatStr s;
     (s = decode_integral(input, method_int)) &&
     (s = decode_integral(input, params.level));
@@ -94,7 +93,7 @@ StatStr decode_compression_params(std::istream& input, CompressionParams& params
 
 StatStr encode_entry_attributes(std::ostream& output, EntryAttributes attributes)
 {
-    switch (attributes.type) {
+    switch (attributes.get_type()) {
         using enum EntryType;
     case None:
     case RegularFile:
@@ -104,22 +103,13 @@ StatStr encode_entry_attributes(std::ostream& output, EntryAttributes attributes
     default: [[unlikely]]
         throw Exception<EntryHeader>("invalid entry type");
     }
-
-    uint16_t val = static_cast<uint8_t>(attributes.type);
-    val = (val << 9) | (static_cast<uint16_t>(attributes.permissions) & 0x1FF);
-
-    return encode_integral(output, val);
+    return encode_integral(output, attributes.data);
 }
 
 StatStr decode_entry_attributes(std::istream& input, EntryAttributes& attributes)
 {
-    uint16_t val = 0;
-    StatStr s = decode_integral(input, val);
-
-    attributes.type = static_cast<EntryType>(val >> 9);
-    attributes.permissions = static_cast<EntryPermissions>(val & 0x1FF);
-
-    switch (attributes.type) {
+    StatStr s = decode_integral(input, attributes.data);
+    switch (attributes.get_type()) {
     case EntryType::None:
     case EntryType::RegularFile:
     case EntryType::Directory:
@@ -128,22 +118,22 @@ StatStr decode_entry_attributes(std::istream& input, EntryAttributes& attributes
     default: [[unlikely]]
         if (s)
             s = "invalid entry type";
-        attributes.type = EntryType::None;
+        attributes.set_type(EntryType::None);
         break;
     }
-
     return s;
 }
 
 StatStr encode_path(std::ostream& output, const std::string& path)
 {
-    static constexpr size_t path_len_limit =
+    static constexpr size_t path_size_limit =
         std::numeric_limits<EntryHeader::EncodedPathSizeType>::max();
 
-    if (path.size() > path_len_limit)
-        throw Exception<EntryHeader>("path too long, must not exceed " + stringify(path_len_limit));
+    if (path.size() > path_size_limit)
+        throw Exception<EntryHeader>("path too long, must not exceed " + stringify(path_size_limit));
 
-    StatStr s = encode_any(output, static_cast<EntryHeader::EncodedPathSizeType>(path.size()));
+    const auto path_size = static_cast<EntryHeader::EncodedPathSizeType>(path.size());
+    StatStr s = encode_integral(output, path_size);
     if (s.failed())
         return s;
 
@@ -157,12 +147,12 @@ StatStr encode_path(std::ostream& output, const std::string& path)
 
 StatStr decode_path(std::istream& input, std::string& path)
 {
-    EntryHeader::EncodedPathSizeType size;
-    StatStr s = decode_any(input, size);
+    EntryHeader::EncodedPathSizeType path_size = 0;
+    StatStr s = decode_integral(input, path_size);
     if (s.failed()) [[unlikely]]
         return s;
 
-    path.resize(size);
+    path.resize(path_size);
     input.read(path.data(), path.size());
 
     if (utils::validate_stream_fail_eof(input)) [[unlikely]]

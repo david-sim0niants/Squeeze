@@ -284,7 +284,7 @@ private:
 
         sqz_file.open(sqz_fn, file_mode);
         if (!sqz_file) {
-            std::cerr << "Error: failed opening a file - " << sqz_fn.c_str() << '\n';
+            std::cerr << "Error: failed opening a file - " << sqz_fn << '\n';
             return EXIT_FAILURE;
         }
 
@@ -351,7 +351,7 @@ private:
         for (auto it = sqz->begin(); it != sqz->end(); ++it) {
             const auto& entry_header = it->second;
             std::stringstream extra;
-            if (entry_header.attributes.type == EntryType::Symlink) {
+            if (entry_header.attributes.get_type() == EntryType::Symlink) {
                 extra << " -> ";
                 sqz->extract(it, extra);
             }
@@ -455,7 +455,7 @@ private:
 
         if (std::isdigit(str.front())) {
             uint8_t level = 0;
-            std::from_chars_result result = std::from_chars(str.begin(), str.end(), level);
+            std::from_chars_result result = std::from_chars(str.data(), str.data() + str.size(), level);
             switch (result.ec) {
             case std::errc::invalid_argument:
             case std::errc::result_out_of_range:

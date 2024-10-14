@@ -21,7 +21,7 @@ void print_byte(char byte, std::ostream& os)
         os << "\\0";
         break;
     default:
-        if (std::isprint(byte))
+        if (std::isprint(static_cast<unsigned char>(byte)))
             os << byte;
         else
             os << "\\x" << ((unsigned short)(byte) & 0xFF);

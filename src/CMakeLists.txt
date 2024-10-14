@@ -3,7 +3,7 @@ add_library(${TARGET_NAME} SHARED
     squeeze.cpp reader.cpp writer.cpp appender.cpp remover.cpp extracter.cpp lister.cpp
     append_scheduler.cpp entry_iterator.cpp
     entry_common.cpp entry_header.cpp entry_input.cpp entry_output.cpp
-    encoder.cpp decoder.cpp
+    encode.cpp decode.cpp encoder_pool.cpp
     misc/thread_pool.cpp misc/thread_safe_queue.cpp misc/substream.cpp misc/cpu_info.cpp
     wrap/file_appender.cpp wrap/file_remover.cpp wrap/file_extracter.cpp wrap/file_squeeze.cpp
     utils/io.cpp utils/fs.cpp)
@@ -25,6 +25,10 @@ if (USE_LOGGING)
     target_link_libraries(${TARGET_NAME} PUBLIC spdlog::spdlog)
 endif ()
 
+if (MSVC)
+    # for MACRO(, ## __VA_ARGS__) syntax to omit trailing commas in macro expansions
+    target_compile_options(${TARGET_NAME} PUBLIC /Zc:preprocessor)
+endif ()
 
 set(SANITIZE "none" CACHE STRING "Enable sanitizer: none, address, thread")
 

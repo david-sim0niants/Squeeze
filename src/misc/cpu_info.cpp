@@ -7,8 +7,8 @@ namespace squeeze::misc {
 
 std::size_t get_nr_available_cpu_cores()
 {
-    int process_affinity_mask;
-    int system_affinity_mask;
+    DWORD64 process_affinity_mask;
+    DWORD64 system_affinity_mask;
 
     if (!GetProcessAffinityMask(GetCurrentProcess(), &process_affinity_mask, &system_affinity_mask))
         return 1;

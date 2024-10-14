@@ -79,8 +79,8 @@ static void test_mockfs_entries(
 
 static void test_mock_attributes(EntryAttributes original, EntryAttributes restored)
 {
-    EXPECT_EQ(original.type, restored.type);
-    EXPECT_EQ(original.permissions, restored.permissions);
+    EXPECT_EQ(original.get_type(), restored.get_type());
+    EXPECT_EQ(original.get_permissions(), restored.get_permissions());
 }
 
 template<> void test_mock_files<mock::RegularFile>(

@@ -53,7 +53,7 @@ public:
 
     template<std::input_iterator InIt, typename... InItEnd>
     class Encoder;
-    template<std::output_iterator<Literal> OutIt, typename... OutItEnd>
+    template<std::output_iterator<DeflateLZ77::Literal> OutIt, typename... OutItEnd>
     class Decoder;
 
     inline static PackedLen pack_len(std::size_t len)

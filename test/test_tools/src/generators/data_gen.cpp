@@ -9,7 +9,7 @@ void apply_noise_on_str(PRNG prng, unsigned char noise_probability, InIt char_it
 {
     for (; char_it != char_it_end; ++char_it) {
         char& c = *char_it;
-        c = prng.gen<unsigned char>(0, 255) <= noise_probability ? char(prng(0, 255)) : c;
+        c = prng(0U, 255U) <= noise_probability ? char(prng(0, 255)) : c;
     }
 }
 
@@ -30,7 +30,7 @@ std::vector<char> gen_data(const PRNG& prng, const std::string_view data_seed,
         const std::size_t substr_size = prng(min_substr_size, max_substr_size);
         const std::size_t substr_pos = prng(std::size_t(0), data_seed.size() - substr_size);
         const std::string_view substr = data_seed.substr(substr_pos, substr_size); 
-        data.insert(data.end(), substr.data(), substr.end());
+        data.insert(data.end(), substr.begin(), substr.end());
         if constexpr (apply_noise)
             apply_noise_on_str(prng, noise_probability, data.end() - substr_size, data.end());
         curr_size -= substr_size;

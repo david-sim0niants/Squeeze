@@ -5,8 +5,8 @@
 #include <utility>
 
 #include "squeeze/compression/params.h"
-#include "squeeze/encoder.h"
-#include "squeeze/decoder.h"
+#include "squeeze/encode.h"
+#include "squeeze/decode.h"
 
 #include "test_tools/generators/test_gen.h"
 
@@ -36,7 +36,7 @@ TEST_P(EncodeDecodeTest, EncodeDecode)
     content.write(data.data(), content_size);
 
     std::stringstream compressed;
-    EncoderStat en_stat = encode(content, content_size, compressed, compression);
+    EncodeStat en_stat = encode(content, content_size, compressed, compression);
     EXPECT_TRUE(en_stat.successful()) << en_stat.report();
 
     const std::size_t compressed_size = compressed.tellp();
@@ -45,7 +45,7 @@ TEST_P(EncodeDecodeTest, EncodeDecode)
     EXPECT_GE(compression_ratio, 1.0);
 
     std::stringstream restored_content;
-    DecoderStat de_stat = decode(restored_content, compressed_size, compressed, compression);
+    DecodeStat de_stat = decode(restored_content, compressed_size, compressed, compression);
     EXPECT_TRUE(de_stat.successful()) << de_stat.report();
 
     ASSERT_THAT(restored_content.view(), Pointwise(Eq(), content.view()));

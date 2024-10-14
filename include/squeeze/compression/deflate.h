@@ -434,7 +434,7 @@ public:
     std::tuple<DeflateHeaderBits, Stat> decode_header_bits()
     {
         std::bitset<3> header_bits {};
-        const bool s = bit_decoder.template decode_bits(header_bits);
+        const bool s = bit_decoder.decode_bits(header_bits);
         Stat ss = s ? success : StatStr("failed decoding header bits");
         return std::make_tuple(static_cast<DeflateHeaderBits>(header_bits.to_ullong()), std::move(ss));
     }

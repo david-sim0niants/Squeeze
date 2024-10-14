@@ -51,7 +51,7 @@ struct EntryHeader {
     using EncodedPathSizeType = uint16_t;
 
     /* Size of the static part of the encoded header */
-    static constexpr size_t encoded_static_size =
+    static constexpr std::size_t encoded_static_size =
         sizeof(major_minor_version) + sizeof(content_size) + sizeof(compression) +
         sizeof(attributes) + sizeof(EncodedPathSizeType);
 };

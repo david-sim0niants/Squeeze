@@ -23,7 +23,7 @@ public:
 
     inline void set_permissions(EntryPermissions permissions)
     {
-        attributes.permissions = permissions;
+        attributes.set_permissions(permissions);
     }
 
 protected:

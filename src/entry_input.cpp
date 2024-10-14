@@ -34,7 +34,7 @@ Stat FileEntryInput::init(EntryHeader& entry_header, ContentType& content)
     if (s.failed())
         return s;
 
-    switch (entry_header.attributes.type) {
+    switch (entry_header.attributes.get_type()) {
         using enum EntryType;
     case Directory:
         SQUEEZE_TRACE("'{}' is a directory", path);
@@ -89,8 +89,8 @@ Stat FileEntryInput::init_entry_header(EntryHeader& entry_header)
         utils::convert(st.type(), type);
         EntryPermissions perms;
         utils::convert(st.permissions(), perms);
-        entry_header.attributes.type = type;
-        entry_header.attributes.permissions = perms;
+        entry_header.attributes.set_type(type);
+        entry_header.attributes.set_permissions(perms);
         return success;
     case not_found:
         return "no such file or directory - " + entry_header.path;

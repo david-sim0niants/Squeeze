@@ -5,7 +5,7 @@
 #include "squeeze/utils/io.h"
 #include "squeeze/utils/defer.h"
 #include "squeeze/utils/defer_macros.h"
-#include "squeeze/decoder.h"
+#include "squeeze/decode.h"
 
 namespace squeeze {
 
@@ -35,7 +35,7 @@ Stat Extracter::extract(const EntryIterator& it, EntryOutput& entry_output)
 
     SQUEEZE_DEBUG("Entry header: {}", stringify(entry_header));
 
-    switch (entry_header.attributes.type) {
+    switch (entry_header.attributes.get_type()) {
         using enum EntryType;
     case None:
     case RegularFile:

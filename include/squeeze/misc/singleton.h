@@ -25,9 +25,14 @@ public:
     }
 
 private:
+    inline static std::unique_ptr<T, Deleter> default_make()
+    {
+        return std::make_unique<T>();
+    }
+
     inline static std::once_flag once_flag;
     inline static std::unique_ptr<T, Deleter> instance_ptr;
-    inline static Maker maker = std::is_default_constructible_v<T> ? std::make_unique<T> : Maker{};
+    inline static Maker maker = std::is_default_constructible_v<T> ? default_make : Maker{};
 };
 
 }

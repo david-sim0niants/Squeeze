@@ -33,8 +33,34 @@ enum class EntryType : uint8_t {
 };
 
 struct EntryAttributes {
-    EntryType type : 7;
-    EntryPermissions permissions : 9;
+    constexpr EntryAttributes() = default;
+
+    constexpr EntryAttributes(EntryType type, EntryPermissions permissions)
+        : data((uint16_t(type) << 9) | uint16_t(permissions))
+    {
+    }
+
+    constexpr inline EntryType get_type() const noexcept
+    {
+        return EntryType(data >> 9);
+    }
+
+    constexpr inline EntryPermissions get_permissions() const noexcept
+    {
+        return EntryPermissions(data & 0x1FF);
+    }
+
+    constexpr inline void set_type(EntryType type) noexcept
+    {
+        data = (uint16_t(type) << 9) | (data & 0x1FF);
+    }
+
+    constexpr inline void set_permissions(EntryPermissions permissions) noexcept
+    {
+        data = (data & 0xFE00) | (uint16_t(permissions) & 0x1FF);
+    }
+
+    uint16_t data = 0;
 };
 
 template<> void print_to(std::ostream& os, const EntryAttributes& attributes);

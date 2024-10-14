@@ -7,8 +7,6 @@
 namespace squeeze::utils {
 
 #if defined(__GNUC__) || defined(__clang__)
-
-// GCC and Clang intrinsics
 constexpr inline uint16_t byteswap16(uint16_t x)
 {
     return __builtin_bswap16(x);
@@ -23,28 +21,7 @@ constexpr inline uint64_t byteswap64(uint64_t x)
 {
     return __builtin_bswap64(x);
 }
-
-#elif defined(_MSC_VER)
-
-// MSVC intrinsics
-constexpr inline uint16_t byteswap16(uint16_t x)
-{
-    return _byteswap_ushort(x);
-}
-
-constexpr inline uint32_t byteswap32(uint32_t x)
-{
-    return _byteswap_ulong(x);
-}
-
-constexpr inline uint64_t byteswap64(uint64_t x)
-{
-    return _byteswap_uint64(x);
-}
-
 #else
-
-// Bitwise fallback for unsupported compilers
 constexpr inline uint16_t byteswap16(uint16_t x)
 {
     return (x >> 8) | (x << 8);
@@ -62,7 +39,6 @@ constexpr inline uint64_t byteswap64(uint64_t x)
     x = ((x & 0xFFFF0000FFFF0000ULL) >> 16) | ((x & 0x0000FFFF0000FFFFULL) << 16);
     return (x >> 32) | (x << 32);
 }
-
 #endif
 
 template<std::integral T>
@@ -83,7 +59,7 @@ constexpr inline T byte_swap(T v)
 template<std::endian endian, std::integral T>
 constexpr inline T to_endian_val(T v)
 {
-    if constexpr (std::endian::native == endian)
+    if constexpr (std::endian::native != endian)
         return byte_swap(v);
     else
         return v;
@@ -92,7 +68,7 @@ constexpr inline T to_endian_val(T v)
 template<std::endian endian, std::integral T>
 constexpr inline T from_endian_val(T v)
 {
-    if constexpr (std::endian::native == endian)
+    if constexpr (std::endian::native != endian)
         return byte_swap(v);
     else
         return v;

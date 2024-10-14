@@ -8,7 +8,7 @@
 #include "entry_input.h"
 #include "status.h"
 #include "append_scheduler.h"
-#include "encoder.h"
+#include "encoder_pool.h"
 
 namespace squeeze {
 

@@ -1,26 +1,19 @@
 #pragma once
 
-#include <thread>
-#include <istream>
 #include <future>
 #include <concepts>
 
-#include "common.h"
-#include "status.h"
-#include "compression/params.h"
+#include "encode.h"
 #include "misc/thread_pool.h"
 #include "misc/task_scheduler.h"
 
 namespace squeeze {
 
-using compression::CompressionParams;
-using EncoderStat = StatStr;
-
-using EncodedBuffer = std::pair<Buffer, EncoderStat>;
+using EncodedBuffer = std::pair<Buffer, EncodeStat>;
 
 class EncoderPool {
 public:
-    using Stat = EncoderStat;
+    using Stat = EncodeStat;
 
 private:
     struct Task;
@@ -55,13 +48,5 @@ private:
     misc::TaskScheduler<Task> scheduler;
     std::atomic_size_t nr_running_threads = 0;
 };
-
-/* Encode single buffer using the compression info provided. */
-EncoderStat encode_buffer(const Buffer& in, Buffer& out, const CompressionParams& compression);
-
-/* Encode a char stream of a given size into another char stream using the compression info provided.
- * Unlike the EncoderPool, doesn't use multithreading. */
-EncoderStat encode(std::istream& in, std::size_t size, std::ostream& out,
-               const compression::CompressionParams& compression);
 
 }

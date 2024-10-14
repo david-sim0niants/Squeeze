@@ -64,7 +64,7 @@ Stat Appender::append(EntryInput& entry_input)
 bool Appender::schedule_appends()
 {
     bool succeeded = true;
-    DEFER( scheduler.finalize(); future_appends.clear(); );
+    DEFER( scheduler.finalize(); future_appends.clear(); owned_entry_inputs.clear(); );
     for (auto& future_append : future_appends)
         succeeded = schedule_append(future_append) && succeeded;
     return succeeded;

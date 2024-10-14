@@ -8,7 +8,7 @@ using Stat = EntryOutput::Stat;
 
 Stat EntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
 {
-    switch (entry_header.attributes.type) {
+    switch (entry_header.attributes.get_type()) {
         using enum EntryType;
     case None:
         return "none type not supported";
@@ -35,7 +35,7 @@ Stat EntryOutput::init(EntryHeader&& entry_header, std::ostream *& stream)
     default:
         throw Exception<EntryOutput>("attempt to extract an entry with an invalid type");
     }
-    permissions = entry_header.attributes.permissions;
+    permissions = entry_header.attributes.get_permissions();
     return success;
 }
 
@@ -45,7 +45,7 @@ Stat EntryOutput::init_symlink(EntryHeader&& entry_header, const std::string& ta
     this->file = symlink;
     if (!symlink)
         return "failed making a symlink in the mock filesystem";
-    permissions = entry_header.attributes.permissions;
+    permissions = entry_header.attributes.get_permissions();
     return success;
 }
 
