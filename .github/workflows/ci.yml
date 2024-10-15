@@ -10,8 +10,8 @@ env:
   BINARY_DIR: ${{ github.workspace }}/build
 
 jobs:
-  build:
-    name: Build and Test
+  build-and-test-on-ubuntu:
+    name: Build and Test on Ubuntu
 
     strategy:
       fail-fast: false
@@ -45,10 +45,44 @@ jobs:
     - name: Build
       working-directory: ${{ env.BINARY_DIR }}
       run: |
-        cmake ../ -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -DUSE_LOGGING=ON -DBUILD_TESTS=ON -DSANITIZE=${{ matrix.sanitizer }}
+        cmake ../ -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=ON -DBUILD_TOOLS=ON -DUSE_LOGGING=ON -DSANITIZE=${{ matrix.sanitizer }}
         make -j$(nproc)
 
     - name: Test
       working-directory: ${{ env.BINARY_DIR }}
       run: ./test/test_all
 
+  build-and-test-on-windows:
+    name: Build and Test on Windows
+
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [ RelWithDebInfo, Debug ]
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.bat
+
+    - name: Install dependencies
+      run: |
+        ./vcpkg/vcpkg.exe install spdlog
+
+    - name: Create build directory
+      run: mkdir ${{env.BINARY_DIR}}
+
+    - name: Build
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        cmake ../ -A x64 -DCMAKE_TOOLCHAIN_FILE=${{ env.SOURCE_DIR }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=ON -DBUILD_TOOLS=ON -DUSE_LOGGING=ON
+        cmake --build . --config ${{ matrix.build_type }} -- /m:$env:NUMBER_OF_PROCESSORS
+
+    - name: Test
+      working-directory: ${{ env.BINARY_DIR }}
+      run: ./bin/${{ matrix.build_type }}/test_all.exe

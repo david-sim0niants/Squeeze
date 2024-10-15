@@ -1,5 +1,8 @@
+set(BUILD_SHARED_LIBS OFF)
+
+# disable gtest installation
 set(INSTALL_GTEST OFF)
-set(INSTALL_GTEST OFF)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest

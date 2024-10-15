@@ -1,5 +1,5 @@
 set(TARGET_NAME squeeze)
-add_library(${TARGET_NAME} SHARED
+add_library(${TARGET_NAME}
     squeeze.cpp reader.cpp writer.cpp appender.cpp remover.cpp extracter.cpp lister.cpp
     append_scheduler.cpp entry_iterator.cpp
     entry_common.cpp entry_header.cpp entry_input.cpp entry_output.cpp
@@ -28,6 +28,9 @@ endif ()
 if (MSVC)
     # for MACRO(, ## __VA_ARGS__) syntax to omit trailing commas in macro expansions
     target_compile_options(${TARGET_NAME} PUBLIC /Zc:preprocessor)
+endif ()
+
+if (WIN32)
     # export all symbols from the DLL
     set_target_properties(${TARGET_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif ()
