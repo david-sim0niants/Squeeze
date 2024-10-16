@@ -15,19 +15,19 @@ namespace squeeze::misc {
 
 namespace detail {
 
-/* This class implements the core functionalities of a thread-safe queue.
+/** This class implements the core functionalities of a thread-safe queue.
  * Separated from the template ThreadSafeQueue to separately implement
  * type-agnostic functionalities and avoid duplicate code generation.
  * Internally uses a linked list and two mutexes to protect the head and tail nodes,
  * as well as an atomic size variable to optimize the lock and wait/notify usages. */
 class BaseThreadSafeQueue {
 private:
-    /* Type-agnostic abstract node type. */
+    /** Type-agnostic abstract node type. */
     struct Node {
         Node *next = nullptr;
     };
 
-    /* Value-type-specific node type. */
+    /** Value-type-specific node type. */
     template<typename T>
     struct TNode : Node {
         explicit TNode(const T& value) : value(value)
@@ -48,7 +48,7 @@ private:
 public:
     BaseThreadSafeQueue() = default;
 
-    /* Usage of copy/move constructors and assignment operators is discouraged and
+    /** Usage of copy/move constructors and assignment operators is discouraged and
      * otherwise wouldn't have a well defined implementation (per my guess). */
 
     BaseThreadSafeQueue(const BaseThreadSafeQueue&) = delete;
@@ -57,7 +57,7 @@ public:
     BaseThreadSafeQueue(BaseThreadSafeQueue&&) = delete;
     BaseThreadSafeQueue& operator=(BaseThreadSafeQueue&&) = delete;
 
-    /* Push value of type T. */
+    /** Push value of type T. */
     template<typename T> inline bool push(T&& value)
     {
         if (is_closed())
@@ -66,7 +66,7 @@ public:
         return true;
     }
 
-    /* Emplace value of type T with arguments of type Args...
+    /** Emplace value of type T with arguments of type Args...
      * Returns true on success and false otherwise (mostly when the queue is marked as closed)*/
     template<typename T, typename ...Args> inline bool emplace(Args&&... args)
     {
@@ -132,7 +132,7 @@ protected:
     ~BaseThreadSafeQueue() = default;
 
 private:
-    /* Extracts and returns the value from the node if it's not null and
+    /** Extracts and returns the value from the node if it's not null and
      * then deletes the node. */
     template<typename T> static std::optional<T> unwrap_node(Node *node)
     {
@@ -165,7 +165,7 @@ private:
 
 }
 
-/* A thread-safe queue interface. Supports pushing values, try popping them, try waiting and popping them, closing etc. */
+/** A thread-safe queue interface. Supports pushing values, try popping them, try waiting and popping them, closing etc. */
 template<typename T>
 class ThreadSafeQueue : private detail::BaseThreadSafeQueue {
     using Base = detail::BaseThreadSafeQueue;
@@ -177,7 +177,7 @@ public:
         Base::clear<T>();
     }
 
-    /* Close the queue. This makes threads, that are waiting for a value to appear,
+    /** Close the queue. This makes threads, that are waiting for a value to appear,
      * be notified that it's over and no more values will be pushed anymore.
      * Any further attempts to push a value to the queue will fail gracefully. */
     inline void close() noexcept
@@ -185,7 +185,7 @@ public:
         Base::close();
     }
 
-    /* Returns whether the queue is closed. */
+    /** Returns whether the queue is closed. */
     inline bool is_closed() const noexcept
     {
         return Base::is_closed();
@@ -201,51 +201,51 @@ public:
         return Base::is_open();
     }
 
-    /* Push value (using move semantics). */
+    /** Push value (using move semantics). */
     inline bool push(T&& value)
     {
         return Base::push(std::move(value));
     }
 
-    /* Push value (using copy semantics). */
+    /** Push value (using copy semantics). */
     inline bool push(const T& value)
     {
         return Base::push(value);
     }
 
-    /* Emplace value using args... */
+    /** Emplace value using args... */
     inline bool emplace(auto&& ...args)
     {
         return Base::emplace<T>(std::forward<decltype(args)>(args)...);
     }
 
-    /* Try to pop a value. Returns an optional which will have a value only if
+    /** Try to pop a value. Returns an optional which will have a value only if
      * the queue wasn't empty at the time of popping. */
     inline std::optional<T> try_pop()
     {
         return Base::try_pop<T>();
     }
 
-    /* Try popping a value by letting the method wait for a value to appear if the queue is currently empty.
+    /** Try popping a value by letting the method wait for a value to appear if the queue is currently empty.
      * Returns an optional with a value only if the queue hasn't closed while it was empty. */
     inline std::optional<T> try_wait_and_pop()
     {
         return Base::try_wait_and_pop<T>();
     }
 
-    /* Empties the queue. */
+    /** Empties the queue. */
     inline void clear()
     {
         Base::clear<T>();
     }
 
-    /* Returns number of elements in the queue. */
+    /** Returns number of elements in the queue. */
     inline std::size_t get_size() const
     {
         return Base::get_size();
     }
 
-    /* Returns whether the queue is empty. */
+    /** Returns whether the queue is empty. */
     inline bool empty() const
     {
         return Base::empty();

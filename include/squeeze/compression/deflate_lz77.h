@@ -12,13 +12,13 @@
 
 namespace squeeze::compression {
 
-/* DeflateLZ77 interface defines additional set of LZ77 coding functionalities
+/** DeflateLZ77 interface defines additional set of LZ77 coding functionalities
  * as specified by the DEFLATE specification (RFC1951).
  * Provides methods for encoding data in a DEFLATE-specified Literal/Length alphabet and Distance alphabet
  * symbols and extra bits. */
 class DeflateLZ77 {
 public:
-    /* Policy of LZ77 per the DEFLATE spec. */
+    /** Policy of LZ77 per the DEFLATE spec. */
     struct Policy {
         using Sym = char;
         static constexpr std::size_t min_match_len = 3;
@@ -27,30 +27,30 @@ public:
     };
 
     using LZ77_ = LZ77<Policy>;
-    /* Literal type */
+    /** Literal type */
     using Literal = LZ77_::Sym;
-    /* Min match length. */
+    /** Min match length. */
     static constexpr std::size_t min_match_len = LZ77_::min_match_len;
-    /* Search buffer size. */
+    /** Search buffer size. */
     static constexpr std::size_t search_size = LZ77_::search_size;
-    /* Lookahead buffer size. */
+    /** Lookahead buffer size. */
     static constexpr std::size_t lookahead_size = LZ77_::lookahead_size;
-    /* Token type */
+    /** Token type */
     using Token = LZ77_::Token;
 
-    /* 5 bit length symbol that maps from [0-28] to [257-285] length symbols of the
+    /** 5 bit length symbol that maps from [0-28] to [257-285] length symbols of the
      * Literal/Length alphabet per the DEFLATE spec. In short: 'LenSym = LiteralLengthSym - 257' */
     using LenSym = uint8_t;
-    /* Up to 5 bits for the length extra bits */
+    /** Up to 5 bits for the length extra bits */
     using LenExtra = uint8_t;
-    /* 5 bit distance symbol. */
+    /** 5 bit distance symbol. */
     using DistSym = uint8_t;
-    /* Up to 13 bits of distance extra bits */
+    /** Up to 13 bits of distance extra bits */
     using DistExtra = uint16_t;
 
-    /* Represents the range of lengths [3-258] */
+    /** Represents the range of lengths [3-258] */
     using PackedLen = uint8_t;
-    /* Represents the range of distances [1-32768] */
+    /** Represents the range of distances [1-32768] */
     using PackedDist = uint16_t;
 
     class PackedToken;
@@ -84,7 +84,7 @@ public:
         return static_cast<std::size_t>(dist) + 1;
     }
 
-    /* Does some convoluted math to encode a normal length into a length symbol and extra bits pair. */
+    /** Does some convoluted math to encode a normal length into a length symbol and extra bits pair. */
     static std::pair<LenSym, LenExtra> encode_len(std::size_t len)
     {
         const PackedLen p_len = pack_len(len);
@@ -96,7 +96,7 @@ public:
         return std::make_pair(4 * p + (p_len >> p), p_len & PackedLen((1 << p) - 1));
     }
 
-    /* Does some convoluted math to decode a length symbol and extra bits pair into a normal length. */
+    /** Does some convoluted math to decode a length symbol and extra bits pair into a normal length. */
     static StatStr decode_len(LenSym len_sym, LenExtra len_extra, std::size_t& len)
     {
         if (len_sym > max_len_sym) [[unlikely]]
@@ -118,7 +118,7 @@ public:
         return success;
     }
 
-    /* Does some convoluted math to encode a normal distance into a distance symbol and extra bits pair. */
+    /** Does some convoluted math to encode a normal distance into a distance symbol and extra bits pair. */
     static std::pair<DistSym, DistExtra> encode_dist(std::size_t dist)
     {
         const PackedDist p_dist = pack_dist(dist);
@@ -128,7 +128,7 @@ public:
         return std::make_pair(2 * p + (p_dist >> p), (p_dist & ((1 << p) - 1)));
     }
 
-    /* Does some convoluted math to decode a distance symbol and extra bits pair into a normal distance. */
+    /** Does some convoluted math to decode a distance symbol and extra bits pair into a normal distance. */
     static StatStr decode_dist(DistSym dist_sym, DistExtra dist_extra, std::size_t& dist)
     {
         if (dist_sym > max_dist_sym) [[unlikely]]
@@ -167,34 +167,34 @@ public:
             return dist_sym / 2 - 1;
     }
 
-    /* Make an encoder from the provided input iterator(s). */
+    /** Make an encoder from the provided input iterator(s). */
     template<std::input_iterator InIt, typename... InItEnd>
     inline static auto make_encoder(InIt in_it, InItEnd... in_it_end)
     {
         return Encoder<InIt, InItEnd...>(in_it, in_it_end...);
     }
 
-    /* Make an encoder from the provided params and input iterator(s). */
+    /** Make an encoder from the provided params and input iterator(s). */
     template<std::input_iterator InIt, typename... InItEnd>
     inline static auto make_encoder(const LZ77EncoderParams& params, InIt in_it, InItEnd... in_it_end)
     {
         return Encoder<InIt, InItEnd...>(params, in_it, in_it_end...);
     }
 
-    /* Make a decoder from the provided output iterator(s). */
+    /** Make a decoder from the provided output iterator(s). */
     template<std::output_iterator<Literal> OutIt, typename... OutItEnd>
     inline static auto make_decoder(OutIt out_it, OutItEnd... out_it_end)
     {
         return Decoder<OutIt, OutItEnd...>(out_it, out_it_end...);
     }
 
-    /* Max length symbol */
+    /** Max length symbol */
     static constexpr LenSym max_len_sym = 28;
-    /* Max distance symbol */
+    /** Max distance symbol */
     static constexpr DistSym max_dist_sym = 29;
 };
 
-/* Representation of an LZ77 token in a packed 16-bit that is more memory-efficient and
+/** Representation of an LZ77 token in a packed 16-bit that is more memory-efficient and
  * can be used as an intermediate LZ77 code for further encoding.
  * Supports four representations: None, [LenExtra/LenSym/DistSym], DistExtra, and Literal.
  * A None value is represented with the 13th and 14th bits on (0x6000).
@@ -217,15 +217,15 @@ public:
  */
 class DeflateLZ77::PackedToken {
 public:
-    /* Construct a none packed token. */
+    /** Construct a none packed token. */
     constexpr PackedToken() = default;
 
-    /* Construct a literal packed token. */
+    /** Construct a literal packed token. */
     constexpr PackedToken(Literal literal) : data(std::make_unsigned_t<Literal>(literal))
     {
     }
 
-    /* Construct a 'Len/Dist pair without distance extra bits' packed token. */
+    /** Construct a 'Len/Dist pair without distance extra bits' packed token. */
     constexpr PackedToken(LenExtra len_extra, LenSym len_sym, DistSym dist_sym)
         : data(len_dist_mark | (len_extra << 10) | (len_sym << 5) | dist_sym)
     {
@@ -234,60 +234,60 @@ public:
         assert(dist_sym < 32);
     }
 
-    /* Construct a 'distance extra bits' packed token. */
+    /** Construct a 'distance extra bits' packed token. */
     constexpr PackedToken(DistExtra dist_extra) : data(dist_extra & dist_extra_mask)
     {
     }
 
-    /* Check if none. */
+    /** Check if none. */
     constexpr inline bool is_none() const noexcept
     {
         return data == none_mark;
     }
 
-    /* Check if a symbol token. */
+    /** Check if a symbol token. */
     constexpr inline bool is_literal() const noexcept
     {
         return !(data & len_dist_mark);
     }
 
-    /* Check if first token of a len/dist pair. */
+    /** Check if first token of a len/dist pair. */
     constexpr inline bool is_len_dist() const noexcept
     {
         return !!(data & len_dist_mark);
     }
 
-    /* Get length symbol. */
+    /** Get length symbol. */
     constexpr inline LenSym get_len_sym() const noexcept
     {
         return static_cast<LenSym>((data >> 5) & sym_mask);
     }
 
-    /* Get length extra bits. */
+    /** Get length extra bits. */
     constexpr inline LenExtra get_len_extra() const noexcept
     {
         return static_cast<LenExtra>((data >> 10) & len_extra_mask);
     }
 
-    /* Get distance symbol. */
+    /** Get distance symbol. */
     constexpr inline DistSym get_dist_sym() const noexcept
     {
         return static_cast<DistSym>(data & sym_mask);
     }
 
-    /* Get distance extra bits. */
+    /** Get distance extra bits. */
     constexpr inline DistExtra get_dist_extra() const noexcept
     {
         return static_cast<DistExtra>(data & dist_extra_mask);
     }
 
-    /* Get literal. */
+    /** Get literal. */
     constexpr inline Literal get_literal() const noexcept
     {
         return static_cast<Literal>(data & literal_mask);
     }
 
-    /* Get the underlying raw data. */
+    /** Get the underlying raw data. */
     constexpr inline uint16_t get_raw() const noexcept
     {
         return data;
@@ -304,38 +304,38 @@ private:
     uint16_t data = none_mark;
 };
 
-/* The DeflateLZ77::Encoder class. Internally uses the LZ77 Encoder and converts LZ77 tokens
+/** The DeflateLZ77::Encoder class. Internally uses the LZ77 Encoder and converts LZ77 tokens
  * into packed tokens. */
 template<std::input_iterator InIt, typename... InItEnd>
 class DeflateLZ77::Encoder {
 public:
-    /* Construct from the provided input iterator(s). */
+    /** Construct from the provided input iterator(s). */
     explicit Encoder(InIt in_it, InItEnd... in_it_end)
         : internal(search_size, lookahead_size, in_it, in_it_end...)
     {
     }
 
-    /* Construct from the provided params and input iterator(s). */
+    /** Construct from the provided params and input iterator(s). */
     explicit Encoder(const LZ77EncoderParams& params, InIt in_it, InItEnd... in_it_end)
         : internal(params, in_it, in_it_end...)
     {
     }
 
-    /* Construct as a continuation of another encoder with new iterator(s). */
+    /** Construct as a continuation of another encoder with new iterator(s). */
     template<std::input_iterator PrevInIt, typename... PrevInItEnd>
     Encoder(const Encoder<PrevInIt, PrevInItEnd...>& prev, InIt in_it, InItEnd... in_it_end)
         :   internal(prev.internal, in_it, in_it_end...)
     {
     }
 
-    /* Construct as a continuation of another encoder with new iterator(s). */
+    /** Construct as a continuation of another encoder with new iterator(s). */
     template<std::input_iterator PrevInIt, typename... PrevInItEnd>
     Encoder(Encoder<PrevInIt, PrevInItEnd...>&& prev, InIt in_it, InItEnd... in_it_end)
         :   internal(std::move(prev.internal), in_it, in_it_end...)
     {
     }
 
-    /* Encodes current data by encoding internally encoded tokens into packed tokens.
+    /** Encodes current data by encoding internally encoded tokens into packed tokens.
      * For len/dist pair, two packed tokens are created. */
     std::pair<PackedToken, PackedToken> encode_once()
     {
@@ -356,7 +356,7 @@ public:
         }
     }
 
-    /* Encode a sequence of packed tokens from internally encoded tokens.
+    /** Encode a sequence of packed tokens from internally encoded tokens.
      * If an extra token failed to be written (when the output iterator reached the end),
      * it's returned from the function, otherwise a none token is returned, so error check
      * can be done by checking if the returned token is a none token. */
@@ -379,32 +379,32 @@ public:
         return {};
     }
 
-    /* Check if the encoder has finished encoding with the current sequence. */
+    /** Check if the encoder has finished encoding with the current sequence. */
     inline bool is_finished() const noexcept
     {
         return internal.is_finished();
     }
 
-    /* Get current iterator. */
+    /** Get current iterator. */
     inline InIt& get_it() noexcept
     {
         return internal.get_it();
     }
 
-    /* Get current iterator. */
+    /** Get current iterator. */
     inline const InIt& get_it() const noexcept
     {
         return internal.get_it();
     }
 
-    /* Continue by using different iterator(s). */
+    /** Continue by using different iterator(s). */
     template<std::input_iterator NextInIt, typename... NextInItEnd>
     inline auto continue_by(NextInIt in_it, NextInItEnd... in_it_end) const &
     {
         return Encoder<NextInIt, NextInItEnd...>(*this, in_it, in_it_end...);
     }
 
-    /* Continue by using different iterator(s). */
+    /** Continue by using different iterator(s). */
     template<std::input_iterator NextInIt, typename... NextInItEnd>
     inline auto continue_by(NextInIt in_it, NextInItEnd... in_it_end) &&
     {
@@ -412,42 +412,42 @@ public:
     }
 
 private:
-    /* Internal LZ77 encoder. */
+    /** Internal LZ77 encoder. */
     LZ77_::Encoder<InIt, InItEnd...> internal;
 };
 
-/* The DeflateLZ77::Decoder class. Converts Literal/Length/Distance symbols and Length/Distance
+/** The DeflateLZ77::Decoder class. Converts Literal/Length/Distance symbols and Length/Distance
  * extra bits back to normal values and internally uses the LZ77::Decoder to decode them. */
 template<std::output_iterator<DeflateLZ77::Literal> OutIt, typename... OutItEnd>
 class DeflateLZ77::Decoder {
 public:
-    /* Construct from the provided output iterator(s). */
+    /** Construct from the provided output iterator(s). */
     explicit Decoder(OutIt out_it, OutItEnd... out_it_end)
         : internal(out_it, out_it_end...)
     {
     }
 
-    /* Construct as a continuation of another decoder with new iterator(s). */
+    /** Construct as a continuation of another decoder with new iterator(s). */
     template<std::output_iterator<Literal> PrevOutIt, typename... PrevOutItEnd>
     Decoder(const Decoder<PrevOutIt, PrevOutItEnd...>& prev, OutIt out_it, OutItEnd... out_it_end)
         : internal(prev.internal)
     {
     }
 
-    /* Construct as a continuation of another decoder with new iterator(s). */
+    /** Construct as a continuation of another decoder with new iterator(s). */
     template<std::output_iterator<Literal> PrevOutIt, typename... PrevOutItEnd>
     Decoder(Decoder<PrevOutIt, PrevOutItEnd...>&& prev, OutIt out_it, OutItEnd... out_it_end)
         : internal(std::move(prev.internal))
     {
     }
 
-    /* Decode a literal. */
+    /** Decode a literal. */
     inline void decode_once(Literal literal)
     {
         internal.decode_once(literal);
     }
 
-    /* Decode a len/dist pair from a length symbol and extra bits, distance symbol and its extra bits. */
+    /** Decode a len/dist pair from a length symbol and extra bits, distance symbol and its extra bits. */
     inline StatStr decode_once(LenSym len_sym, LenExtra len_extra, DistSym dist_sym, DistExtra dist_extra)
     {
         std::size_t len, dist;
@@ -459,32 +459,32 @@ public:
             return s;
     }
 
-    /* Check if the decoder has finished processing tokens. */
+    /** Check if the decoder has finished processing tokens. */
     inline bool is_finished() const noexcept
     {
         return internal.is_finished();
     }
 
-    /* Get current iterator. */
+    /** Get current iterator. */
     inline OutIt& get_it() noexcept
     {
         return internal.get_it();
     }
 
-    /* Get current iterator. */
+    /** Get current iterator. */
     inline const OutIt& get_it() const noexcept
     {
         return internal.get_it();
     }
 
-    /* Continue by using different iterator(s). */
+    /** Continue by using different iterator(s). */
     template<std::output_iterator<Literal> NextOutIt, typename... NextOutItEnd>
     inline auto continue_by(NextOutIt in_it, NextOutItEnd... in_it_end) const &
     {
         return Decoder<NextOutIt, NextOutItEnd...>(*this, in_it, in_it_end...);
     }
 
-    /* Continue by using different iterator(s). */
+    /** Continue by using different iterator(s). */
     template<std::output_iterator<Literal> NextOutIt, typename... NextOutItEnd>
     inline auto continue_by(NextOutIt in_it, NextOutItEnd... in_it_end) &&
     {
@@ -492,7 +492,7 @@ public:
     }
 
 private:
-    /* Internal LZ77 decoder. */
+    /** Internal LZ77 decoder. */
     LZ77_::Decoder<OutIt, OutItEnd...> internal;
 };
 

@@ -12,7 +12,7 @@
 
 namespace squeeze::compression {
 
-/* Sliding window utility for LZ77 encoding/decoding implemented as a circular buffer.
+/** Sliding window utility for LZ77 encoding/decoding implemented as a circular buffer.
  * Stores a static buffer and a circularly iterating pivot point that points both
  * to the start and end of the circular buffer. Maintains an absolute position of the start of the buffer. */
 template<typename Sym, std::size_t size>
@@ -76,7 +76,7 @@ public:
         return std::max(pos, size);
     }
 
-    /* Check if the suffix of the given length matches a sequence of the same length
+    /** Check if the suffix of the given length matches a sequence of the same length
      * at the specified position. */
     bool suffix_matches_at(std::size_t match_pos, std::size_t suffix_len) const
     {

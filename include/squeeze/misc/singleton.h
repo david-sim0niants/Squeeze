@@ -11,7 +11,7 @@
 
 namespace squeeze::misc {
 
-/* Generic singleton double-checked class. */
+/** Generic singleton double-checked class. */
 template<class T, typename Deleter = std::default_delete<T>>
 class Singleton {
 public:

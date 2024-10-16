@@ -10,7 +10,7 @@
 
 namespace squeeze::compression {
 
-/* Deflate header bits per the DEFLATE spec (RFC1951) */
+/** Deflate header bits per the DEFLATE spec (RFC1951) */
 enum class DeflateHeaderBits : std::uint8_t {
     Store = 0b00, // not supported
     FixedHuffman = 0b01, // not supported

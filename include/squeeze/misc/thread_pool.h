@@ -14,7 +14,7 @@
 
 namespace squeeze::misc {
 
-/* Interface for a thread pool.
+/** Interface for a thread pool.
  * Supports assign_task() method which blocks until a worker thread is freed.
  * Supports try_assign_task() method that does the same but returns false when all worker threads are busy.
  * Supports waiting_for_tasks() method that waits for all the assigned tasks to complete. */
@@ -24,7 +24,7 @@ private:
     using Task = std::function<void ()>;
 
 public:
-    /* Initialize the thread pool and optionally provide number of worker threads to create.
+    /** Initialize the thread pool and optionally provide number of worker threads to create.
      * Defaults to the number of cores in the system and it's NOT recommended to pass a bigger number. */
     explicit ThreadPool(const unsigned concurrency = get_nr_available_cpu_cores());
     ~ThreadPool();

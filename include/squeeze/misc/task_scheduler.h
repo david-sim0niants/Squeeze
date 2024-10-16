@@ -17,7 +17,7 @@ enum class TaskRunPolicy {
     Wait
 };
 
-/* Simple task scheduler. Supports scheduling tasks of type Task and running them.
+/** Simple task scheduler. Supports scheduling tasks of type Task and running them.
  * Users are responsible for calling the run (or run_till_error) methods on their own
  * and can choose to run it in parallel or in any other way. */
 template<typename Task>
@@ -41,32 +41,32 @@ public:
         task_q.open();
     }
 
-    /* Schedule a task (uses move semantics). */
+    /** Schedule a task (uses move semantics). */
     inline void schedule(Task&& task)
     {
         task_q.push(std::move(task));
     }
 
-    /* Emplace a task to schedule. */
+    /** Emplace a task to schedule. */
     inline void schedule(auto&&... args)
     {
         task_q.emplace(std::forward<decltype(args)>(args)...);
     }
 
-    /* Close scheduling. When all the tasks scheduled prior are done, the run(_till_error)
+    /** Close scheduling. When all the tasks scheduled prior are done, the run(_till_error)
      * method will return. All subsequent attempts to schedule tasks will be ignored. */
     inline void close() noexcept
     {
         task_q.close();
     }
 
-    /* Get the number of tasks left to run. */
+    /** Get the number of tasks left to run. */
     inline std::size_t get_nr_tasks_left() const
     {
         return task_q.get_size();
     }
 
-    /* Run until hitting an error. This method is valid to use if calling a Task object returns a status.
+    /** Run until hitting an error. This method is valid to use if calling a Task object returns a status.
      * This method is mainly supposed to be called within a different thread parallel to scheduling threads. */
     template<TaskRunPolicy policy = TaskRunPolicy::Wait, typename... Args>
     auto run_till_error(Args&&... args)
@@ -80,7 +80,7 @@ public:
         return Stat(success);
     }
 
-    /* Plain task runner.
+    /** Plain task runner.
      * Mainly supposed to be called within a different thread parallel to scheduling threads. */
     template<TaskRunPolicy policy = TaskRunPolicy::Wait>
     void run(auto&&... args)

@@ -17,7 +17,7 @@
 
 namespace squeeze::misc {
 
-/* This is a class used for encoding bits. Internally handles all the necessary bit operations
+/** This is a class used for encoding bits. Internally handles all the necessary bit operations
  * to provide a bit-writing medium interface. Writes bits on an output sequence defined by the
  * provided output iterator(s) */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
@@ -55,14 +55,14 @@ public:
     {
     }
 
-    /* Encode the bitset. */
+    /** Encode the bitset. */
     template<std::size_t nr_bits>
     inline bool encode_bits(const std::bitset<nr_bits>& bits)
     {
         return encode_bits(bits, nr_bits);
     }
 
-    /* Encode the bitset with a custom number of bits. */
+    /** Encode the bitset with a custom number of bits. */
     template<std::size_t max_nr_bits>
     bool encode_bits(const std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
     {
@@ -73,21 +73,21 @@ public:
         return 0 == nr_bits;
     }
 
-    /* Encode the bits represented in an integral form. */
+    /** Encode the bits represented in an integral form. */
     template<std::integral T>
     inline bool encode_bits(T bits, std::size_t nr_bits)
     {
         return encode_bits(std::bitset<sizeof(T) * CHAR_BIT>(bits), nr_bits);
     }
 
-    /* Encode the bits represented in an integral form. */
+    /** Encode the bits represented in an integral form. */
     template<std::size_t nr_bits, std::integral T>
     inline bool encode_bits(T bits)
     {
         return encode_bits(std::bitset<nr_bits>(bits));
     }
 
-    /* Zero-pad remaining bits and flush them. */
+    /** Zero-pad remaining bits and flush them. */
     inline std::size_t finalize()
     {
         if (seq.is_valid() and char_size != mid_off) {
@@ -97,53 +97,53 @@ public:
         return char_size - mid_off;
     }
 
-    /* Reset the bit-encoder state. */
+    /** Reset the bit-encoder state. */
     inline void reset()
     {
         mid_chr = Char{};
         mid_off = char_size;
     }
 
-    /* Get the current iterator. */
+    /** Get the current iterator. */
     inline OutIt& get_it()
     {
         return seq.it;
     }
 
-    /* Get the current iterator. */
+    /** Get the current iterator. */
     inline const OutIt& get_it() const
     {
         return seq.it;
     }
 
-    /* Check if there's space to write bits to. */
+    /** Check if there's space to write bits to. */
     inline bool is_valid() const noexcept
     {
         return seq.is_valid();
     }
 
-    /* Continue by using a different unbounded iterator. */
+    /** Continue by using a different unbounded iterator. */
     template<std::output_iterator<Char> NextOutIt>
     inline auto continue_by(NextOutIt it) const
     {
         return BitEncoder<Char, char_size, NextOutIt>(*this, it);
     }
 
-    /* Continue by using a different bounded iterator. */
+    /** Continue by using a different bounded iterator. */
     template<std::output_iterator<Char> NextOutIt>
     inline auto continue_by(NextOutIt it, NextOutIt it_end) const
     {
         return BitEncoder<Char, char_size, NextOutIt, NextOutIt>(*this, it, it_end);
     }
 
-    /* Find number of characters required to write for encoding the given amount of bits. */
+    /** Find number of characters required to write for encoding the given amount of bits. */
     inline std::size_t find_chars_required_for(std::size_t nr_bits) const
     {
         return (nr_bits + char_size - mid_off) / char_size;
     }
 
 private:
-    /* Encode mid character bits. If mid offset becomes 0, flush and return. */
+    /** Encode mid character bits. If mid offset becomes 0, flush and return. */
     template<typename Bitset>
     inline void encode_mid_bits(const Bitset& bits, std::size_t& nr_bits)
     {
@@ -161,7 +161,7 @@ private:
         }
     }
 
-    /* Encode main bits flushing them character-wise. */
+    /** Encode main bits flushing them character-wise. */
     template<typename Bitset>
     inline void encode_main_bits(const Bitset& bits, std::size_t& nr_bits)
     {
@@ -169,7 +169,7 @@ private:
             *seq.it = static_cast<Char>((bits >> (nr_bits - char_size)).to_ullong()) & Char(-1);
     }
 
-    /* Encode remainder bits left after previous two operations. These won't be flushed immediately
+    /** Encode remainder bits left after previous two operations. These won't be flushed immediately
      * and wait for upcoming bits to combine with and flush together. */
     template<typename Bitset>
     inline void encode_remainder_bits(const Bitset& bits, std::size_t& nr_bits)
@@ -180,17 +180,17 @@ private:
         nr_bits = 0;
     }
 
-    /* Stores the not yet fully encoded character. */
+    /** Stores the not yet fully encoded character. */
     Char mid_chr {};
-    /* Stores the number of bits left to write to get a fully encoded character.
+    /** Stores the number of bits left to write to get a fully encoded character.
      * Can also be thought of as a position of the unwritten bit stream within the mid char.
      * It's the opposite of Decoder::mid_pos and its initial value is char_size. */
     std::size_t mid_off = char_size;
-    /* Output character sequence. */
+    /** Output character sequence. */
     Seq seq;
 };
 
-/* This is a class used for decoding bits. Internally handles all the necessary bit operations
+/** This is a class used for decoding bits. Internally handles all the necessary bit operations
  * to provide a bit-reading medium interface. Reads bits from an input sequence defined by the
  * provided input iterator(s) */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
@@ -228,14 +228,14 @@ public:
     {
     }
 
-    /* Decode the bitset. */
+    /** Decode the bitset. */
     template<std::size_t nr_bits>
     bool decode_bits(std::bitset<nr_bits>& bits)
     {
         return decode_bits(bits, nr_bits);
     }
 
-    /* Decode the bitset with a custom number of bits. */
+    /** Decode the bitset with a custom number of bits. */
     template<std::size_t max_nr_bits>
     bool decode_bits(std::bitset<max_nr_bits>& bits, std::size_t nr_bits)
     {
@@ -247,7 +247,7 @@ public:
         return 0 == nr_bits;
     }
 
-    /* Decode the bits represented in an integral form. */
+    /** Decode the bits represented in an integral form. */
     template<std::integral T>
     bool decode_bits(T& bits, std::size_t nr_bits)
     {
@@ -257,7 +257,7 @@ public:
         return s;
     }
 
-    /* Decode the bits represented in an integral form. */
+    /** Decode the bits represented in an integral form. */
     template<std::size_t nr_bits, std::integral T>
     bool decode_bits(T& bits)
     {
@@ -267,7 +267,7 @@ public:
         return s;
     }
 
-    /* Read a single bit. */
+    /** Read a single bit. */
     bool read_bit(bool& bit)
     {
         if (0 == mid_pos) {
@@ -284,7 +284,7 @@ public:
         return true;
     }
 
-    /* Obtain the remaining bits and reset. */
+    /** Obtain the remaining bits and reset. */
     template<std::size_t max_nr_bits>
     void finalize(std::bitset<max_nr_bits>& bits, std::size_t nr_bits = max_nr_bits)
     {
@@ -293,46 +293,46 @@ public:
         reset();
     }
 
-    /* Reset the bit-decoder state. */
+    /** Reset the bit-decoder state. */
     inline void reset()
     {
         mid_chr = Char{};
         mid_pos = 0;
     }
 
-    /* Get the current iterator. */
+    /** Get the current iterator. */
     inline InIt& get_it()
     {
         return seq.it;
     }
 
-    /* Get the current iterator. */
+    /** Get the current iterator. */
     inline const InIt& get_it() const
     {
         return seq.it;
     }
 
-    /* Check if there's space to read bits from. */
+    /** Check if there's space to read bits from. */
     inline bool is_valid() const noexcept
     {
         return seq.is_valid() || 0 != mid_pos;
     }
 
-    /* Continue by using a different unbounded iterator. */
+    /** Continue by using a different unbounded iterator. */
     template<std::input_iterator NextInIt>
     inline auto continue_by(NextInIt next_it) const
     {
         return BitDecoder<Char, char_size, NextInIt>(*this, next_it);
     }
 
-    /* Continue by using a different bounded iterator. */
+    /** Continue by using a different bounded iterator. */
     template<std::input_iterator NextInIt>
     inline auto continue_by(NextInIt next_it, NextInIt next_it_end) const
     {
         return BitDecoder<Char, char_size, NextInIt, NextInIt>(*this, next_it, next_it_end);
     }
 
-    /* Find number of characters required to write for decoding the given amount of bits. */
+    /** Find number of characters required to write for decoding the given amount of bits. */
     inline std::size_t find_chars_required_for(std::size_t nr_bits) const
     {
         const std::size_t N = (nr_bits + char_size - mid_pos);
@@ -340,7 +340,7 @@ public:
     }
 
 private:
-    /* Decode mid character bits. */
+    /** Decode mid character bits. */
     template<typename Bitset>
     inline void decode_mid_bits(Bitset& bits, std::size_t& nr_bits)
     {
@@ -353,7 +353,7 @@ private:
         nr_bits -= nr_mid_bits;
     }
 
-    /* Decode main bits fetching them character-wise. */
+    /** Decode main bits fetching them character-wise. */
     template<typename Bitset>
     inline void decode_main_bits(Bitset& bits, std::size_t& nr_bits)
     {
@@ -363,7 +363,7 @@ private:
         }
     }
 
-    /* Decode remainder bits that won't fully consume the fetched character.
+    /** Decode remainder bits that won't fully consume the fetched character.
      * Store the unused bits in the mid character to be processed later. */
     template<typename Bitset>
     inline void decode_remainder_bits(Bitset& bits, std::size_t& nr_bits)
@@ -383,17 +383,17 @@ private:
         nr_bits = 0;
     }
 
-    /* Stores the not yet fully decoded character. */
+    /** Stores the not yet fully decoded character. */
     Char mid_chr {};
-    /* Stores the number of bits left to read to get a fully decoded character.
+    /** Stores the number of bits left to read to get a fully decoded character.
      * Can also be thought of as a position of the unread bit stream within the mid char.
      * It's the opposite of BitEncoder::mid_off and its initial value is 0. */
     std::size_t mid_pos = 0;
-    /* Input character sequence. */
+    /** Input character sequence. */
     Seq seq;
 };
 
-/* Make a bit encoder using unbounded output iterator. */
+/** Make a bit encoder using unbounded output iterator. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
     std::output_iterator<Char> OutIt>
 auto make_bit_encoder(OutIt out_it)
@@ -401,7 +401,7 @@ auto make_bit_encoder(OutIt out_it)
     return BitEncoder<Char, char_size, OutIt, void>(out_it);
 }
 
-/* Make a bit encoder using bounded output iterator. */
+/** Make a bit encoder using bounded output iterator. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
     std::output_iterator<Char> OutIt>
 auto make_bit_encoder(OutIt out_it, OutIt out_it_end)
@@ -409,7 +409,7 @@ auto make_bit_encoder(OutIt out_it, OutIt out_it_end)
     return BitEncoder<Char, char_size, OutIt, OutIt>(out_it, out_it_end);
 }
 
-/* Make a bit decoder using unbounded output iterator. */
+/** Make a bit decoder using unbounded output iterator. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
     std::input_iterator InIt>
 auto make_bit_decoder(InIt in_it)
@@ -417,7 +417,7 @@ auto make_bit_decoder(InIt in_it)
     return BitDecoder<Char, char_size, InIt, void>(in_it);
 }
 
-/* Make a bit decoder using bounded output iterator. */
+/** Make a bit decoder using bounded output iterator. */
 template<typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
     std::input_iterator InIt>
 auto make_bit_decoder(InIt in_it, InIt in_it_end)

@@ -76,7 +76,7 @@ bool Remover::perform_removes()
 
         uint64_t next_pos = pos;
         while (true) {
-            /* There might be some "unpleasant" cases when a remove operation
+            /** There might be some "unpleasant" cases when a remove operation
              * at the same position has been registered multiple times.
              * To overcome this problem we just keep popping out the next remove
              * until its position is different. We will need the next remove position later. */
@@ -90,7 +90,7 @@ bool Remover::perform_removes()
             }
         };
 
-        /* Removing a chunk of data is just moving another chunk of data, that is,
+        /** Removing a chunk of data is just moving another chunk of data, that is,
          * between the current one and the next chunk of data to remove, to the left,
          * concatenating it with the rest of the remaining data.
          * In other words, each subsequent gap is pushed to the right, merging it with the

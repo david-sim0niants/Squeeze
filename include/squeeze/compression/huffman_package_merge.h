@@ -20,7 +20,7 @@ namespace squeeze::compression {
 using squeeze::utils::RandomAccessInputIterator;
 using squeeze::utils::RandomAccessOutputIterator;
 
-/* Package-Merge algorithm used for generating optimal length-limited Huffman codes.
+/** Package-Merge algorithm used for generating optimal length-limited Huffman codes.
  * This implementation follows the algorithm described in:
  * L.L. Larmore and D.S. Hirschberg, "A Fast Algorithm for Optimal Length-Limited Huffman Codes"
  * URL: https://ics.uci.edu/~dhirschb/pubs/LenLimHuff.pdf
@@ -28,22 +28,22 @@ using squeeze::utils::RandomAccessOutputIterator;
 template<typename Weight, typename Depth>
 class HuffmanPackageMerge {
 private:
-    /* The width type. While the paper originally defines width of an item to be 2^(-depth),
+    /** The width type. While the paper originally defines width of an item to be 2^(-depth),
      * and the cumulative width of nodes as sum of negative powers of 2, we avoid using
      * floating-point arithmetics by scaling width values by 2^max_depth. This results
      * in width values to be positive powers of 2 and use "levels" instead of "depths",
      * where each depth corresponds to a level with the following relation:
      *                  level = max_depth - depth */
     using Width = std::size_t;
-    /* Internal implementation uses levels instead of depths that span [0, max_level]
+    /** Internal implementation uses levels instead of depths that span [0, max_level]
      * range that maps to [max_depth - 1, 0] range of depths. max_depth = max_level + 1 */
     using Level = Depth;
 
-    /* Struct representing a package. */
+    /** Struct representing a package. */
     struct Pack {
-        Weight weight; /* Cumulative weight of the package. */
-        std::size_t midct; /* Number of all nodes in the package at the current mid level. */
-        Width hiwidth; /* Cumulative width of all nodes in the packages under the current mid level (having a HIgher depth)*/
+        Weight weight; /** Cumulative weight of the package. */
+        std::size_t midct; /** Number of all nodes in the package at the current mid level. */
+        Width hiwidth; /** Cumulative width of all nodes in the packages under the current mid level (having a HIgher depth)*/
 
         inline bool operator<(const Pack& rhs) const noexcept
         {
@@ -51,7 +51,7 @@ private:
         }
     };
 
-    /* Struct representing an item, with a weight and index.
+    /** Struct representing an item, with a weight and index.
      * This is useful if items are meant to be sorted first, while still returning
      * their optimal depths (code lengths) in the original order. */
     struct Item {
@@ -64,15 +64,15 @@ private:
         }
     };
 
-    /* Context of internal methods to handle common data. */
+    /** Context of internal methods to handle common data. */
     struct Context {
-        std::span<Item> items; /* List of items. */
-        std::span<std::size_t> nr_nodes_per_level; /* Number of nodes at each level. */
-        std::span<Pack> pack_storage; /* A reusable storage meant to store packages. */
+        std::span<Item> items; /** List of items. */
+        std::span<std::size_t> nr_nodes_per_level; /** Number of nodes at each level. */
+        std::span<Pack> pack_storage; /** A reusable storage meant to store packages. */
     };
 
 public:
-    /* Package-Merge with a compile-time known number of weights and avoids using dynamic memory.
+    /** Package-Merge with a compile-time known number of weights and avoids using dynamic memory.
      * Accepts an iterator pointing to depths to return depth values for the corresponding weights. */
     template<Depth max_depth, std::size_t nr_weights,
         std::input_iterator WeightIt, RandomAccessOutputIterator<Depth> DepthIt>
@@ -89,7 +89,7 @@ public:
         return package_merge_internal<max_depth>(ctx, depth_it);
     }
 
-    /* Package-Merge with a runtime-known number of weights and uses dynamic memory.
+    /** Package-Merge with a runtime-known number of weights and uses dynamic memory.
      * Accepts an iterator pointing to depths to return depth values for the corresponding weights. */
     template<Depth max_depth, std::input_iterator WeightIt, RandomAccessOutputIterator<Depth> DepthIt>
     static void package_merge(WeightIt weight_it, std::size_t nr_weights, DepthIt depth_it)
@@ -106,7 +106,7 @@ public:
     }
 
 private:
-    /* Turn weights into items, and handle and remove zero-weight items. */
+    /** Turn weights into items, and handle and remove zero-weight items. */
     template<std::input_iterator WeightIt, RandomAccessOutputIterator<Depth> DepthIt>
     static void make_and_filter_items(std::span<Item>& items, WeightIt weight_it, DepthIt depth_it)
     {
@@ -125,7 +125,7 @@ private:
         items = items.first(nr_nz_weights);
     }
 
-    /* Internal implementation assuming the items are ready and pre-processed. */
+    /** Internal implementation assuming the items are ready and pre-processed. */
     template<Depth max_depth, RandomAccessOutputIterator<Depth> DepthIt>
     static void package_merge_internal(Context& ctx, DepthIt depth_it)
     {
@@ -150,7 +150,7 @@ private:
         calc_depths_from_nodes_per_level<max_depth>(ctx, nr_items, depth_it);
     }
 
-    /* Number of nodes at each level define depths for each item. This method does exactly that. */
+    /** Number of nodes at each level define depths for each item. This method does exactly that. */
     template<Depth max_depth, RandomAccessOutputIterator<Depth> DepthIt>
     static void calc_depths_from_nodes_per_level(Context& ctx, std::size_t nr_items, DepthIt depth_it)
     {
@@ -171,7 +171,7 @@ private:
         }
     }
 
-    /* Recursive Package-Merge that uses O(N) space and avoids dynamic memory allocation. */
+    /** Recursive Package-Merge that uses O(N) space and avoids dynamic memory allocation. */
     template<Level max_level, Level level_shift>
     static void package_merge_impl(Context& ctx, Width width, std::size_t item_idx, std::size_t nr_items)
     {
@@ -199,7 +199,7 @@ private:
         }
     }
 
-    /* Package-Merge using O(N) space and calculates information only about
+    /** Package-Merge using O(N) space and calculates information only about
      * the number of nodes at the current mid_level=max_level/2 (midct) and
      * the number of nodes at levels below (hiwidth). */
     template<Level max_level>
@@ -251,7 +251,7 @@ private:
         return std::make_tuple(midct, hiwidth);
     }
 
-    /* Package packages pair-wise, forming twice less packages. */
+    /** Package packages pair-wise, forming twice less packages. */
     template<Level max_level>
     static void package(Pack *packs, std::size_t& nr_packs, bool ignore_first)
     {
@@ -262,7 +262,7 @@ private:
         assert(std::is_sorted(packs, packs + nr_packs));
     }
 
-    /* Make new packages from items at the current level and merge them with existing packages. */
+    /** Make new packages from items at the current level and merge them with existing packages. */
     template<Level max_level>
     static void merge(Pack *pack_storage, std::size_t& nr_packs,
             const Item *items, std::size_t nr_items, Level level)
@@ -280,7 +280,7 @@ private:
         assert(std::is_sorted(packs, packs + nr_packs));
     }
 
-    /* Turn items into packages. */
+    /** Turn items into packages. */
     template<Level max_level>
     static constexpr void package_items(const Item *items, Pack *packs, std::size_t nr_items, Level level)
     {
@@ -288,7 +288,7 @@ private:
             packs[i] = package_item<max_level>(items[i].weight, level);
     }
 
-    /* Turn a single item into a package. */
+    /** Turn a single item into a package. */
     template<Level max_level>
     inline static constexpr Pack package_item(Weight weight, Level level)
     {
@@ -299,7 +299,7 @@ private:
         };
     }
 
-    /* Combine two packages into a single one. */
+    /** Combine two packages into a single one. */
     template<Level max_level>
     inline static constexpr Pack combine_packs(const Pack& pack_0, const Pack& pack_1)
     {

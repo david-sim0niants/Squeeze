@@ -15,7 +15,7 @@ namespace detail {
                                 requires(T a, T b) { { a < b } -> std::convertible_to<bool>; };
 }
 
-/* Concept defining what is expected from a Huffman policy type. */
+/** Concept defining what is expected from a Huffman policy type. */
 template<typename T>
 concept HuffmanPolicy = requires
     {

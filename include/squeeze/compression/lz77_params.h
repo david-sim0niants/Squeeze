@@ -10,10 +10,10 @@
 
 namespace squeeze::compression {
 
-/* Additional runtime encoder params. */
+/** Additional runtime encoder params. */
 struct LZ77EncoderParams {
-    std::size_t lazy_match_threshold; /* Controls the lazy matching behaviour. */
-    std::size_t match_insert_threshold; /* Controls match insertion into the hash chain behavior. */
+    std::size_t lazy_match_threshold; /** Controls the lazy matching behaviour. */
+    std::size_t match_insert_threshold; /** Controls match insertion into the hash chain behavior. */
 };
 
 }

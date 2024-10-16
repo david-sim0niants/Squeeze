@@ -9,7 +9,7 @@
 
 namespace squeeze::utils {
 
-/* Defers the function (or callable) call at scope end where this object exists.
+/** Defers the function (or callable) call at scope end where this object exists.
  * Uses RAII principle to accomplish this by making the call in its destructor. */
 template<typename F> requires std::is_invocable_v<F>
 class Defer {

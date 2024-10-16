@@ -11,15 +11,15 @@
 
 namespace squeeze::compression {
 
-/* Additional compression-related flags. */
+/** Additional compression-related flags. */
 enum class CompressionFlags {
     None = 0,
-    FinalBlock = 1, /* Compress as a final block of data. */
-    ExpectFinalBlock = FinalBlock, /* Expect to compress the final block of data. */
+    FinalBlock = 1, /** Compress as a final block of data. */
+    ExpectFinalBlock = FinalBlock, /** Expect to compress the final block of data. */
 };
 SQUEEZE_DEFINE_ENUM_LOGIC_BITWISE_OPERATORS(CompressionFlags);
 
-/* Stores an overall result of compression. */
+/** Stores an overall result of compression. */
 struct CompressionResult {
     CompressionResult() = default;
 
@@ -30,11 +30,11 @@ struct CompressionResult {
     StatStr status;
 };
 
-/* Stores an overall result of decompression. */
+/** Stores an overall result of decompression. */
 struct DecompressionResult {
     enum Flags {
         None = 0,
-        FinalBlock = 1, /* Indicates that the decompressed block is the final block of data. */
+        FinalBlock = 1, /** Indicates that the decompressed block is the final block of data. */
     };
 
     DecompressionResult() = default;
@@ -55,7 +55,7 @@ struct DecompressionResult {
     StatStr status = success;
 };
 
-/* The compressor interface. */
+/** The compressor interface. */
 template<std::output_iterator<char> OutIt, typename... OutItEnd>
     requires (sizeof...(OutItEnd) <= 1)
 class Compressor {
@@ -66,7 +66,7 @@ public:
     {
     }
 
-    /* Compress the given input data using the provided compression params and flags. */
+    /** Compress the given input data using the provided compression params and flags. */
     template<std::input_iterator InIt>
     std::tuple<InIt, CompressionResult> compress(InIt in_it, InIt in_it_end,
             CompressionParams params, CompressionFlags flags = CompressionFlags::None)
@@ -84,7 +84,7 @@ public:
         }
     }
 
-    /* Compress the given input data using the provided compression params and flags,
+    /** Compress the given input data using the provided compression params and flags,
      * and compile-time provided compression method. */
     template<CompressionMethod method, std::input_iterator InIt>
     inline std::tuple<InIt, CompressionResult> compress(InIt in_it, InIt in_it_end,
@@ -129,7 +129,7 @@ private:
     BitEncoder& bit_encoder;
 };
 
-/* The decompressor interface. */
+/** The decompressor interface. */
 template<std::input_iterator InIt, typename... InItEnd>
     requires (sizeof...(InItEnd) <= 1)
 class Decompressor {
@@ -140,7 +140,7 @@ public:
     {
     }
 
-    /* Decompress to the provided output destination using the provided compression params and flags. */
+    /** Decompress to the provided output destination using the provided compression params and flags. */
     template<std::output_iterator<char> OutIt>
     std::tuple<OutIt, DecompressionResult> decompress(OutIt out_it, OutIt out_it_end,
             CompressionParams params, CompressionFlags flags)
@@ -158,7 +158,7 @@ public:
         }
     }
 
-    /* Decompress to the provided output destination using the provided compression params and flags,
+    /** Decompress to the provided output destination using the provided compression params and flags,
      * and compile-time provided compression method. */
     template<CompressionMethod method, std::output_iterator<char> OutIt>
     std::tuple<OutIt, DecompressionResult> decompress(OutIt out_it, OutIt out_it_end,
@@ -206,7 +206,7 @@ private:
     BitDecoder& bit_decoder;
 };
 
-/* Compress data from the given input data to the given bit encoder using
+/** Compress data from the given input data to the given bit encoder using
  * the provided compression params and flags.
  * Return an input iterator at the point where compression stopped and the compression result. */
 template<std::input_iterator InIt, std::output_iterator<char> OutIt, typename... OutItEnd>
@@ -218,7 +218,7 @@ std::tuple<InIt, CompressionResult> compress(InIt in_it, InIt in_it_end,
     return Compressor(bit_encoder).encode(in_it, in_it_end, params, flags);
 }
 
-/* Decompress data from the given bit decoder to the given output destination using
+/** Decompress data from the given bit decoder to the given output destination using
  * the provided compression params and flags.
  * Return an output iterator at the point where decompression stopped and the decompression result. */
 template<std::output_iterator<char> OutIt, std::input_iterator InIt, typename ...InItEnd>
@@ -230,7 +230,7 @@ std::tuple<OutIt, DecompressionResult> decompress(OutIt out_it, OutIt out_it_end
     return Decompressor(bit_decoder).decode(out_it, out_it_end, params, flags);
 }
 
-/* Compress data from the given input data to the given output destination using
+/** Compress data from the given input data to the given output destination using
  * the provided compression params and flags.
  * Return input and output iterators at the point where compression stopped and the compression result. */
 template<std::input_iterator InIt, std::output_iterator<char> OutIt, typename ...OutItEnd>
@@ -246,7 +246,7 @@ std::tuple<InIt, OutIt, CompressionResult> compress(InIt in_it, InIt in_it_end,
     return std::make_tuple(in_it, out_it, std::exchange(result, CompressionResult()));
 }
 
-/* Decompress data from the given input data to the given output destination using
+/** Decompress data from the given input data to the given output destination using
  * the provided compression params and flags.
  * Return input and output iterators at the point where decompression stopped and the decompression result. */
 template<std::output_iterator<char> OutIt, std::input_iterator InIt, typename ...InItEnd>

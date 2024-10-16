@@ -13,7 +13,7 @@
 
 namespace squeeze::wrap {
 
-/* Wrapper over the Appender interface for providing additional append methods
+/** Wrapper over the Appender interface for providing additional append methods
  * specifically designed for handling files. */
 class FileAppender {
 public:
@@ -22,24 +22,24 @@ public:
     explicit FileAppender(Appender& appender) : appender(appender)
     {}
 
-    /* Append a file with given path and ensure the same path is not appended more than once. */
+    /** Append a file with given path and ensure the same path is not appended more than once. */
     inline bool will_append(std::string&& path, const CompressionParams& compression,
             Stat *stat = nullptr)
     {
         return will_append(std::filesystem::path(std::move(path)), compression, stat);
     }
 
-    /* Append a file with given path and ensure the same path is not appended more than once. */
+    /** Append a file with given path and ensure the same path is not appended more than once. */
     bool will_append(const std::filesystem::path& path,
             const CompressionParams& compression, Stat *stat = nullptr);
 
-    /* Append recursively all files within the path.
+    /** Append recursively all files within the path.
      * get_stat_ptr() is supposed to provide a pointer to the subsequent status. */
     bool will_append_recursively(const std::string_view path,
             const CompressionParams& compression,
             const std::function<Stat *()>& get_stat_ptr = [](){ return nullptr; });
 
-    /* Calls perform_appends() on the appender while also resetting its own state. */
+    /** Calls perform_appends() on the appender while also resetting its own state. */
     void perform_appends();
 
     inline auto& get_wrappee()

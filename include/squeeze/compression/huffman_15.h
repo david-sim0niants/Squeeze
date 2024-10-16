@@ -13,7 +13,7 @@
 
 namespace squeeze::compression {
 
-/* A special Huffman coding interface meant to provide methods for a complete encoding/decoding of
+/** A special Huffman coding interface meant to provide methods for a complete encoding/decoding of
  * byte data using Huffman coding with 15 bit code length limit and DeflateHuffman for encoding/decoding
  * the code lengths with 7 bit code length limit. */
 template<HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>>
@@ -37,27 +37,27 @@ public:
         std::input_iterator InIt = typename std::vector<Char>::iterator, typename InItEnd = void>
     class Decoder;
 
-    /* The alphabet size. All possible 256 bytes + one terminator symbol. */
+    /** The alphabet size. All possible 256 bytes + one terminator symbol. */
     static constexpr std::size_t alphabet_size = 257;
-    /* The terminator symbol. */
+    /** The terminator symbol. */
     static constexpr int term_sym = 0x100;
 
 public:
-    /* Make an encoder using the given bit encoder. */
+    /** Make an encoder using the given bit encoder. */
     template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename OutItEnd>
     inline static auto make_encoder(misc::BitEncoder<Char, char_size, OutIt, OutItEnd>& bit_encoder)
     {
         return Encoder<Char, char_size, OutIt, OutItEnd>(bit_encoder);
     }
 
-    /* Make a decoder using the given bit decoder. */
+    /** Make a decoder using the given bit decoder. */
     template<typename Char, std::size_t char_size, std::input_iterator InIt, typename InItEnd>
     inline static auto make_decoder(misc::BitDecoder<Char, char_size, InIt, InItEnd>& bit_decoder)
     {
         return Decoder<Char, char_size, InIt, InItEnd>(bit_decoder);
     }
 
-    /* Utility for counting symbol frequencies. */
+    /** Utility for counting symbol frequencies. */
     template<std::input_iterator InIt, RandomAccessOutputIterator<Freq> FreqIt>
     static void count_freqs(InIt in_it, InIt in_it_end, FreqIt freq_it)
         requires std::convertible_to<std::iter_value_t<InIt>, char>
@@ -67,7 +67,7 @@ public:
     }
 };
 
-/* Huffman15::Encoder class. Provides methods for encoding code lengths as well as complete data encoding. */
+/** Huffman15::Encoder class. Provides methods for encoding code lengths as well as complete data encoding. */
 template<HuffmanPolicy Policy, HuffmanPolicy CodeLenPolicy>
     requires (Policy::code_len_limit == 15 && CodeLenPolicy::code_len_limit == 7)
 template<typename Char, std::size_t char_size, std::output_iterator<Char> OutIt, typename OutItEnd>
@@ -86,7 +86,7 @@ public:
         return DHuffman::make_encoder(bit_encoder).encode_code_lens(cl_it,  cl_it_end);
     }
 
-    /* Encode data. Generates and encodes the code lengths and the main data. */
+    /** Encode data. Generates and encodes the code lengths and the main data. */
     template<bool use_term, std::forward_iterator InIt>
     std::tuple<InIt, Stat> encode_data(InIt in_it, InIt in_it_end)
         requires std::convertible_to<std::iter_value_t<InIt>, char>
@@ -116,7 +116,7 @@ private:
     BitEncoder& bit_encoder;
 };
 
-/* Huffman15::Decoder class. Provides methods for decoding code lengths as well as complete data decoding. */
+/** Huffman15::Decoder class. Provides methods for decoding code lengths as well as complete data decoding. */
 template<HuffmanPolicy Policy, HuffmanPolicy CodeLenPolicy>
     requires (Policy::code_len_limit == 15 and CodeLenPolicy::code_len_limit == 7)
 template<typename Char, std::size_t char_size, std::input_iterator InIt, typename InItEnd>
@@ -135,7 +135,7 @@ public:
         return DHuffman::make_decoder(bit_decoder).decode_code_lens(cl_it, cl_it_end);
     }
 
-    /* Decode data. Decodes the code lengths and the main data. */
+    /** Decode data. Decodes the code lengths and the main data. */
     template<bool expect_term, std::output_iterator<char> OutIt>
     std::tuple<OutIt, Stat> decode_data(OutIt out_it, OutIt out_it_end)
     {
@@ -166,7 +166,7 @@ private:
     BitDecoder& bit_decoder;
 };
 
-/* Encode data using Huffman15 with the given bit encoder.
+/** Encode data using Huffman15 with the given bit encoder.
  * Return the input iterator and status at the point when encoding stopped. */
 template<bool use_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
@@ -183,7 +183,7 @@ inline std::tuple<InIt, StatStr> huffman15_encode(
         template encode_data<use_term>(in_it, in_it_end);
 }
 
-/* Decode data using Huffman15 with the given bit encoder.
+/** Decode data using Huffman15 with the given bit encoder.
  * Return the output iterator and status at the point when decoding stopped. */
 template<bool expect_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
@@ -200,7 +200,7 @@ inline std::tuple<OutIt, StatStr> huffman15_decode(
         template decode_data<expect_term>(out_it, out_it_end);
 }
 
-/* Encode data using Huffman15. Return (InIt, OutIt, Stat) triple at the point when encoding stopped. */
+/** Encode data using Huffman15. Return (InIt, OutIt, Stat) triple at the point when encoding stopped. */
 template<bool use_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
         std::input_iterator InIt = typename std::vector<char>::iterator,
@@ -225,7 +225,7 @@ std::tuple<InIt, OutIt, StatStr> huffman15_encode(
     return std::make_tuple(in_it, out_it, success);
 }
 
-/* Decode data using Huffman15. Return (OutIt, InIt, Stat) triple at the point when decoding stopped. */
+/** Decode data using Huffman15. Return (OutIt, InIt, Stat) triple at the point when decoding stopped. */
 template<bool expect_term = true, typename Char = char, std::size_t char_size = sizeof(Char) * CHAR_BIT,
         HuffmanPolicy Policy = BasicHuffmanPolicy<15>, HuffmanPolicy CodeLenPolicy = BasicHuffmanPolicy<7>,
         std::output_iterator<char> OutIt = typename std::vector<char>::iterator,

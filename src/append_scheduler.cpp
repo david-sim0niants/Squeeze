@@ -15,7 +15,7 @@ namespace squeeze {
 using Stat = AppendScheduler::Stat;
 using FutureBuffer = AppendScheduler::FutureBuffer;
 
-/* Abstract block appender. */
+/** Abstract block appender. */
 class BlockAppender {
 public:
     virtual Stat run(std::ostream& target) = 0;
@@ -25,7 +25,7 @@ public:
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::BufferAppender::"
 
-/* Buffer appender task. */
+/** Buffer appender task. */
 class BufferAppender final : public BlockAppender {
 public:
     explicit BufferAppender(Buffer&& buffer) : buffer(std::move(buffer))
@@ -50,7 +50,7 @@ private:
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::FutureBufferAppender::"
 
-/* Future buffer appender task. */
+/** Future buffer appender task. */
 class FutureBufferAppender final : public BlockAppender {
 public:
     explicit FutureBufferAppender(FutureBuffer&& future_buffer)
@@ -84,7 +84,7 @@ private:
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::ErrorRaiser::"
 
-/* Error raiser task. */
+/** Error raiser task. */
 class ErrorRaiser final : public BlockAppender {
 public:
     ErrorRaiser(Stat&& error) : error(std::move(error))
@@ -104,7 +104,7 @@ private:
 #undef SQUEEZE_LOG_FUNC_PREFIX
 #define SQUEEZE_LOG_FUNC_PREFIX "squeeze::StringAppender::"
 
-/* String appender task. */
+/** String appender task. */
 class StringAppender final : public BlockAppender {
 public:
     StringAppender(std::string&& str) : str(std::move(str))

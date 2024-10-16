@@ -94,5 +94,5 @@ inline void init_logging()
 
 }
 
-#endif /* SQUEEZE_USE_LOGGING */
+#endif /** SQUEEZE_USE_LOGGING */
 

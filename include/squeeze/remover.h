@@ -13,7 +13,7 @@
 
 namespace squeeze {
 
-/* Interface responsible for performing entry remove operations.
+/** Interface responsible for performing entry remove operations.
  * For optimal use of these operations will_remove method is provided
  * for registering these operations and performing them all at once
  * by calling the provided perform_removes() method. Immediate task-running remove()
@@ -32,14 +32,14 @@ public:
     explicit Remover(std::iostream& target);
     ~Remover();
 
-    /* Register a future remove operation by providing an iterator pointing to the entry to be removed.
+    /** Register a future remove operation by providing an iterator pointing to the entry to be removed.
      * Pass an optional pointer to a future status to assign when the task is done. */
     void will_remove(const EntryIterator& it, Stat *err = nullptr);
 
-    /* Remove an entry immediately by passing an iterator pointing to it. */
+    /** Remove an entry immediately by passing an iterator pointing to it. */
     Stat remove(const EntryIterator& it);
 
-    /* Perform the registered removes.
+    /** Perform the registered removes.
      * The method guarantees that the put pointer of the target stream
      * will be at the new end of the stream */
     bool perform_removes();

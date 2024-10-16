@@ -9,12 +9,12 @@ namespace squeeze::misc {
 
 class ThreadPool::WorkerThread {
 public:
-    /* Type of the state of the worker thread. */
+    /** Type of the state of the worker thread. */
     enum class State : uint8_t {
-        Idle, /* Free to use state. */
-        Starting, /* A short-lived state of being acquired but not ready to run */
-        Running, /* Running state */
-        Stopping, /* A short-lived state of stopping the thread. */
+        Idle, /** Free to use state. */
+        Starting, /** A short-lived state of being acquired but not ready to run */
+        Running, /** Running state */
+        Stopping, /** A short-lived state of stopping the thread. */
     };
 
     WorkerThread() : state(State::Idle), internal(std::mem_fn(&WorkerThread::run), this)
@@ -35,7 +35,7 @@ public:
     WorkerThread& operator=(const WorkerThread&) = delete;
     WorkerThread& operator=(WorkerThread&&) = delete;
 
-    /* Try assigning a task to the scheduler. Will fail if already busy but might as well fail spuriously. */
+    /** Try assigning a task to the scheduler. Will fail if already busy but might as well fail spuriously. */
     bool try_assign_task(Task& task)
     {
         if (!task)
@@ -51,7 +51,7 @@ public:
         return true;
     }
 
-    /* Wait for task to complete. */
+    /** Wait for task to complete. */
     void wait_for_task() const noexcept
     {
         state.wait(State::Running, std::memory_order::acquire);
@@ -103,7 +103,7 @@ bool ThreadPool::try_assign_task(Task& task)
     }
 }
 
-/* "Runs over" the worker threads to find a free thread to acquire. */
+/** "Runs over" the worker threads to find a free thread to acquire. */
 void ThreadPool::assign_task_unsafe(Task& task)
 {
     while (true)

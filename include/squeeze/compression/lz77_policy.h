@@ -8,7 +8,7 @@
 
 namespace squeeze::compression {
 
-/* Concept defining what is expected from an LZ77 policy type. */
+/** Concept defining what is expected from an LZ77 policy type. */
 template<typename T>
 concept LZ77Policy = requires
     {
