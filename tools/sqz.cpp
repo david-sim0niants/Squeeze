@@ -522,9 +522,9 @@ Options:
     -L, --list          List all entries in the sqz file
     -r, --recurse       Enable recursive mode: directories will be processed recursively
         --no-recurse    Disable non-recursive mode: directories won't be processed recursively
-    -C, --compression   Specify compression info in a form of 'method' or 'level' or 'method/level',
+    -C, --compression   Specify compression info in the form of 'method' or 'level' or 'method/level',
                         where method is one of the following: {none, huffman, deflate}; and level is an integer with
-                        the following bounds for each method: {[0-0], [0-8], [0-8]}
+                        the following bounds for each method: {[0-0], [1-8], [0-8]}
     -l, --log-level     Set the log level which can be one of the following:
                         [trace, debug, info, warn, error, critical, off] or:
                         [0,     1,     2,    3,    4,     5,        6  ] or:
