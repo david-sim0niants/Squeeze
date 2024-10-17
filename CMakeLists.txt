@@ -32,3 +32,17 @@ if (BUILD_TOOLS)
 endif ()
 
 option(USE_LOGGING "Use logging?" OFF)
+
+find_package(Doxygen)
+if (DOXYGEN_FOUND)
+    set(DOXYGEN_CONFIG_FILE ${PROJECT_SOURCE_DIR}/Doxyfile)
+
+    add_custom_target(doc
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_CONFIG_FILE}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM
+    )
+else ()
+    message(STATUS "Doxygen not found. Documentation target 'doc' will not be available.")
+endif ()

@@ -17,11 +17,11 @@
 namespace squeeze {
 
 /** Interface responsible for performing appending operations.
- * For optimal use of these operations family of will_append() methods are
+ * For optimal use of these operations, a family of will_append() methods is
  * provided for registering these operations and performing them all at once
  * by calling the provided perform_appends() method.
  * Immediate task-running append methods also exist for convenience.
- * All will_append() and append() operations require an entry input in some way to be passed.
+ * All will_append() and append() operations require an entry input to be passed.
  * Entry input is a generalized interface for providing an entry header and
  * corresponding entry content to be processed. */
 class Appender {
@@ -96,7 +96,7 @@ protected:
 
     /** Schedules all registered appends. */
     bool schedule_appends();
-    /** Schedules single registered append. */
+    /** Schedules a single registered append. */
     bool schedule_append(FutureAppend& future_append);
     /** Schedules a registered stream append. */
     bool schedule_append_stream(const CompressionParams& compression, std::istream& stream);

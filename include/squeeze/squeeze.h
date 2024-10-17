@@ -11,8 +11,8 @@
 namespace squeeze {
 
 /** The main Squeeze interface, combining interfaces of both Reader and Writer.
- * Also provides an additional update() method as an alternative for
- * of the write() method inherited from Writer that handles cases with entries
+ * Also provides an additional update() method as an alternative for the write()
+ * method inherited from Writer that handles cases with entries
  * already existing in the squeeze that can be updated. */
 class Squeeze : public Reader, public Writer {
 public:
