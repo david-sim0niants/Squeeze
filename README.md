@@ -55,7 +55,7 @@ This is a file compression library and utility, supporting multiple compression 
 
 ### File Format
 
-The library defines a compact `*.sqz` file format. The format consists of compressed file entries. Each entry begins with a header that includes the path, attributes (permissions and type), compression method and level, content size, and major/minor version of Squeeze used to create the entry. The header is followed by the entry content, which has the size specified in the header. Since the format is just a list of entries, it is also possible to concatenate two sqz files, resulting in a valid sqz file that contains entries from both files. 
+The library defines a compact `*.sqz` file format. The format consists of compressed file entries. Each entry begins with a header that includes the path, attributes (permissions and type), compression method and level, content size, and version of Squeeze used to create the entry. The header is followed by the entry content, which has the size specified in the header. Since the format is just a list of entries, it is also possible to concatenate two sqz files, resulting in a valid sqz file that contains entries from both files.
 
 ### CLI Tool
 
@@ -90,7 +90,7 @@ The compression library is centered around the `Squeeze` class, which combines t
 
 * `Reader` inherits from `Extracter` and `Lister`.
     * `Extracter` handles extracting entries,
-    * `Lister` supports listing entries and includes `begin()` and `end()` methods, allowing iteration over the compressed data using an `EntryIterator`. This makes the compressed data format behave like an STL container, enabling users to traverse entries as if they were interacting with a standard container. 
+    * `Lister` supports listing entries and includes `begin()` and `end()` methods, allowing iteration over the compressed data using an `EntryIterator`. This makes the compressed data format behave like an STL container, enabling users to traverse entries as if they were interacting with a standard container.
 * Writer inherits from `Appender` and `Remover`.
     * `Appender` handles adding new entries,
     * `Remover` manages the removal of entries.

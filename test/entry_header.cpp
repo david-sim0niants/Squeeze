@@ -22,7 +22,7 @@ TEST(EntryHeader, EncodeDecode)
             static_cast<std::underlying_type_t<EntryPermissions>>(EntryPermissions::All);
 
     EntryHeader original_entry_header = {
-        .major_minor_version = {version.major, version.minor},
+        .version = version,
         .content_size = static_cast<uint64_t>(prng(0, std::numeric_limits<int>::max())),
         .compression = {
             .method = compression::CompressionMethod::None,
@@ -46,11 +46,8 @@ TEST(EntryHeader, EncodeDecode)
     EXPECT_EQ(original_entry_header.content_size,
               restored_entry_header.content_size);
 
-    EXPECT_EQ(original_entry_header.major_minor_version.major,
-              restored_entry_header.major_minor_version.major);
-
-    EXPECT_EQ(original_entry_header.major_minor_version.minor,
-              restored_entry_header.major_minor_version.minor);
+    EXPECT_EQ(original_entry_header.version.data,
+              restored_entry_header.version.data);
 
     EXPECT_EQ(original_entry_header.compression.method,
               restored_entry_header.compression.method);

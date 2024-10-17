@@ -169,21 +169,20 @@ StatStr decode_path(std::istream& input, std::string& path)
 
 StatStr EntryHeader::encode_content_size(std::ostream &output, uint64_t content_size)
 {
-    output.seekp(output.tellp() + static_cast<std::streamoff>(sizeof(EntryHeader::major_minor_version)));
+    output.seekp(output.tellp() + static_cast<std::streamoff>(sizeof(EntryHeader::version)));
     return encode_integral(output, content_size);
 }
 
 StatStr EntryHeader::decode_content_size(std::istream &input, uint64_t& content_size)
 {
-    input.seekg(input.tellg() + static_cast<std::streamoff>(sizeof(EntryHeader::major_minor_version)));
+    input.seekg(input.tellg() + static_cast<std::streamoff>(sizeof(EntryHeader::version)));
     return decode_integral(input, content_size);
 }
 
 StatStr EntryHeader::encode(std::ostream& output, const EntryHeader& entry_header)
 {
     StatStr s;
-    (s = encode_integral(output, entry_header.major_minor_version.major)) &&
-    (s = encode_integral(output, entry_header.major_minor_version.minor)) &&
+    (s = encode_integral(output, entry_header.version.data)) &&
     (s = encode_integral(output, entry_header.content_size)) &&
     (s = encode_compression_params(output, entry_header.compression)) &&
     (s = encode_entry_attributes(output, entry_header.attributes)) &&
@@ -194,8 +193,7 @@ StatStr EntryHeader::encode(std::ostream& output, const EntryHeader& entry_heade
 StatStr EntryHeader::decode(std::istream& input, EntryHeader& entry_header)
 {
     StatStr s;
-    (s = decode_integral(input, entry_header.major_minor_version.major)) &&
-    (s = decode_integral(input, entry_header.major_minor_version.minor)) &&
+    (s = decode_integral(input, entry_header.version.data)) &&
     (s = decode_integral(input, entry_header.content_size)) &&
     (s = decode_compression_params(input, entry_header.compression)) &&
     (s = decode_entry_attributes(input, entry_header.attributes)) &&
@@ -207,7 +205,7 @@ template<> void print_to(std::ostream& os, const EntryHeader& header)
 {
     print_to(os,
         "{ content_size=", header.content_size,
-        ", major_minor_version=", header.major_minor_version.major, '.', header.major_minor_version.minor,
+        ", version=", version.get_major(), '.', version.get_minor(), '.', version.get_patch(),
         ", compression=", header.compression,
         ", attributes=", header.attributes,
         ", path=", header.path, " }");

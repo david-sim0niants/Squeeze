@@ -24,9 +24,29 @@
 namespace squeeze {
 
 struct SemVer {
-    uint8_t major;
-    uint8_t minor;
-    uint16_t patch;
+    constexpr SemVer() noexcept = default;
+
+    constexpr SemVer(uint16_t major, uint16_t minor, uint16_t patch) noexcept
+        : data(((major & 0xFFF) << 20) | ((minor & 0x3FF) << 10) | (patch & 0x3FF))
+    {
+    }
+
+    inline constexpr uint16_t get_major() const noexcept
+    {
+        return (data >> 20) & 0xFFF;
+    }
+
+    inline constexpr uint16_t get_minor() const noexcept
+    {
+        return (data >> 10) & 0x3FF;
+    }
+
+    inline constexpr uint16_t get_patch() const noexcept
+    {
+        return data & 0x3FF;
+    }
+
+    uint32_t data = 0;
 };
 
 constexpr SemVer version = { SQUEEZE_VERSION_MAJOR, SQUEEZE_VERSION_MINOR, SQUEEZE_VERSION_PATCH };

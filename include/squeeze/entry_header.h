@@ -9,6 +9,7 @@
 #include <ostream>
 
 #include "entry_common.h"
+#include "version.h"
 
 #include "compression/params.h"
 #include "status.h"
@@ -19,9 +20,7 @@ using compression::CompressionParams;
 
 /** Struct that contains the entry header data. */
 struct EntryHeader {
-    struct {
-        uint8_t major = 0, minor = 0;
-    } major_minor_version = {}; /** Major and minor versions */
+    SemVer version; /** Version of squeeze that created the entry */
     uint64_t content_size = 0; /** Entry content size */
     CompressionParams compression; /** Compression used */
     EntryAttributes attributes; /** Entry attributes including its file type and permissions */
@@ -56,7 +55,7 @@ struct EntryHeader {
 
     /** Size of the static part of the encoded header */
     static constexpr std::size_t encoded_static_size =
-        sizeof(major_minor_version) + sizeof(content_size) + sizeof(compression) +
+        sizeof(version) + sizeof(content_size) + sizeof(compression) +
         sizeof(attributes) + sizeof(EncodedPathSizeType);
 };
 

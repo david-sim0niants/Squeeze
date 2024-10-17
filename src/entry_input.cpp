@@ -17,7 +17,7 @@ using Stat = EntryInput::Stat;
 
 void EntryInput::init_entry_header(EntryHeader& entry_header)
 {
-    entry_header.major_minor_version = {version.major, version.minor};
+    entry_header.version = version;
     entry_header.path = path;
 }
 
