@@ -4,10 +4,14 @@ on:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/release.yml'
+      - README.md
+      - LICENSE
   pull_request:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/release.yml'
+      - README.md
+      - LICENSE
 
 env:
   SOURCE_DIR: ${{ github.workspace }}
@@ -41,7 +45,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libspdlog-dev
+        sudo apt-get install -y ${{ matrix.compiler.cc }} libspdlog-dev
 
     - name: Create build directory
       run: mkdir ${{env.BINARY_DIR}}
