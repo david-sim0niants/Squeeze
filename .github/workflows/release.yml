@@ -1,5 +1,4 @@
-
-name: Build and Release
+name: Release
 on:
   push:
     tags:
@@ -91,13 +90,54 @@ jobs:
       run: |
         cmake --install . --config Release --prefix install_dir
 
-        $env:ARTIFACT_NAME=squeeze.win-amd64.zip
-        $env:ARTIFACT_PATH=$env:BINARY_DIR/$env:ARTIFACT_NAME
+        $env:ARTIFACT_NAME = "squeeze.win-amd64.zip"
+        $env:ARTIFACT_PATH = "$($env:BINARY_DIR)/$($env:ARTIFACT_NAME)"
 
-        echo "ARTIFACT_NAME=$env:ARTIFACT_NAME" >> $GITHUB_ENV
-        echo "ARTIFACT_PATH=$env:ARTIFACT_PATH" >> $GITHUB_ENV
+        echo "ARTIFACT_NAME=$($env:ARTIFACT_NAME)" >> $env:GITHUB_ENV
+        echo "ARTIFACT_PATH=$($env:ARTIFACT_PATH)" >> $env:GITHUB_ENV
 
-        Compress-Archive -Path install_dir\* -DestinationPath $env:ARTIFACT_PATH
+        Compress-Archive -Path "install_dir\*" -DestinationPath $env:ARTIFACT_PATH
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          ${{ env.ARTIFACT_PATH }}
+
+  gen-docs:
+    name: Generate documentation
+    needs: [make-release]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang doxygen
+
+    - name: Create build directory
+      run: mkdir ${{env.BINARY_DIR}}
+
+    - name: Build
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        cmake ../ -DCMAKE_INSTALL_PREFIX=/ -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=OFF -DBUILD_TOOLS=OFF -DUSE_LOGGING=OFF -DSANITIZE=none
+        make doc
+
+    - name: Archive docs
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        ARTIFACT_NAME=squeeze.docs.zip
+        ARTIFACT_PATH=$BINARY_DIR/$ARTIFACT_NAME
+
+        echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+        echo "ARTIFACT_PATH=$ARTIFACT_PATH" >> $GITHUB_ENV
+
+        cp ../LICENSE LICENSE
+        zip $ARTIFACT_NAME LICENSE docs -r
 
     - name: Release
       uses: softprops/action-gh-release@v2

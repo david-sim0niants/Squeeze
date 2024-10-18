@@ -46,3 +46,5 @@ if (DOXYGEN_FOUND)
 else ()
     message(STATUS "Doxygen not found. Documentation target 'doc' will not be available.")
 endif ()
+
+install(FILES ${PROJECT_SOURCE_DIR}/LICENSE DESTINATION share/doc/${PROJECT_NAME})
