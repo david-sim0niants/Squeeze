@@ -1,0 +1,108 @@
+
+name: Build and Release
+on:
+  push:
+    tags:
+      - "v*"
+env:
+  SOURCE_DIR: ${{ github.workspace }}
+  BINARY_DIR: ${{ github.workspace }}/build
+
+jobs:
+  make-release:
+    name: Make Release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+
+  build-linux-amd64:
+    name: Build linux-amd64 artifact
+    needs: [make-release]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libspdlog-dev
+
+    - name: Create build directory
+      run: mkdir ${{env.BINARY_DIR}}
+
+    - name: Build
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        cmake ../ -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=OFF -DBUILD_TOOLS=ON -DUSE_LOGGING=ON -DSANITIZE=none
+        make -j$(nproc)
+
+    - name: Install and Archive
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        make DESTDIR=install_dir install
+
+        ARTIFACT_NAME=squeeze.linux-amd64.tar.gz
+        ARTIFACT_PATH=$BINARY_DIR/$ARTIFACT_NAME
+
+        echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+        echo "ARTIFACT_PATH=$ARTIFACT_PATH" >> $GITHUB_ENV
+
+        tar -czvf $ARTIFACT_PATH -C install_dir .
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          ${{ env.ARTIFACT_PATH }}
+
+  build-win-amd64:
+    name: Build win-amd64 artifact
+    needs: [make-release]
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.bat
+
+    - name: Install dependencies
+      run: |
+        ./vcpkg/vcpkg.exe install spdlog
+
+    - name: Create build directory
+      run: mkdir ${{env.BINARY_DIR}}
+
+    - name: Build
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        cmake ../ -A x64 -DCMAKE_TOOLCHAIN_FILE=${{ env.SOURCE_DIR }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_INSTALL_PREFIX=/ -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=ON -DBUILD_TOOLS=ON -DUSE_LOGGING=ON
+        cmake --build . --config Release -- /m:$env:NUMBER_OF_PROCESSORS
+
+    - name: Install and Archive
+      working-directory: ${{ env.BINARY_DIR }}
+      run: |
+        cmake --install . --config Release --prefix install_dir
+
+        $env:ARTIFACT_NAME=squeeze.win-amd64.zip
+        $env:ARTIFACT_PATH=$env:BINARY_DIR/$env:ARTIFACT_NAME
+
+        echo "ARTIFACT_NAME=$env:ARTIFACT_NAME" >> $GITHUB_ENV
+        echo "ARTIFACT_PATH=$env:ARTIFACT_PATH" >> $GITHUB_ENV
+
+        Compress-Archive -Path install_dir\* -DestinationPath $env:ARTIFACT_PATH
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          ${{ env.ARTIFACT_PATH }}
+
