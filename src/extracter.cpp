@@ -32,7 +32,7 @@ Stat Extracter::extract(const EntryIterator& it, std::ostream& output)
 
 Stat Extracter::extract(const EntryIterator& it, EntryOutput& entry_output)
 {
-    SQUEEZE_TRACE("Extracting {}", it->second.path);
+    SQUEEZE_INFO("Extracting {}", it->second.path);
 
     auto& [pos, entry_header] = *it;
     source.seekg(pos + entry_header.get_encoded_header_size());

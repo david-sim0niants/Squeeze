@@ -84,7 +84,7 @@ bool Appender::schedule_append(FutureAppend& future_append)
     Stat s = future_append.entry_input.init(entry_header, content);
     DEFER( future_append.entry_input.deinit(); );
     if (s.failed()) {
-        SQUEEZE_ERROR("Failed initializing entry input");
+        SQUEEZE_ERROR("Failed initializing entry input {}", entry_header.path);
         if (future_append.status)
             *future_append.status =
                 {"failed scheduling entry append because failed initializing the entry input", s};

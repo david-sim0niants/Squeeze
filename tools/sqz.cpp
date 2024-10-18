@@ -14,6 +14,8 @@
 #include "squeeze/wrap/file_squeeze.h"
 #include "squeeze/exception.h"
 #include "squeeze/compression/config.h"
+#include "squeeze/utils/defer.h"
+#include "squeeze/utils/defer_macros.h"
 
 #include "utils/argparser.h"
 
@@ -196,7 +198,9 @@ private:
             LogLevel log_level;
             if (not parse_log_level(*arg, log_level))
                 return EXIT_FAILURE;
+
             set_log_level(log_level);
+
             break;
         }
         case Option::Help:
@@ -352,6 +356,11 @@ private:
     void run_list()
     {
         assert(sqz.has_value());
+
+        LogLevel log_level = get_log_level();
+        set_log_level(LogLevel::Off);
+        DEFER( set_log_level(log_level) );
+
         for (auto it = sqz->begin(); it != sqz->end(); ++it) {
             const auto& entry_header = it->second;
             std::stringstream extra;

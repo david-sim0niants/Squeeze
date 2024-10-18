@@ -186,7 +186,7 @@ bool EntryAppendScheduler::set_status(Stat&& s)
 
 Stat EntryAppendScheduler::run_internal(std::ostream& target)
 {
-    SQUEEZE_TRACE("Appending {}", entry_header.path);
+    SQUEEZE_INFO("Appending {}", entry_header.path);
 
     const std::streampos initial_pos = target.tellp();
     SQUEEZE_DEBUG("initial_pos = {}", static_cast<long long>(initial_pos));

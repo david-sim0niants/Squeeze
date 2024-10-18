@@ -49,6 +49,11 @@ enum class LogLevel {
     Off      = spdlog::level::off,
 };
 
+inline LogLevel get_log_level()
+{
+    return static_cast<LogLevel>(spdlog::get_level());
+}
+
 inline void set_log_level(LogLevel level)
 {
     spdlog::set_level(static_cast<spdlog::level::level_enum>(
@@ -59,11 +64,11 @@ inline void init_logging()
 {
 #ifdef NDEBUG
     set_log_level(LogLevel::Info);
+    spdlog::set_pattern("[%^%l%$] %v");
 #else
     set_log_level(LogLevel::Trace);
-#endif
-
     spdlog::set_pattern("[%^%l%$] [%s:%#] %v");
+#endif
 }
 
 }
@@ -83,6 +88,11 @@ enum class LogLevel {
     Critical,
     Off,
 };
+
+inline LogLevel get_log_level()
+{
+    return LogLevel::Off;
+}
 
 inline void set_log_level(LogLevel level)
 {

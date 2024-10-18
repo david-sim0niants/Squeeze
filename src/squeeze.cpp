@@ -29,7 +29,7 @@ bool Squeeze::update()
         if (node.empty())
             continue;
         will_remove(it, node.mapped()->status);
-        SQUEEZE_TRACE("Will update {}", it->second.path);
+        SQUEEZE_INFO("Will update {}", it->second.path);
     }
 
     return this->write();

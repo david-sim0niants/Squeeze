@@ -82,7 +82,7 @@ Options:
     -h, --help          Display usage information
 ```
 
-Most options in the tool operate in an interpreted manner, so that specifying `-A` means files listed after the option until another option like `-X` should be appended. It's possible to list mixed read/write options, and sqz will perform them sequentially. Options don't affect files listed before them; for example, `-r` sets recursive mode, which means directories listed afterwards will be appended, removed, or extracted recursively but doesn't affect files listed before.
+Most options in the tool are order-sensitive, meaning files listed before an option will not be affected by it. For example, when the `-X` (`--extract`) option is set, it will extract files listed afterwards until another option, such as `-A` (`--append`), is set. Similarly, the `-r` (`--recurse`) option enables recursive mode, so directories listed afterwards, until `--no-recurse` or the end, will be appended, removed, or extracted recursively. Mixed append, remove, extract options, multiple compression settings, and log levels can be listed, and they will execute in the exact order provided.
 
 ### Library
 

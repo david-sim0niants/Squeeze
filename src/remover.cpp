@@ -72,7 +72,7 @@ bool Remover::perform_removes()
         uint64_t len = future_removes.top().len;
         Stat *stat = future_removes.top().status;
 
-        SQUEEZE_TRACE("Removing {}", path);
+        SQUEEZE_INFO("Removing {}", path);
 
         uint64_t next_pos = pos;
         while (true) {
@@ -111,6 +111,10 @@ bool Remover::perform_removes()
 
             if (stat)
                 *stat = {"failed removing '" + path + '\'', s};
+
+            while (future_removes.size() > 1)
+                future_removes.pop();
+
             return false;
         }
 
