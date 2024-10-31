@@ -42,7 +42,7 @@ public:
     };
 
     enum class Option {
-        Append, Remove, Extract, List, Recurse, NoRecurse, Compression, LogLevel, Help
+        Append, Remove, Extract, List, Recurse, NoRecurse, Compression, LogLevel, Directory, Help
     };
 
 public:
@@ -72,8 +72,8 @@ public:
         .level = 8,
     };
 
-    static constexpr char short_options[] = "ARXLhrCl";
-    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse", "compression", "log-level"};
+    static constexpr char short_options[] = "ARXLhrClD";
+    static constexpr std::string_view long_options[] = {"append", "remove", "extract", "list", "help", "recurse", "no-recurse", "compression", "log-level", "dir"};
 
 private:
     int handle_arguments()
@@ -198,9 +198,25 @@ private:
             LogLevel log_level;
             if (not parse_log_level(*arg, log_level))
                 return EXIT_FAILURE;
-
             set_log_level(log_level);
+            break;
+        }
+        case Option::Directory:
+        {
+            namespace fs = std::filesystem;
+            auto arg = arg_parser->raw_next();
+            if (!arg) {
+                std::cerr << "Error: no directory specified.\n";
+                return EXIT_FAILURE;
+            }
+            fs::path path(*arg);
 
+            std::error_code ec;
+            std::filesystem::current_path(path, ec);
+            if (ec) {
+                std::cerr << "Error: failed changing the current directory: " << ec.message() << std::endl;
+                return EXIT_FAILURE;
+            }
             break;
         }
         case Option::Help:
@@ -282,7 +298,7 @@ private:
     int init_sqz(std::string_view filename)
     {
         deinit_sqz();
-        sqz_fn = std::filesystem::path(filename);
+        sqz_fn = std::filesystem::absolute(filename);
 
         std::ios_base::openmode file_mode = std::ios_base::in | std::ios_base::out | std::ios_base::binary;
         if (!std::filesystem::exists(sqz_fn)) {
@@ -389,6 +405,8 @@ private:
             return Option::Compression;
         case 'l':
             return Option::LogLevel;
+        case 'D':
+            return Option::Directory;
         case 'h':
             return Option::Help;
         default:
@@ -414,6 +432,8 @@ private:
             return Option::Compression;
         if (option == "log-level")
             return Option::LogLevel;
+        if (option == "directory")
+            return Option::Directory;
         if (option == "help")
             return Option::Help;
         throw BaseException("unexpected long option");
@@ -543,6 +563,7 @@ Options:
                         [0,     1,     2,    3,    4,     5,        6  ] or:
                         [t,     d,     i,    w,    e,     c,        o  ]
                         Log levels are case-insensitive
+    -D, --dir           Change current directory: assume relative paths to be relative to that directory
     -h, --help          Display usage information
 )"""";
     }
