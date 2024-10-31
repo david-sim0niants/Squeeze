@@ -79,6 +79,7 @@ Options:
                         [0,     1,     2,    3,    4,     5,        6  ] or:
                         [t,     d,     i,    w,    e,     c,        o  ]
                         Log levels are case-insensitive
+    -D, --dir           Change current directory: assume relative paths to be relative to that directory
     -h, --help          Display usage information
 ```
 
